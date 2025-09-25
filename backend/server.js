@@ -1,0 +1,46 @@
+//server.js
+
+import express from "express";
+import cors from "cors";
+import {supabase} from "./db.js";
+import bodyParser from "body-parser";
+import dotenv from "dotenv";
+
+import registerMiddlewares from "./middlewares/index.js";
+import setupSwagger from "./services/swagger.js";
+import authRoute from "./routes/auth.js";
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+setupSwagger(app);
+
+// Middleware
+registerMiddlewares(app);
+
+// Routes
+app.use("/api/auth", authRoute);
+
+app.get('/', (req, res) => res.send('Smart Schedule API running'));
+
+// Start server
+(async () => {
+  try {
+
+    app.listen(PORT, () => {
+      console.log(` Server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error(' Failed to start server:', err);
+    process.exit(1);
+  }
+})();
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log(' Shutting down server...');
+  process.exit(0);
+});
+
