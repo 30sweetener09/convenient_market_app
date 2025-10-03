@@ -1,5 +1,6 @@
 //server.js
 
+// link vercel: https://convenient-market-app.vercel.app/
 import express from "express";
 import cors from "cors";
 import {supabase} from "./db.js";
@@ -8,8 +9,7 @@ import dotenv from "dotenv";
 
 import registerMiddlewares from "./middlewares/index.js";
 import setupSwagger from "./services/swagger.js";
-import authRoute from "./routes/auth.js";
-
+import userRoute from "./routes/users.js";
 dotenv.config();
 
 const app = express();
@@ -21,7 +21,7 @@ setupSwagger(app);
 registerMiddlewares(app);
 
 // Routes
-app.use("/api/auth", authRoute);
+app.use("/api/user", userRoute);
 
 app.get('/', (req, res) => res.send('Smart Schedule API running'));
 

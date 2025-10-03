@@ -1,12 +1,11 @@
-// controllers/authController.js
+// controllers/userController.js
 import { supabase } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
 
 
-
 /**
  * @swagger
- * /auth/login:
+ * /user/login:
  *   post:
  *     summary: Đăng nhập
  *     tags: [Auth]
@@ -44,7 +43,7 @@ export const login = async (req, res) => {
 
 /**
  * @swagger
- * /auth/register:
+ * /user/:
  *   post:
  *     summary: Đăng ký tài khoản mới
  *     tags: [Auth]
@@ -97,7 +96,7 @@ export const register = async (req, res) => {
 
 /**
  * @swagger
- * /auth/logout:
+ * /user/logout:
  *   post:
  *     summary: Đăng xuất
  *     tags: [Auth]
@@ -114,6 +113,8 @@ export const logout = async (req, res) => {
     const { error } = await supabase.auth.signOut();
     if (error) return res.status(400).json({ error: error.message });
     res.json({ message: "Logged out" });
+
+    console.log("User logged out");
   } catch (err) {
     res.status(500).json({ error: "Internal server error" });
   }
@@ -121,7 +122,7 @@ export const logout = async (req, res) => {
 
 /**
  * @swagger
- * /auth/refresh-token:
+ * /user/refresh-token:
  *   post:
  *     summary: Làm mới access token
  *     tags: [Auth]
@@ -156,7 +157,7 @@ export const refreshToken = async (req, res) => {
 
 /**
  * @swagger
- * /auth/send-verification-code:
+ * /user/send-verification-code:
  *   post:
  *     summary: Gửi mã xác minh đến email
  *     tags: [Auth]
@@ -190,7 +191,7 @@ export const sendVerificationCode = async (req, res) => {
 
 /**
  * @swagger
- * /auth/verify-email:
+ * /user/verify-email:
  *   post:
  *     summary: Xác minh email
  *     tags: [Auth]
@@ -223,7 +224,7 @@ export const verifyEmail = async (req, res) => {
 
 /**
  * @swagger
- * /auth/change-password:
+ * /user/change-password:
  *   post:
  *     summary: Đổi mật khẩu
  *     security:
@@ -251,6 +252,50 @@ export const changePassword = async (req, res) => {
     const { data, error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return res.status(400).json({ error: error.message });
     res.json({ message: "Password changed", user: data.user });
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * @swagger
+ * /user/:
+ *   get:
+ *     summary: Lấy thông tin user
+ *     security:
+ *       - bearerAuth: []
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Lấy user thành công
+ */
+export const getUser = async (req, res) => {
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ user: data.user });
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * @swagger
+ * /user/:
+ *   delete:
+ *     summary: Xóa tài khoản
+ *     security:
+ *       - bearerAuth: []
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Xóa thành công
+ */
+export const deleteUser = async (req, res) => {
+  try {
+    const { data, error } = await supabase.auth.admin.deleteUser(req.user.id);
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ message: "User deleted", data });
   } catch (err) {
     res.status(500).json({ error: "Internal server error" });
   }
