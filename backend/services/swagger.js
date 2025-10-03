@@ -12,10 +12,10 @@ const swaggerOptions = {
       description: "API backend cho ứng dụng đa nền tảng"
     },
     servers: [
-      { url: "http://localhost:3000" }
+      { url: "http://localhost:3000/api" }
     ]
   },
-  apis: ["./server.js", "./routes/*.js"], // nơi chứa swagger comment
+  apis: ["./server.js", "./routes/*.js", "./controllers/*.js"], // nơi chứa swagger comment
 };
 
 const swaggerSpec = swaggerJsDoc(swaggerOptions);
