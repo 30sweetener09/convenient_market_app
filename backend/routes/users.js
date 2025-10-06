@@ -1,6 +1,6 @@
 import express from "express";
 import { register, login, logout, refreshToken, sendVerificationCode,verifyEmail, changePassword, getUser, deleteUser } from "../controllers/userController.js";
-
+import { requirePermission } from "../middlewares/permission.js";
 const router = express.Router();
 
 
@@ -12,6 +12,6 @@ router.post("/send-verification-code", sendVerificationCode);
 router.post("/verify-email", verifyEmail);
 router.post("/change-password", changePassword);
 router.get("/", getUser);
-router.delete("/", deleteUser);
+router.delete("/", requirePermission("delete_user"), deleteUser);
 
 export default router;
