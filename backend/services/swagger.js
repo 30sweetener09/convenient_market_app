@@ -12,7 +12,7 @@ const swaggerOptions = {
       description: "API backend cho ứng dụng đa nền tảng"
     },
     servers: [
-      { url: "http://localhost:3000/api" }
+      { url: "https://convenient-market-app.vercel.app/api" }
     ]
   },
   apis: ["./server.js", "./routes/*.js", "./controllers/*.js"], // nơi chứa swagger comment
