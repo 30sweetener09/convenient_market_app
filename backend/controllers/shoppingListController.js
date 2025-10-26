@@ -36,7 +36,6 @@ export const createShoppingList = async (req, res) => {
   try {
     const { name, assignToUsername, note, date } = req.body;
 
-    // ✅ Kiểm tra dữ liệu đầu vào
     if (!name || !assignToUsername || !date) {
       return res.status(400).json({
         resultMessage: {
@@ -47,7 +46,6 @@ export const createShoppingList = async (req, res) => {
       });
     }
 
-    // ✅ Ghi vào Supabase (bảng: shopping_list)
     const { data, error } = await supabase
       .from("shopping_list")
       .insert([
@@ -66,7 +64,6 @@ export const createShoppingList = async (req, res) => {
 
     if (error) throw error;
 
-    // ✅ Trả về phản hồi
     res.status(200).json({
       resultMessage: {
         en: "Shopping list created successfully.",
