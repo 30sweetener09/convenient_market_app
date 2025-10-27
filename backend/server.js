@@ -11,6 +11,8 @@ import registerMiddlewares from "./middlewares/index.js";
 import setupSwagger from "./services/swagger.js";
 import userRoute from "./routes/users.js";
 import shoppingListRoutes from "./routes/shoppingList.js";
+import mealPlanRoutes from "./routes/mealPlan.js";
+import recipesRoutes from "./routes/recipes.js";
 dotenv.config();
 
 const app = express();
@@ -24,6 +26,8 @@ registerMiddlewares(app);
 // Routes
 app.use("/api/user", userRoute);
 app.use("/api/shoppingList", shoppingListRoutes);
+app.use("/api/mealPlan", mealPlanRoutes);
+app.use("/api/recipes", recipeRoutes);
 
 app.get("/", (req, res) => res.send("Smart Schedule API running"));
 
