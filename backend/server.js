@@ -13,6 +13,9 @@ import userRoute from "./routes/users.js";
 import shoppingListRoutes from "./routes/shoppingList.js";
 import mealPlanRoutes from "./routes/mealPlan.js";
 import recipesRoutes from "./routes/recipes.js";
+import adminRoutes from "./routes/admin.js";
+import foodRoutes from "./routes/food.js";
+import fridgeRoutes from "./routes/fridge.js";
 dotenv.config();
 
 const app = express();
@@ -28,6 +31,9 @@ app.use("/api/user", userRoute);
 app.use("/api/shoppingList", shoppingListRoutes);
 app.use("/api/mealPlan", mealPlanRoutes);
 app.use("/api/recipes", recipeRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/food", foodRoutes);
+app.use("/api/fridge", fridgeRoutes);
 
 app.get("/", (req, res) => res.send("Smart Schedule API running"));
 
