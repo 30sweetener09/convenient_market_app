@@ -90,45 +90,91 @@ import { supabase } from "../db.js";
  *       500:
  *         description: Internal server error
  */
+
 export const createRecipe = async (req, res) => {
   try {
     const { foodName, name, htmlContent, description } = req.body;
 
+    // 00349 - Vui lòng cung cấp tất cả các trường bắt buộc
     if (!foodName || !name || !htmlContent || !description) {
       return res.status(400).json({
         resultMessage: {
-          en: "Missing required fields",
-          vn: "Thiếu thông tin bắt buộc",
+          en: "Please provide all required fields",
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
         },
-        resultCode: "400",
+        resultCode: "00349",
       });
     }
 
-    // Find food by name
+    // 00350 - Vui lòng cung cấp một tên thực phẩm hợp lệ
+    if (typeof foodName !== "string" || foodName.trim() === "") {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid food name",
+          vn: "Vui lòng cung cấp một tên thực phẩm hợp lệ",
+        },
+        resultCode: "00350",
+      });
+    }
+
+    // 00351 - Vui lòng cung cấp một tên công thức hợp lệ
+    if (typeof name !== "string" || name.trim() === "") {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid recipe name",
+          vn: "Vui lòng cung cấp một tên công thức hợp lệ",
+        },
+        resultCode: "00351",
+      });
+    }
+
+    // 00352 - Vui lòng cung cấp một mô tả công thức hợp lệ
+    if (typeof description !== "string" || description.trim() === "") {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid recipe description",
+          vn: "Vui lòng cung cấp một mô tả công thức hợp lệ",
+        },
+        resultCode: "00352",
+      });
+    }
+
+    // 00353 - Vui lòng cung cấp nội dung HTML công thức hợp lệ
+    if (typeof htmlContent !== "string" || htmlContent.trim() === "") {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide valid recipe HTML content",
+          vn: "Vui lòng cung cấp nội dung HTML công thức hợp lệ",
+        },
+        resultCode: "00353",
+      });
+    }
+
+    // 00354 - Không tìm thấy thực phẩm với tên đã cung cấp
     const { data: food, error: foodError } = await supabase
       .from("foods")
       .select("*")
-      .eq("name", foodName)
+      .ilike("name", foodName.trim())
       .single();
 
     if (foodError || !food) {
       return res.status(404).json({
         resultMessage: {
-          en: "Food not found",
-          vn: "Không tìm thấy thực phẩm",
+          en: "Food not found with the provided name",
+          vn: "Không tìm thấy thực phẩm với tên đã cung cấp",
         },
-        resultCode: "404",
+        resultCode: "00354",
       });
     }
 
     // Insert recipe
-    const { data, error } = await supabase
+    const { data: recipeData, error: insertError } = await supabase
       .from("recipes")
       .insert([
         {
           name: name.trim(),
           description: description.trim(),
-          html_content: htmlContent,
+          html_content: htmlContent.trim(),
           food_id: food.id,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -137,38 +183,46 @@ export const createRecipe = async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (insertError) throw insertError;
 
+    // 00357 - Thêm công thức nấu ăn thành công
     res.status(200).json({
       resultMessage: {
-        en: "Add recipe successfull",
+        en: "Recipe added successfully",
         vn: "Thêm công thức nấu ăn thành công",
       },
       resultCode: "00357",
       newRecipe: {
-        id: data.id,
-        name: data.name,
-        description: data.description,
-        htmlContent: data.html_content,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        FoodId: data.food_id,
-        "Food.id": food.id,
-        "Food.name": food.name,
-        "Food.imageUrl": food.image_url || food.imageUrl,
-        "Food.type": food.type,
-        "Food.createdAt": food.created_at,
-        "Food.updatedAt": food.updated_at,
-        "Food.FoodCategoryId": food.food_category_id || food.FoodCategoryId,
-        "Food.UserId": food.user_id || food.UserId,
-        "Food.UnitOfMeasurementId":
-          food.unit_of_measurement_id || food.UnitOfMeasurementId,
+        id: recipeData.id,
+        name: recipeData.name,
+        description: recipeData.description,
+        htmlContent: recipeData.html_content,
+        createdAt: recipeData.created_at,
+        updatedAt: recipeData.updated_at,
+        FoodId: recipeData.food_id,
+        Food: {
+          id: food.id,
+          name: food.name,
+          imageUrl: food.image_url || food.imageUrl,
+          type: food.type,
+          createdAt: food.created_at,
+          updatedAt: food.updated_at,
+          FoodCategoryId: food.food_category_id || food.FoodCategoryId,
+          UserId: food.user_id || food.UserId,
+          UnitOfMeasurementId:
+            food.unit_of_measurement_id || food.UnitOfMeasurementId,
+        },
       },
     });
   } catch (err) {
     console.error("Error creating recipe:", err.message);
     res.status(500).json({
-      error: "Internal server error",
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
     });
   }
 };
@@ -252,17 +306,107 @@ export const updateRecipe = async (req, res) => {
     const { recipeId, newHtmlContent, newDescription, newFoodName, newName } =
       req.body;
 
-    if (!recipeId) {
+    // 00358 - Vui lòng cung cấp tất cả các trường bắt buộc
+    if (
+      !recipeId &&
+      newHtmlContent === undefined &&
+      newDescription === undefined &&
+      newFoodName === undefined &&
+      newName === undefined
+    ) {
       return res.status(400).json({
         resultMessage: {
-          en: "Missing recipeId",
-          vn: "Thiếu recipeId",
+          en: "Please provide all required fields",
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
         },
-        resultCode: "400",
+        resultCode: "00358",
       });
     }
 
-    // Check if recipe exists
+    // 00359 - Vui lòng cung cấp một ID công thức!
+    if (!recipeId || (typeof recipeId === "string" && recipeId.trim() === "")) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a recipe ID!",
+          vn: "Vui lòng cung cấp một ID công thức!",
+        },
+        resultCode: "00359",
+      });
+    }
+
+    // 00360 - Vui lòng cung cấp ít nhất một trong các trường sau
+    if (
+      newFoodName === undefined &&
+      newDescription === undefined &&
+      newHtmlContent === undefined &&
+      newName === undefined
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide at least one of the following fields: newFoodName, newDescription, newHtmlContent, newName",
+          vn: "Vui lòng cung cấp ít nhất một trong các trường sau, newFoodName, newDescription, newHtmlContent, newName",
+        },
+        resultCode: "00360",
+      });
+    }
+
+    // 00361 - Vui lòng cung cấp một tên thực phẩm mới hợp lệ!
+    if (
+      newFoodName !== undefined &&
+      (typeof newFoodName !== "string" || newFoodName.trim() === "")
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid new food name!",
+          vn: "Vui lòng cung cấp một tên thực phẩm mới hợp lệ!",
+        },
+        resultCode: "00361",
+      });
+    }
+
+    // 00362 - Vui lòng cung cấp một mô tả mới hợp lệ!
+    if (
+      newDescription !== undefined &&
+      (typeof newDescription !== "string" || newDescription.trim() === "")
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid new description!",
+          vn: "Vui lòng cung cấp một mô tả mới hợp lệ!",
+        },
+        resultCode: "00362",
+      });
+    }
+
+    // 00363 - Vui lòng cung cấp nội dung HTML mới hợp lệ!
+    if (
+      newHtmlContent !== undefined &&
+      (typeof newHtmlContent !== "string" || newHtmlContent.trim() === "")
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide valid new HTML content!",
+          vn: "Vui lòng cung cấp nội dung HTML mới hợp lệ!",
+        },
+        resultCode: "00363",
+      });
+    }
+
+    // 00364 - Vui lòng cung cấp một tên công thức mới hợp lệ!
+    if (
+      newName !== undefined &&
+      (typeof newName !== "string" || newName.trim() === "")
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid new recipe name!",
+          vn: "Vui lòng cung cấp một tên công thức mới hợp lệ!",
+        },
+        resultCode: "00364",
+      });
+    }
+
+    // 00365 - Không tìm thấy công thức với ID đã cung cấp
     const { data: existingRecipe, error: fetchError } = await supabase
       .from("recipes")
       .select("*")
@@ -272,52 +416,48 @@ export const updateRecipe = async (req, res) => {
     if (fetchError || !existingRecipe) {
       return res.status(404).json({
         resultMessage: {
-          en: "Recipe not found",
-          vn: "Không tìm thấy công thức",
+          en: "Recipe not found with the provided ID",
+          vn: "Không tìm thấy công thức với ID đã cung cấp",
         },
-        resultCode: "404",
+        resultCode: "00365",
       });
     }
 
     // Build update object
     const updateData = { updated_at: new Date().toISOString() };
 
+    // Xử lý newName
     if (newName !== undefined) {
-      if (!newName || newName.trim() === "") {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Name cannot be empty",
-            vn: "Tên không được để trống",
-          },
-          resultCode: "400",
-        });
-      }
       updateData.name = newName.trim();
     }
 
+    // Xử lý newDescription
     if (newDescription !== undefined) {
       updateData.description = newDescription.trim();
     }
 
+    // Xử lý newHtmlContent
     if (newHtmlContent !== undefined) {
-      updateData.html_content = newHtmlContent;
+      updateData.html_content = newHtmlContent.trim();
     }
 
+    // Xử lý newFoodName
     let foodData = null;
     if (newFoodName !== undefined) {
+      // 00367 - Tên thực phẩm mới không tồn tại
       const { data: food, error: foodError } = await supabase
         .from("foods")
         .select("*")
-        .eq("name", newFoodName)
+        .ilike("name", newFoodName.trim())
         .single();
 
       if (foodError || !food) {
         return res.status(404).json({
           resultMessage: {
-            en: "Food not found",
-            vn: "Không tìm thấy thực phẩm",
+            en: "New food name does not exist",
+            vn: "Tên thực phẩm mới không tồn tại",
           },
-          resultCode: "404",
+          resultCode: "00367",
         });
       }
 
@@ -326,56 +466,66 @@ export const updateRecipe = async (req, res) => {
     }
 
     // Update recipe
-    const { data, error } = await supabase
+    const { data: updatedRecipe, error: updateError } = await supabase
       .from("recipes")
       .update(updateData)
       .eq("id", recipeId)
       .select()
       .single();
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
     // Get food data if not already fetched
     if (!foodData) {
       const { data: food } = await supabase
         .from("foods")
         .select("*")
-        .eq("id", data.food_id)
+        .eq("id", updatedRecipe.food_id)
         .single();
       foodData = food;
     }
 
+    // 00370 - Cập nhật công thức nấu ăn thành công
     res.status(200).json({
       resultMessage: {
-        en: "Recipe updated successfully.",
+        en: "Recipe updated successfully",
         vn: "Cập nhật công thức nấu ăn thành công",
       },
       resultCode: "00370",
       recipe: {
-        id: data.id,
-        name: data.name,
-        description: data.description,
-        htmlContent: data.html_content,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        FoodId: data.food_id,
-        "Food.id": foodData?.id,
-        "Food.name": foodData?.name,
-        "Food.imageUrl": foodData?.image_url || foodData?.imageUrl,
-        "Food.type": foodData?.type,
-        "Food.createdAt": foodData?.created_at,
-        "Food.updatedAt": foodData?.updated_at,
-        "Food.FoodCategoryId":
-          foodData?.food_category_id || foodData?.FoodCategoryId,
-        "Food.UserId": foodData?.user_id || foodData?.UserId,
-        "Food.UnitOfMeasurementId":
-          foodData?.unit_of_measurement_id || foodData?.UnitOfMeasurementId,
+        id: updatedRecipe.id,
+        name: updatedRecipe.name,
+        description: updatedRecipe.description,
+        htmlContent: updatedRecipe.html_content,
+        createdAt: updatedRecipe.created_at,
+        updatedAt: updatedRecipe.updated_at,
+        FoodId: updatedRecipe.food_id,
+        Food: foodData
+          ? {
+              id: foodData.id,
+              name: foodData.name,
+              imageUrl: foodData.image_url || foodData.imageUrl,
+              type: foodData.type,
+              createdAt: foodData.created_at,
+              updatedAt: foodData.updated_at,
+              FoodCategoryId:
+                foodData.food_category_id || foodData.FoodCategoryId,
+              UserId: foodData.user_id || foodData.UserId,
+              UnitOfMeasurementId:
+                foodData.unit_of_measurement_id || foodData.UnitOfMeasurementId,
+            }
+          : null,
       },
     });
   } catch (err) {
     console.error("Error updating recipe:", err.message);
     res.status(500).json({
-      error: "Internal server error",
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
     });
   }
 };
@@ -431,16 +581,39 @@ export const deleteRecipe = async (req, res) => {
   try {
     const { recipeId } = req.body;
 
+    // 00371 - Vui lòng cung cấp tất cả các trường bắt buộc
     if (!recipeId) {
       return res.status(400).json({
         resultMessage: {
-          en: "Missing recipeId",
-          vn: "Thiếu recipeId",
+          en: "Please provide all required fields",
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
         },
-        resultCode: "400",
+        resultCode: "00371",
       });
     }
 
+    // 00372 - Vui lòng cung cấp một ID công thức hợp lệ
+    if (typeof recipeId !== "string" && typeof recipeId !== "number") {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid recipe ID",
+          vn: "Vui lòng cung cấp một ID công thức hợp lệ",
+        },
+        resultCode: "00372",
+      });
+    }
+
+    if (typeof recipeId === "string" && recipeId.trim() === "") {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid recipe ID",
+          vn: "Vui lòng cung cấp một ID công thức hợp lệ",
+        },
+        resultCode: "00372",
+      });
+    }
+
+    // 00373 - Không tìm thấy công thức với ID đã cung cấp
     const { data: existingRecipe, error: fetchError } = await supabase
       .from("recipes")
       .select("id")
@@ -450,23 +623,25 @@ export const deleteRecipe = async (req, res) => {
     if (fetchError || !existingRecipe) {
       return res.status(404).json({
         resultMessage: {
-          en: "Recipe not found",
-          vn: "Không tìm thấy công thức",
+          en: "Recipe not found with the provided ID",
+          vn: "Không tìm thấy công thức với ID đã cung cấp",
         },
-        resultCode: "404",
+        resultCode: "00373",
       });
     }
 
-    const { error } = await supabase
+    // Xóa recipe
+    const { error: deleteError } = await supabase
       .from("recipes")
       .delete()
       .eq("id", recipeId);
 
-    if (error) throw error;
+    if (deleteError) throw deleteError;
 
+    // 00376 - Công thức của bạn đã được xóa thành công
     res.status(200).json({
       resultMessage: {
-        en: "Your recipe was deleted successfully.",
+        en: "Your recipe was deleted successfully",
         vn: "Công thức của bạn đã được xóa thành công",
       },
       resultCode: "00376",
@@ -474,7 +649,12 @@ export const deleteRecipe = async (req, res) => {
   } catch (err) {
     console.error("Error deleting recipe:", err.message);
     res.status(500).json({
-      error: "Internal server error",
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
     });
   }
 };
@@ -558,10 +738,10 @@ export const getRecipesByFoodId = async (req, res) => {
     if (!foodId) {
       return res.status(400).json({
         resultMessage: {
-          en: "Missing foodId parameter",
-          vn: "Thiếu tham số foodId",
+          en: "ecipe not found with the provided ID",
+          vn: "Không tìm thấy công thức với ID đã cung cấp",
         },
-        resultCode: "400",
+        resultCode: "00376",
       });
     }
 

@@ -3,29 +3,36 @@ import { supabase } from "../db.js";
 
 // Helper function to validate and format date
 const validateAndFormatDate = (dateString) => {
-  if (!dateString || typeof dateString !== "string") {
-    return null;
-  }
+  if (!dateString || typeof dateString !== "string") return null;
 
   const parts = dateString.split("/");
-  if (parts.length !== 3) {
-    return null;
-  }
+  if (parts.length !== 3) return null;
 
   const [month, day, year] = parts;
   const monthNum = parseInt(month, 10);
   const dayNum = parseInt(day, 10);
   const yearNum = parseInt(year, 10);
 
-  if (isNaN(monthNum) || isNaN(dayNum) || isNaN(yearNum)) {
-    return null;
-  }
+  if (isNaN(monthNum) || isNaN(dayNum) || isNaN(yearNum)) return null;
+  if (monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) return null;
 
-  if (monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) {
-    return null;
-  }
+  const daysInMonth = [
+    31,
+    yearNum % 4 === 0 && (yearNum % 100 !== 0 || yearNum % 400 === 0) ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+  if (dayNum > daysInMonth[monthNum - 1]) return null;
 
-  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  return `${yearNum}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 };
 
 // Helper function to format date back to M/D/YYYY
@@ -126,55 +133,116 @@ export const createMealPlan = async (req, res) => {
   try {
     const { foodName, timestamp, name } = req.body;
 
+    // 00313 - Vui lòng cung cấp tất cả các trường bắt buộc
     if (!foodName || !timestamp || !name) {
       return res.status(400).json({
         resultMessage: {
-          en: "Missing required fields",
-          vn: "Thiếu thông tin bắt buộc",
+          en: "Please provide all required fields",
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
         },
-        resultCode: "400",
+        resultCode: "00313",
       });
     }
 
-    // Validate timestamp format
+    // 00314 - Vui lòng cung cấp một tên thực phẩm hợp lệ
+    if (typeof foodName !== "string" || foodName.trim() === "") {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid food name",
+          vn: "Vui lòng cung cấp một tên thực phẩm hợp lệ",
+        },
+        resultCode: "00314",
+      });
+    }
+
+    // 00315 - Vui lòng cung cấp một dấu thời gian hợp lệ
     const formattedDate = validateAndFormatDate(timestamp);
     if (!formattedDate) {
       return res.status(400).json({
         resultMessage: {
-          en: "Invalid timestamp format. Expected M/D/YYYY",
-          vn: "Định dạng thời gian không hợp lệ. Yêu cầu M/D/YYYY",
+          en: "Please provide a valid timestamp",
+          vn: "Vui lòng cung cấp một dấu thời gian hợp lệ",
         },
-        resultCode: "400",
+        resultCode: "00315",
       });
     }
 
-    // Find food by name
+    // 00316 - Vui lòng cung cấp một tên hợp lệ cho bữa ăn, sáng, trưa, tối
+    const validMealNames = ["sáng", "trưa", "tối", "sang", "trua", "toi"];
+    if (
+      typeof name !== "string" ||
+      name.trim() === "" ||
+      !validMealNames.includes(name.trim().toLowerCase())
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid meal name: breakfast (sáng), lunch (trưa), dinner (tối)",
+          vn: "Vui lòng cung cấp một tên hợp lệ cho bữa ăn, sáng, trưa, tối",
+        },
+        resultCode: "00316",
+      });
+    }
+
+    // 00319 - Người dùng không phải là quản trị viên nhóm
+    if (!req.user || !req.user.id) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00319",
+      });
+    }
+
+    const { data: adminData, error: adminError } = await supabase
+      .from("users")
+      .select("id, role, group_id")
+      .eq("id", req.user.id)
+      .single();
+
+    if (adminError || !adminData || adminData.role !== "admin") {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00319",
+      });
+    }
+
+    // 00317 - Không tìm thấy thực phẩm với tên đã cung cấp
     const { data: food, error: foodError } = await supabase
       .from("foods")
-      .select("id")
-      .eq("name", foodName)
+      .select("id, name")
+      .ilike("name", foodName.trim())
       .single();
 
     if (foodError || !food) {
       return res.status(404).json({
         resultMessage: {
-          en: "Food not found",
-          vn: "Không tìm thấy thực phẩm",
+          en: "Food not found with the provided name",
+          vn: "Không tìm thấy thực phẩm với tên đã cung cấp",
         },
-        resultCode: "404",
+        resultCode: "00317",
       });
     }
 
+    // Chuẩn hóa tên bữa ăn
+    let normalizedMealName = name.trim().toLowerCase();
+    if (normalizedMealName === "sang") normalizedMealName = "sáng";
+    if (normalizedMealName === "trua") normalizedMealName = "trưa";
+    if (normalizedMealName === "toi") normalizedMealName = "tối";
+
     // Insert meal plan
-    const { data, error } = await supabase
+    const { data: mealPlanData, error: insertError } = await supabase
       .from("meal_plans")
       .insert([
         {
-          name: name.trim(),
+          name: normalizedMealName,
           timestamp: formattedDate,
           status: "NOT_PASS_YET",
           food_id: food.id,
-          user_id: req.user?.id,
+          user_id: req.user.id,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
@@ -182,29 +250,35 @@ export const createMealPlan = async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (insertError) throw insertError;
 
+    // 00322 - Thêm kế hoạch bữa ăn thành công
     res.status(200).json({
       resultMessage: {
-        en: "Add meal plan successfull",
+        en: "Meal plan added successfully",
         vn: "Thêm kế hoạch bữa ăn thành công",
       },
       resultCode: "00322",
       newPlan: {
-        id: data.id,
-        name: data.name,
-        timestamp: formatDateToDisplay(data.timestamp),
-        status: data.status,
-        FoodId: data.food_id,
-        UserId: data.user_id,
-        updatedAt: data.updated_at,
-        createdAt: data.created_at,
+        id: mealPlanData.id,
+        name: mealPlanData.name,
+        timestamp: mealPlanData.timestamp,
+        status: mealPlanData.status,
+        FoodId: mealPlanData.food_id,
+        UserId: mealPlanData.user_id,
+        updatedAt: mealPlanData.updated_at,
+        createdAt: mealPlanData.created_at,
       },
     });
   } catch (err) {
     console.error("Error creating meal plan:", err.message);
     res.status(500).json({
-      error: "Internal server error",
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
     });
   }
 };
@@ -297,143 +371,240 @@ export const updateMealPlan = async (req, res) => {
   try {
     const { planId, newFoodName, newTimestamp, newName, newStatus } = req.body;
 
-    if (!planId) {
+    // 00331 - Vui lòng cung cấp tất cả các trường bắt buộc
+    if (
+      !planId &&
+      newFoodName === undefined &&
+      newTimestamp === undefined &&
+      newName === undefined &&
+      newStatus === undefined
+    ) {
       return res.status(400).json({
         resultMessage: {
-          en: "Missing planId",
-          vn: "Thiếu planId",
+          en: "Please provide all required fields",
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
         },
-        resultCode: "400",
+        resultCode: "00331",
       });
     }
 
-    // Check if meal plan exists and belongs to user
+    // 00332 - Vui lòng cung cấp một ID kế hoạch!
+    if (!planId || (typeof planId === "string" && planId.trim() === "")) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a plan ID!",
+          vn: "Vui lòng cung cấp một ID kế hoạch!",
+        },
+        resultCode: "00332",
+      });
+    }
+
+    // 00333 - Vui lòng cung cấp ít nhất một trong các trường sau
+    if (
+      newFoodName === undefined &&
+      newTimestamp === undefined &&
+      newName === undefined &&
+      newStatus === undefined
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide at least one of the following fields: newFoodName, newTimestamp, newName",
+          vn: "Vui lòng cung cấp ít nhất một trong các trường sau, newFoodName, newTimestamp, newName",
+        },
+        resultCode: "00333",
+      });
+    }
+
+    // 00334 - Vui lòng cung cấp một tên thực phẩm mới hợp lệ!
+    if (
+      newFoodName !== undefined &&
+      (typeof newFoodName !== "string" || newFoodName.trim() === "")
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid new food name!",
+          vn: "Vui lòng cung cấp một tên thực phẩm mới hợp lệ!",
+        },
+        resultCode: "00334",
+      });
+    }
+
+    // 00335 - Vui lòng cung cấp một dấu thời gian hợp lệ!
+    let formattedDate;
+    if (newTimestamp !== undefined) {
+      formattedDate = validateAndFormatDate(newTimestamp);
+      if (!formattedDate) {
+        return res.status(400).json({
+          resultMessage: {
+            en: "Please provide a valid timestamp!",
+            vn: "Vui lòng cung cấp một dấu thời gian hợp lệ!",
+          },
+          resultCode: "00335",
+        });
+      }
+    }
+
+    // 00336 - Vui lòng cung cấp một tên hợp lệ, sáng, trưa, tối!
+    const validMealNames = ["sáng", "trưa", "tối", "sang", "trua", "toi"];
+    if (newName !== undefined) {
+      if (
+        typeof newName !== "string" ||
+        newName.trim() === "" ||
+        !validMealNames.includes(newName.trim().toLowerCase())
+      ) {
+        return res.status(400).json({
+          resultMessage: {
+            en: "Please provide a valid name: breakfast (sáng), lunch (trưa), dinner (tối)!",
+            vn: "Vui lòng cung cấp một tên hợp lệ, sáng, trưa, tối!",
+          },
+          resultCode: "00336",
+        });
+      }
+    }
+
+    // 00339 - Người dùng không phải là quản trị viên nhóm
+    if (!req.user || !req.user.id) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00339",
+      });
+    }
+
+    const { data: adminData, error: adminError } = await supabase
+      .from("users")
+      .select("id, role, group_id")
+      .eq("id", req.user.id)
+      .single();
+
+    if (adminError || !adminData || adminData.role !== "admin") {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00339",
+      });
+    }
+
+    // 00337 - Không tìm thấy kế hoạch với ID đã cung cấp
     const { data: existingPlan, error: fetchError } = await supabase
       .from("meal_plans")
-      .select("user_id")
+      .select("*")
       .eq("id", planId)
       .single();
 
     if (fetchError || !existingPlan) {
       return res.status(404).json({
         resultMessage: {
-          en: "Meal plan not found",
-          vn: "Không tìm thấy kế hoạch bữa ăn",
+          en: "Plan not found with the provided ID",
+          vn: "Không tìm thấy kế hoạch với ID đã cung cấp",
         },
-        resultCode: "404",
+        resultCode: "00337",
       });
     }
 
-    if (existingPlan.user_id !== req.user?.id) {
+    // Kiểm tra meal plan có thuộc về user này không
+    if (existingPlan.user_id !== req.user.id) {
       return res.status(403).json({
         resultMessage: {
-          en: "Permission denied",
-          vn: "Không có quyền",
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
         },
-        resultCode: "403",
+        resultCode: "00339",
       });
     }
 
     // Build update object
     const updateData = { updated_at: new Date().toISOString() };
 
-    if (newName !== undefined) {
-      if (!newName || newName.trim() === "") {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Name cannot be empty",
-            vn: "Tên không được để trống",
-          },
-          resultCode: "400",
-        });
-      }
-      updateData.name = newName.trim();
-    }
-
+    // Xử lý newFoodName
     if (newFoodName !== undefined) {
-      // Find food by name
+      // 00341 - Tên thực phẩm mới không tồn tại
       const { data: food, error: foodError } = await supabase
         .from("foods")
-        .select("id")
-        .eq("name", newFoodName)
+        .select("id, name")
+        .ilike("name", newFoodName.trim())
         .single();
 
       if (foodError || !food) {
         return res.status(404).json({
           resultMessage: {
-            en: "Food not found",
-            vn: "Không tìm thấy thực phẩm",
+            en: "New food name does not exist",
+            vn: "Tên thực phẩm mới không tồn tại",
           },
-          resultCode: "404",
+          resultCode: "00341",
         });
       }
 
       updateData.food_id = food.id;
     }
 
+    // Xử lý newName
+    if (newName !== undefined) {
+      let normalizedMealName = newName.trim().toLowerCase();
+      if (normalizedMealName === "sang") normalizedMealName = "sáng";
+      if (normalizedMealName === "trua") normalizedMealName = "trưa";
+      if (normalizedMealName === "toi") normalizedMealName = "tối";
+
+      updateData.name = normalizedMealName;
+    }
+
+    // Xử lý newTimestamp
     if (newTimestamp !== undefined) {
-      const formattedDate = validateAndFormatDate(newTimestamp);
-      if (!formattedDate) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Invalid timestamp format. Expected M/D/YYYY",
-            vn: "Định dạng thời gian không hợp lệ. Yêu cầu M/D/YYYY",
-          },
-          resultCode: "400",
-        });
-      }
       updateData.timestamp = formattedDate;
     }
 
+    // Xử lý newStatus (nếu có)
     if (newStatus !== undefined) {
       const validStatuses = ["NOT_PASS_YET", "PASSED", "SKIPPED"];
-      if (!validStatuses.includes(newStatus)) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Invalid status. Must be NOT_PASS_YET, PASSED, or SKIPPED",
-            vn: "Trạng thái không hợp lệ. Phải là NOT_PASS_YET, PASSED, hoặc SKIPPED",
-          },
-          resultCode: "400",
-        });
+      if (validStatuses.includes(newStatus)) {
+        updateData.status = newStatus;
       }
-      updateData.status = newStatus;
     }
 
     // Update meal plan
-    const { data, error } = await supabase
+    const { data: updatedPlanData, error: updateError } = await supabase
       .from("meal_plans")
       .update(updateData)
       .eq("id", planId)
       .select()
       .single();
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
+    // 00344 - Cập nhật kế hoạch bữa ăn thành công
     res.status(200).json({
       resultMessage: {
         en: "Meal plan updated successfully",
         vn: "Cập nhật kế hoạch bữa ăn thành công",
       },
-      resultCode: "00326",
+      resultCode: "00344",
       updatedPlan: {
-        id: data.id,
-        name: data.name,
-        timestamp: formatDateToDisplay(data.timestamp),
-        status: data.status,
-        FoodId: data.food_id,
-        UserId: data.user_id,
-        updatedAt: data.updated_at,
-        createdAt: data.created_at,
+        id: updatedPlanData.id,
+        name: updatedPlanData.name,
+        timestamp: updatedPlanData.timestamp,
+        status: updatedPlanData.status,
+        FoodId: updatedPlanData.food_id,
+        UserId: updatedPlanData.user_id,
+        updatedAt: updatedPlanData.updated_at,
+        createdAt: updatedPlanData.created_at,
       },
     });
   } catch (err) {
     console.error("Error updating meal plan:", err.message);
     res.status(500).json({
-      error: "Internal server error",
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
     });
   }
 };
-
 /**
  * @swagger
  * /api/meal-plans/delete:
@@ -489,54 +660,105 @@ export const deleteMealPlan = async (req, res) => {
   try {
     const { planId } = req.body;
 
+    // 00323 - Vui lòng cung cấp tất cả các trường bắt buộc
     if (!planId) {
       return res.status(400).json({
         resultMessage: {
-          en: "Missing planId",
-          vn: "Thiếu planId",
+          en: "Please provide all required fields",
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
         },
-        resultCode: "400",
+        resultCode: "00323",
       });
     }
 
-    // Check if meal plan exists and belongs to user
+    // 00324 - Vui lòng cung cấp một ID kế hoạch hợp lệ
+    if (typeof planId !== "string" && typeof planId !== "number") {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid plan ID",
+          vn: "Vui lòng cung cấp một ID kế hoạch hợp lệ",
+        },
+        resultCode: "00324",
+      });
+    }
+
+    if (typeof planId === "string" && planId.trim() === "") {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid plan ID",
+          vn: "Vui lòng cung cấp một ID kế hoạch hợp lệ",
+        },
+        resultCode: "00324",
+      });
+    }
+
+    // 00327 - Người dùng không phải là quản trị viên nhóm
+    if (!req.user || !req.user.id) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00327",
+      });
+    }
+
+    const { data: adminData, error: adminError } = await supabase
+      .from("users")
+      .select("id, role, group_id")
+      .eq("id", req.user.id)
+      .single();
+
+    if (adminError || !adminData || adminData.role !== "admin") {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00327",
+      });
+    }
+
+    // 00325 - Không tìm thấy kế hoạch với ID đã cung cấp
     const { data: existingPlan, error: fetchError } = await supabase
       .from("meal_plans")
-      .select("user_id")
+      .select("*")
       .eq("id", planId)
       .single();
 
     if (fetchError || !existingPlan) {
       return res.status(404).json({
         resultMessage: {
-          en: "Meal plan not found",
-          vn: "Không tìm thấy kế hoạch bữa ăn",
+          en: "Plan not found with the provided ID",
+          vn: "Không tìm thấy kế hoạch với ID đã cung cấp",
         },
-        resultCode: "404",
+        resultCode: "00325",
       });
     }
 
-    if (existingPlan.user_id !== req.user?.id) {
+    // Kiểm tra meal plan có thuộc về user này không
+    if (existingPlan.user_id !== req.user.id) {
       return res.status(403).json({
         resultMessage: {
-          en: "Permission denied",
-          vn: "Không có quyền",
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
         },
-        resultCode: "403",
+        resultCode: "00327",
       });
     }
 
-    // Delete meal plan
-    const { error } = await supabase
+    // Xóa meal plan
+    const { error: deleteError } = await supabase
       .from("meal_plans")
       .delete()
       .eq("id", planId);
 
-    if (error) throw error;
+    if (deleteError) throw deleteError;
 
+    // 00330 - Kế hoạch bữa ăn của bạn đã được xóa thành công
     res.status(200).json({
       resultMessage: {
-        en: "Your meal plan was deleted successfully.",
+        en: "Your meal plan was deleted successfully",
         vn: "Kế hoạch bữa ăn của bạn đã được xóa thành công",
       },
       resultCode: "00330",
@@ -544,7 +766,12 @@ export const deleteMealPlan = async (req, res) => {
   } catch (err) {
     console.error("Error deleting meal plan:", err.message);
     res.status(500).json({
-      error: "Internal server error",
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
     });
   }
 };
@@ -633,23 +860,42 @@ export const getMealPlansByDate = async (req, res) => {
   try {
     const { date } = req.query;
 
+    // Kiểm tra authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        resultMessage: {
+          en: "Unauthorized",
+          vn: "Chưa xác thực",
+        },
+        resultCode: "00401",
+      });
+    }
+
+    // 00345 - Bạn chưa vào nhóm nào
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("id, group_id")
+      .eq("id", req.user.id)
+      .single();
+
+    if (userError || !userData || !userData.group_id) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "You have not joined any group",
+          vn: "Bạn chưa vào nhóm nào",
+        },
+        resultCode: "00345",
+      });
+    }
+
+    // Kiểm tra date parameter
     if (!date) {
       return res.status(400).json({
         resultMessage: {
           en: "Missing date parameter",
           vn: "Thiếu tham số date",
         },
-        resultCode: "400",
-      });
-    }
-
-    if (!req.user?.id) {
-      return res.status(401).json({
-        resultMessage: {
-          en: "Unauthorized",
-          vn: "Chưa xác thực",
-        },
-        resultCode: "401",
+        resultCode: "00400",
       });
     }
 
@@ -658,10 +904,10 @@ export const getMealPlansByDate = async (req, res) => {
     if (!formattedDate) {
       return res.status(400).json({
         resultMessage: {
-          en: "Invalid date format. Expected M/D/YYYY",
-          vn: "Định dạng ngày không hợp lệ. Yêu cầu M/D/YYYY",
+          en: "Invalid date format. Expected MM/DD/YYYY",
+          vn: "Định dạng ngày không hợp lệ. Yêu cầu MM/DD/YYYY",
         },
-        resultCode: "400",
+        resultCode: "00400",
       });
     }
 
@@ -671,7 +917,21 @@ export const getMealPlansByDate = async (req, res) => {
       .select(
         `
         *,
-        foods!meal_plans_food_id_fkey (*)
+        foods!meal_plans_food_id_fkey (
+          id,
+          name,
+          image_url,
+          imageUrl,
+          type,
+          created_at,
+          updated_at,
+          food_category_id,
+          FoodCategoryId,
+          user_id,
+          UserId,
+          unit_of_measurement_id,
+          UnitOfMeasurementId
+        )
       `
       )
       .eq("user_id", req.user.id)
@@ -680,9 +940,10 @@ export const getMealPlansByDate = async (req, res) => {
 
     if (error) throw error;
 
+    // Format response data
     const formattedPlans = plans.map((plan) => ({
       id: plan.id,
-      timestamp: formatDateToDisplay(plan.timestamp),
+      timestamp: plan.timestamp,
       status: plan.status,
       name: plan.name,
       createdAt: plan.created_at,
@@ -707,9 +968,10 @@ export const getMealPlansByDate = async (req, res) => {
         : null,
     }));
 
+    // 00348 - Lấy danh sách thành công
     res.status(200).json({
       resultMessage: {
-        en: "Get plans successfull",
+        en: "Get plans successfully",
         vn: "Lấy danh sách thành công",
       },
       resultCode: "00348",
@@ -718,7 +980,12 @@ export const getMealPlansByDate = async (req, res) => {
   } catch (err) {
     console.error("Error getting meal plans by date:", err.message);
     res.status(500).json({
-      error: "Internal server error",
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
     });
   }
 };
