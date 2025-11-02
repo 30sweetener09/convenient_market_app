@@ -3,13 +3,14 @@
 // link vercel: https://convenient-market-app.vercel.app/
 import express from "express";
 import cors from "cors";
-import {supabase} from "./db.js";
+import { supabase } from "./db.js";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
 
 import registerMiddlewares from "./middlewares/index.js";
 import setupSwagger from "./services/swagger.js";
 import userRoute from "./routes/users.js";
+
 dotenv.config();
 
 const app = express();
@@ -23,24 +24,23 @@ registerMiddlewares(app);
 // Routes
 app.use("/api/user", userRoute);
 
-app.get('/', (req, res) => res.send('Smart Schedule API running'));
+
+app.get("/", (req, res) => res.send("Smart Schedule API running"));
 
 // Start server
 (async () => {
   try {
-
     app.listen(PORT, () => {
       console.log(` Server running on port ${PORT}`);
     });
   } catch (err) {
-    console.error(' Failed to start server:', err);
+    console.error(" Failed to start server:", err);
     process.exit(1);
   }
 })();
 
 // Graceful shutdown
-process.on('SIGINT', () => {
-  console.log(' Shutting down server...');
+process.on("SIGINT", () => {
+  console.log(" Shutting down server...");
   process.exit(0);
 });
-
