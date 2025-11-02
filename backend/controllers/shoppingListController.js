@@ -1,33 +1,99 @@
 // controllers/shoppingListController.js
 import { supabase } from "../db.js";
 
-// Helper function to validate and format date
+// Helper function to validate and format date (MM/DD/YYYY → YYYY-MM-DD)
 const validateAndFormatDate = (dateString) => {
-  if (!dateString || typeof dateString !== "string") {
-    return null;
-  }
+  if (!dateString || typeof dateString !== "string") return null;
 
   const parts = dateString.split("/");
-  if (parts.length !== 3) {
-    return null;
-  }
+  if (parts.length !== 3) return null;
 
   const [month, day, year] = parts;
   const monthNum = parseInt(month, 10);
   const dayNum = parseInt(day, 10);
   const yearNum = parseInt(year, 10);
 
-  if (isNaN(monthNum) || isNaN(dayNum) || isNaN(yearNum)) {
-    return null;
-  }
+  if (isNaN(monthNum) || isNaN(dayNum) || isNaN(yearNum)) return null;
+  if (monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) return null;
 
-  if (monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) {
-    return null;
-  }
+  const daysInMonth = [
+    31,
+    yearNum % 4 === 0 && (yearNum % 100 !== 0 || yearNum % 400 === 0) ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+  if (dayNum > daysInMonth[monthNum - 1]) return null;
 
-  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  return `${yearNum}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 };
 
+/**
+ * @swagger
+ * /shopping-list/create:
+ *   post:
+ *     summary: Create a new shopping list
+ *     tags: [Shopping List]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - assignToUsername
+ *               - date
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Shopping list for today"
+ *               assignToUsername:
+ *                 type: string
+ *                 example: "member6320"
+ *               note:
+ *                 type: string
+ *                 example: "nếu ngày ấy"
+ *               date:
+ *                 type: string
+ *                 pattern: '^\d{2}/\d{2}/\d{4}$'
+ *                 example: "12/30/2022"
+ *                 description: Date in MM/DD/YYYY format
+ *     responses:
+ *       200:
+ *         description: Shopping list created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                     vn:
+ *                       type: string
+ *                 resultCode:
+ *                   type: string
+ *                 createdShoppingList:
+ *                   type: object
+ *       400:
+ *         description: Bad request - Missing fields or invalid date format
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Internal server error
+ */
 export const createShoppingList = async (req, res) => {
   try {
     const { name, assignToUsername, note, date } = req.body;
@@ -38,11 +104,10 @@ export const createShoppingList = async (req, res) => {
           en: "Missing required fields",
           vn: "Thiếu thông tin bắt buộc",
         },
-        resultCode: "400",
+        resultCode: "00250",
       });
     }
 
-    // Validate date format
     const formattedDate = validateAndFormatDate(date);
     if (!formattedDate) {
       return res.status(400).json({
@@ -50,11 +115,10 @@ export const createShoppingList = async (req, res) => {
           en: "Invalid date format. Expected MM/DD/YYYY",
           vn: "Định dạng ngày không hợp lệ. Yêu cầu MM/DD/YYYY",
         },
-        resultCode: "400",
+        resultCode: "00256",
       });
     }
 
-    // Find user by username
     const { data: assignedUser, error: userError } = await supabase
       .from("users")
       .select("id")
@@ -67,11 +131,10 @@ export const createShoppingList = async (req, res) => {
           en: "User not found",
           vn: "Không tìm thấy người dùng",
         },
-        resultCode: "404",
+        resultCode: "00262",
       });
     }
 
-    // Insert shopping list
     const { data, error } = await supabase
       .from("shopping_list")
       .insert([
@@ -118,6 +181,49 @@ export const createShoppingList = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /shopping-list/update:
+ *   put:
+ *     summary: Update an existing shopping list
+ *     tags: [Shopping List]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - listId
+ *             properties:
+ *               listId:
+ *                 type: integer
+ *                 example: 1
+ *               newName:
+ *                 type: string
+ *                 example: "Monthly Groceries"
+ *               newAssignToUsername:
+ *                 type: string
+ *                 example: "jane_doe"
+ *               newDate:
+ *                 type: string
+ *                 pattern: '^\d{2}/\d{2}/\d{4}$'
+ *                 example: "01/15/2025"
+ *               newNote:
+ *                 type: string
+ *                 example: "Updated note"
+ *     responses:
+ *       200:
+ *         description: Shopping list updated successfully
+ *       400:
+ *         description: Bad request
+ *       403:
+ *         description: Permission denied
+ *       404:
+ *         description: Shopping list or user not found
+ */
 export const updateShoppingList = async (req, res) => {
   try {
     const { listId, newName, newAssignToUsername, newDate, newNote } = req.body;
@@ -128,11 +234,10 @@ export const updateShoppingList = async (req, res) => {
           en: "Missing listId",
           vn: "Thiếu listId",
         },
-        resultCode: "400",
+        resultCode: "00251",
       });
     }
 
-    // Check if list exists and belongs to user
     const { data: existingList, error: fetchError } = await supabase
       .from("shopping_list")
       .select("belongs_to_admin_id")
@@ -145,7 +250,7 @@ export const updateShoppingList = async (req, res) => {
           en: "Shopping list not found",
           vn: "Không tìm thấy danh sách mua sắm",
         },
-        resultCode: "404",
+        resultCode: "00260",
       });
     }
 
@@ -155,11 +260,10 @@ export const updateShoppingList = async (req, res) => {
           en: "Permission denied",
           vn: "Không có quyền",
         },
-        resultCode: "403",
+        resultCode: "00261",
       });
     }
 
-    // Build update object
     const updateData = { updated_at: new Date().toISOString() };
 
     if (newName !== undefined) {
@@ -169,14 +273,13 @@ export const updateShoppingList = async (req, res) => {
             en: "Name cannot be empty",
             vn: "Tên không được để trống",
           },
-          resultCode: "400",
+          resultCode: "00250",
         });
       }
       updateData.name = newName;
     }
 
     if (newAssignToUsername !== undefined) {
-      // Find new assigned user
       const { data: newUser, error: userError } = await supabase
         .from("users")
         .select("id")
@@ -189,7 +292,7 @@ export const updateShoppingList = async (req, res) => {
             en: "User not found",
             vn: "Không tìm thấy người dùng",
           },
-          resultCode: "404",
+          resultCode: "00262",
         });
       }
 
@@ -209,13 +312,12 @@ export const updateShoppingList = async (req, res) => {
             en: "Invalid date format. Expected MM/DD/YYYY",
             vn: "Định dạng ngày không hợp lệ. Yêu cầu MM/DD/YYYY",
           },
-          resultCode: "400",
+          resultCode: "00256",
         });
       }
       updateData.date = formattedDate;
     }
 
-    // Update list
     const { data, error } = await supabase
       .from("shopping_list")
       .update(updateData)
@@ -252,6 +354,36 @@ export const updateShoppingList = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /shopping-list/delete:
+ *   delete:
+ *     summary: Delete a shopping list
+ *     tags: [Shopping List]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - listId
+ *             properties:
+ *               listId:
+ *                 type: integer
+ *                 example: 1
+ *     responses:
+ *       200:
+ *         description: Shopping list deleted successfully
+ *       400:
+ *         description: Missing listId
+ *       403:
+ *         description: Permission denied
+ *       404:
+ *         description: Shopping list not found
+ */
 export const deleteShoppingList = async (req, res) => {
   try {
     const { listId } = req.body;
@@ -262,11 +394,10 @@ export const deleteShoppingList = async (req, res) => {
           en: "Missing listId",
           vn: "Thiếu listId",
         },
-        resultCode: "400",
+        resultCode: "00267",
       });
     }
 
-    // Check if list exists and belongs to user
     const { data: existingList, error: fetchError } = await supabase
       .from("shopping_list")
       .select("belongs_to_admin_id")
@@ -279,7 +410,7 @@ export const deleteShoppingList = async (req, res) => {
           en: "Shopping list not found",
           vn: "Không tìm thấy danh sách mua sắm",
         },
-        resultCode: "404",
+        resultCode: "00272",
       });
     }
 
@@ -289,11 +420,10 @@ export const deleteShoppingList = async (req, res) => {
           en: "Permission denied",
           vn: "Không có quyền",
         },
-        resultCode: "403",
+        resultCode: "00273",
       });
     }
 
-    // Delete list (tasks will be cascade deleted if foreign key is set up properly)
     const { error } = await supabase
       .from("shopping_list")
       .delete()
@@ -316,18 +446,62 @@ export const deleteShoppingList = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /shopping-list/tasks/create:
+ *   post:
+ *     summary: Create tasks for a shopping list
+ *     tags: [Shopping List Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - listId
+ *               - tasks
+ *             properties:
+ *               listId:
+ *                 type: integer
+ *                 example: 1
+ *               tasks:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - foodName
+ *                     - quantity
+ *                   properties:
+ *                     foodName:
+ *                       type: string
+ *                       example: "Tomatoes"
+ *                     quantity:
+ *                       type: string
+ *                       example: "2 kg"
+ *     responses:
+ *       200:
+ *         description: Tasks created successfully
+ *       400:
+ *         description: Bad request - Invalid input
+ *       403:
+ *         description: Permission denied
+ *       404:
+ *         description: Shopping list not found
+ */
 export const createTasks = async (req, res) => {
   try {
     const { listId, tasks } = req.body;
 
-    // Validate input
     if (!listId || !tasks || !Array.isArray(tasks)) {
       return res.status(400).json({
         resultMessage: {
           en: "Missing required fields",
           vn: "Thiếu thông tin bắt buộc",
         },
-        resultCode: "400",
+        resultCode: "00276",
       });
     }
 
@@ -337,11 +511,10 @@ export const createTasks = async (req, res) => {
           en: "Tasks array cannot be empty",
           vn: "Danh sách nhiệm vụ không được rỗng",
         },
-        resultCode: "400",
+        resultCode: "00278",
       });
     }
 
-    // Validate each task
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
       if (!task.foodName || task.foodName.trim() === "") {
@@ -350,7 +523,7 @@ export const createTasks = async (req, res) => {
             en: `Task ${i + 1}: Food name is required`,
             vn: `Nhiệm vụ ${i + 1}: Tên thực phẩm là bắt buộc`,
           },
-          resultCode: "400",
+          resultCode: "00276",
         });
       }
       if (!task.quantity || task.quantity.trim() === "") {
@@ -359,12 +532,11 @@ export const createTasks = async (req, res) => {
             en: `Task ${i + 1}: Quantity is required`,
             vn: `Nhiệm vụ ${i + 1}: Số lượng là bắt buộc`,
           },
-          resultCode: "400",
+          resultCode: "00276",
         });
       }
     }
 
-    // Check if shopping list exists and belongs to user
     const { data: existingList, error: fetchError } = await supabase
       .from("shopping_list")
       .select("id, belongs_to_admin_id")
@@ -377,7 +549,7 @@ export const createTasks = async (req, res) => {
           en: "Shopping list not found",
           vn: "Không tìm thấy danh sách mua sắm",
         },
-        resultCode: "404",
+        resultCode: "00283",
       });
     }
 
@@ -387,11 +559,10 @@ export const createTasks = async (req, res) => {
           en: "Permission denied",
           vn: "Không có quyền",
         },
-        resultCode: "403",
+        resultCode: "00284",
       });
     }
 
-    // Prepare tasks data
     const taskData = tasks.map((task) => ({
       shopping_list_id: listId,
       food_name: task.foodName.trim(),
@@ -401,7 +572,6 @@ export const createTasks = async (req, res) => {
       updated_at: new Date().toISOString(),
     }));
 
-    // Insert tasks
     const { error } = await supabase
       .from("shopping_list_tasks")
       .insert(taskData);
@@ -423,6 +593,40 @@ export const createTasks = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /shopping-list/tasks/list:
+ *   get:
+ *     summary: Get list of shopping lists with tasks
+ *     tags: [Shopping List Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved shopping lists and tasks
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                     vn:
+ *                       type: string
+ *                 resultCode:
+ *                   type: string
+ *                 role:
+ *                   type: string
+ *                 list:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       401:
+ *         description: Unauthorized
+ */
 export const getListOfTasks = async (req, res) => {
   try {
     if (!req.user?.id) {
@@ -435,7 +639,6 @@ export const getListOfTasks = async (req, res) => {
       });
     }
 
-    // Get shopping lists of user
     const { data: lists, error } = await supabase
       .from("shopping_list")
       .select(
@@ -449,7 +652,6 @@ export const getListOfTasks = async (req, res) => {
 
     if (error) throw error;
 
-    // Get tasks for each list
     const listWithTasks = await Promise.all(
       lists.map(async (list) => {
         const { data: tasks } = await supabase
@@ -499,6 +701,36 @@ export const getListOfTasks = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /shopping-list/tasks/mark:
+ *   put:
+ *     summary: Mark/unmark a task as done
+ *     tags: [Shopping List Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - taskId
+ *             properties:
+ *               taskId:
+ *                 type: integer
+ *                 example: 1
+ *     responses:
+ *       200:
+ *         description: Task marked successfully
+ *       400:
+ *         description: Missing taskId
+ *       403:
+ *         description: Permission denied
+ *       404:
+ *         description: Task not found
+ */
 export const markTask = async (req, res) => {
   try {
     const { taskId } = req.body;
@@ -513,7 +745,6 @@ export const markTask = async (req, res) => {
       });
     }
 
-    // Get current task info
     const { data: task, error: fetchError } = await supabase
       .from("shopping_list_tasks")
       .select("*, shopping_list!inner(belongs_to_admin_id)")
@@ -530,7 +761,6 @@ export const markTask = async (req, res) => {
       });
     }
 
-    // Check permission
     if (task.shopping_list.belongs_to_admin_id !== req.user?.id) {
       return res.status(403).json({
         resultMessage: {
@@ -541,7 +771,6 @@ export const markTask = async (req, res) => {
       });
     }
 
-    // Toggle done status
     const { error } = await supabase
       .from("shopping_list_tasks")
       .update({
@@ -568,6 +797,36 @@ export const markTask = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /shopping-list/tasks/delete:
+ *   delete:
+ *     summary: Delete a task
+ *     tags: [Shopping List Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - taskId
+ *             properties:
+ *               taskId:
+ *                 type: integer
+ *                 example: 1
+ *     responses:
+ *       200:
+ *         description: Task deleted successfully
+ *       400:
+ *         description: Missing taskId
+ *       403:
+ *         description: Permission denied
+ *       404:
+ *         description: Task not found
+ */
 export const deleteTask = async (req, res) => {
   try {
     const { taskId } = req.body;
@@ -582,7 +841,6 @@ export const deleteTask = async (req, res) => {
       });
     }
 
-    // Check if task exists and user has permission
     const { data: task, error: fetchError } = await supabase
       .from("shopping_list_tasks")
       .select("*, shopping_list!inner(belongs_to_admin_id)")
@@ -609,7 +867,6 @@ export const deleteTask = async (req, res) => {
       });
     }
 
-    // Delete task
     const { error } = await supabase
       .from("shopping_list_tasks")
       .delete()
@@ -632,6 +889,42 @@ export const deleteTask = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /shopping-list/tasks/update:
+ *   put:
+ *     summary: Update a task
+ *     tags: [Shopping List Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - taskId
+ *             properties:
+ *               taskId:
+ *                 type: integer
+ *                 example: 1
+ *               newFoodName:
+ *                 type: string
+ *                 example: "Fresh Tomatoes"
+ *               newQuantity:
+ *                 type: string
+ *                 example: "3 kg"
+ *     responses:
+ *       200:
+ *         description: Task updated successfully
+ *       400:
+ *         description: Bad request
+ *       403:
+ *         description: Permission denied
+ *       404:
+ *         description: Task not found
+ */
 export const updateTask = async (req, res) => {
   try {
     const { taskId, newFoodName, newQuantity } = req.body;
@@ -646,7 +939,6 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    // Check if task exists and user has permission
     const { data: task, error: fetchError } = await supabase
       .from("shopping_list_tasks")
       .select("*, shopping_list!inner(belongs_to_admin_id)")
@@ -673,7 +965,6 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    // Build update object
     const updateData = { updated_at: new Date().toISOString() };
 
     if (newFoodName !== undefined) {
@@ -702,7 +993,6 @@ export const updateTask = async (req, res) => {
       updateData.quantity = newQuantity.trim();
     }
 
-    // Update task
     const { error } = await supabase
       .from("shopping_list_tasks")
       .update(updateData)

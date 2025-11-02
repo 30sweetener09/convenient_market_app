@@ -1,6 +1,95 @@
 // controllers/recipeController.js
 import { supabase } from "../db.js";
 
+/**
+ * @swagger
+ * /api/recipes/create:
+ *   post:
+ *     summary: Create a new recipe
+ *     description: Create a new recipe for a specific food item
+ *     tags: [Recipes]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - foodName
+ *               - name
+ *               - htmlContent
+ *               - description
+ *             properties:
+ *               foodName:
+ *                 type: string
+ *                 description: Name of the food item
+ *                 example: "Phở"
+ *               name:
+ *                 type: string
+ *                 description: Name of the recipe
+ *                 example: "Phở Bò Truyền Thống"
+ *               htmlContent:
+ *                 type: string
+ *                 description: HTML content of the recipe instructions
+ *                 example: "<h2>Nguyên liệu</h2><p>500g thịt bò...</p>"
+ *               description:
+ *                 type: string
+ *                 description: Short description of the recipe
+ *                 example: "Công thức phở bò truyền thống Hà Nội"
+ *     responses:
+ *       200:
+ *         description: Recipe created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Add recipe successfull"
+ *                     vn:
+ *                       type: string
+ *                       example: "Thêm công thức nấu ăn thành công"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00357"
+ *                 newRecipe:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     htmlContent:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *                     FoodId:
+ *                       type: string
+ *                     Food.id:
+ *                       type: string
+ *                     Food.name:
+ *                       type: string
+ *                     Food.imageUrl:
+ *                       type: string
+ *                     Food.type:
+ *                       type: string
+ *       400:
+ *         description: Missing required fields
+ *       404:
+ *         description: Food not found
+ *       500:
+ *         description: Internal server error
+ */
 export const createRecipe = async (req, res) => {
   try {
     const { foodName, name, htmlContent, description } = req.body;
@@ -84,6 +173,80 @@ export const createRecipe = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /api/recipes/update:
+ *   put:
+ *     summary: Update an existing recipe
+ *     description: Update recipe details including name, description, content, or associated food
+ *     tags: [Recipes]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - recipeId
+ *             properties:
+ *               recipeId:
+ *                 type: string
+ *                 description: ID of the recipe to update
+ *                 example: "123e4567-e89b-12d3-a456-426614174000"
+ *               newName:
+ *                 type: string
+ *                 description: New name for the recipe
+ *                 example: "Phở Bò Đặc Biệt"
+ *               newDescription:
+ *                 type: string
+ *                 description: New description for the recipe
+ *                 example: "Công thức phở bò đặc biệt với nhiều loại thịt"
+ *               newHtmlContent:
+ *                 type: string
+ *                 description: New HTML content for recipe instructions
+ *                 example: "<h2>Nguyên liệu</h2><p>Thịt bò, sườn...</p>"
+ *               newFoodName:
+ *                 type: string
+ *                 description: New food name to associate with the recipe
+ *                 example: "Phở Đặc Biệt"
+ *     responses:
+ *       200:
+ *         description: Recipe updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Recipe updated successfully."
+ *                     vn:
+ *                       type: string
+ *                       example: "Cập nhật công thức nấu ăn thành công"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00370"
+ *                 recipe:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     htmlContent:
+ *                       type: string
+ *       400:
+ *         description: Missing recipeId or invalid data
+ *       404:
+ *         description: Recipe or food not found
+ *       500:
+ *         description: Internal server error
+ */
 export const updateRecipe = async (req, res) => {
   try {
     const { recipeId, newHtmlContent, newDescription, newFoodName, newName } =
@@ -217,6 +380,53 @@ export const updateRecipe = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /api/recipes/delete:
+ *   delete:
+ *     summary: Delete a recipe
+ *     description: Delete a recipe by its ID
+ *     tags: [Recipes]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - recipeId
+ *             properties:
+ *               recipeId:
+ *                 type: string
+ *                 description: ID of the recipe to delete
+ *                 example: "123e4567-e89b-12d3-a456-426614174000"
+ *     responses:
+ *       200:
+ *         description: Recipe deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Your recipe was deleted successfully."
+ *                     vn:
+ *                       type: string
+ *                       example: "Công thức của bạn đã được xóa thành công"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00376"
+ *       400:
+ *         description: Missing recipeId
+ *       404:
+ *         description: Recipe not found
+ *       500:
+ *         description: Internal server error
+ */
 export const deleteRecipe = async (req, res) => {
   try {
     const { recipeId } = req.body;
@@ -269,6 +479,78 @@ export const deleteRecipe = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /api/recipes/get-by-food:
+ *   get:
+ *     summary: Get all recipes for a specific food
+ *     description: Retrieve all recipes associated with a food item by food ID
+ *     tags: [Recipes]
+ *     parameters:
+ *       - in: query
+ *         name: foodId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the food item
+ *         example: "123e4567-e89b-12d3-a456-426614174000"
+ *     responses:
+ *       200:
+ *         description: Recipes retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Get recipes successfull"
+ *                     vn:
+ *                       type: string
+ *                       example: "Lấy các công thức thành công"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00378"
+ *                 recipes:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       htmlContent:
+ *                         type: string
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                       FoodId:
+ *                         type: string
+ *                       Food:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                           imageUrl:
+ *                             type: string
+ *                           type:
+ *                             type: string
+ *       400:
+ *         description: Missing foodId parameter
+ *       500:
+ *         description: Internal server error
+ */
 export const getRecipesByFoodId = async (req, res) => {
   try {
     const { foodId } = req.query;
