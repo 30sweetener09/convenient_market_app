@@ -13,9 +13,19 @@ import userRoute from "./routes/users.js";
 
 dotenv.config();
 
+
+
 const app = express();
 const PORT = process.env.PORT || 3000;
-
+// Cho phép mọi origin, mọi method, mọi header
+app.use(cors({
+  origin: "*",          
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"], 
+  credentials: false     
+}));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 setupSwagger(app);
 
 // Middleware
