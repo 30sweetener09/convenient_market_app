@@ -10,7 +10,7 @@ import {
   deleteTask,
   updateTask,
 } from "../controllers/shoppingListController.js";
-import { authenticateToken } from "../middleware/auth.js"; // Adjust path as needed
+import { authMiddleware } from "../middlewares/authMiddleware.js"; // Adjust path as needed
 
 const router = express.Router();
 
