@@ -4,8 +4,8 @@ import {
   createFood,
   updateFood,
   deleteFood,
-  getAllFoods,
-  getFoodById,
+  getFoodsByGroup,
+  getFoodById
 } from "../controllers/foodController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 
