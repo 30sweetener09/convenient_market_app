@@ -15,7 +15,7 @@ import { authMiddleware } from "../middlewares/authMiddleware.js"; // Adjust pat
 const router = express.Router();
 
 // Apply authentication middleware to all routes
-router.use(authenticateToken);
+router.use(authMiddleware);
 
 // Shopping List routes
 router.get("/", getListOfTasks);

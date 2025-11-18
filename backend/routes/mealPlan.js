@@ -11,7 +11,7 @@ import { authMiddleware } from "../middlewares/authMiddleware.js"; // Adjust pat
 const router = express.Router();
 
 // Apply authentication middleware to all routes
-router.use(authenticateToken);
+router.use(authMiddleware);
 
 router.get("/", getMealPlansByDate);
 router.post("/", createMealPlan);

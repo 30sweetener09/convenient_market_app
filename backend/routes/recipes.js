@@ -8,14 +8,14 @@ import {
 } from "../controllers/recipeController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js"; // Adjust path as needed
 
-const router = express.Router();
+const recipeRoutes = express.Router();
 
 // Apply authentication middleware to all routes
-router.use(authenticateToken);
+recipeRoutes.use(authMiddleware);
 
-router.get("/", getRecipesByFoodId);
-router.post("/", createRecipe);
-router.put("/", updateRecipe);
-router.delete("/", deleteRecipe);
+recipeRoutes.get("/", getRecipesByFoodId);
+recipeRoutes.post("/", createRecipe);
+recipeRoutes.put("/", updateRecipe);
+recipeRoutes.delete("/", deleteRecipe);
 
-export default router;
+export default recipeRoutes;

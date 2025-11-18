@@ -12,7 +12,7 @@ import setupSwagger from "./services/swagger.js";
 import userRoute from "./routes/users.js";
 import shoppingListRoutes from "./routes/shoppingList.js";
 import mealPlanRoutes from "./routes/mealPlan.js";
-import recipesRoutes from "./routes/recipes.js";
+import recipeRoutes from "./routes/recipes.js";
 import adminRoutes from "./routes/admin.js";
 import foodRoutes from "./routes/food.js";
 import fridgeRoutes from "./routes/fridge.js";
