@@ -12,7 +12,7 @@ const swaggerOptions = {
       description: "API backend cho ứng dụng đa nền tảng"
     },
     servers: [
-      { url: "https://convenient-market-app.vercel.app/api" }
+      { url: "https://convenient-market-app.onrender.com/api" }
     ]
   },
   apis: ["./server.js", "./routes/*.js", "./controllers/*.js"], // nơi chứa swagger comment
@@ -24,4 +24,4 @@ export default (app) => {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 };
 
-// url swagger: http://localhost:3000/api-docs
+// url swagger: https://convenient-market-app.onrender.com/api/api-docs

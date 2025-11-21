@@ -1,5 +1,3 @@
-//server.js
-
 // link vercel: https://convenient-market-app.vercel.app/
 import express from "express";
 import cors from "cors";
@@ -16,11 +14,23 @@ import recipeRoutes from "./routes/recipes.js";
 import adminRoutes from "./routes/admin.js";
 import foodRoutes from "./routes/food.js";
 import fridgeRoutes from "./routes/fridge.js";
+
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: false,
+  })
+);
+
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 setupSwagger(app);
 
 // Middleware

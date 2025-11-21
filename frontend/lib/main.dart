@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/screens/home/home_screen.dart';
 import 'package:provider/provider.dart';
-import 'routes/app_routes.dart';
 import 'providers/auth_provider.dart';
+import 'routes/app_routes.dart';
+import 'screens/auth/login_screen.dart';
+import 'widgets/auth_guard.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AuthProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -12,16 +20,19 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-      ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'Login Base App',
-        initialRoute: '/login',
-        routes: AppRoutes.routes,
-      ),
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Convenient Market',
+
+          // ✅ Nếu đã đăng nhập thì vào /home, chưa thì /login
+          initialRoute: auth.isLoggedIn ? '/home' : '/login',
+
+          // ✅ Các route trong app
+          routes: AppRoutes.routes,
+        );
+      },
     );
   }
 }
