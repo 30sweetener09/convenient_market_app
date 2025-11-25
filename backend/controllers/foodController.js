@@ -6,27 +6,26 @@ import { v4 as uuidv4 } from "uuid";
  * Upload image buffer to Supabase Storage and return public URL
  */
 const uploadImage = async (file) => {
-  if (!file ||!file.buffer) return null;
+  if (!file || !file.buffer) return null;
 
-  const mime = file.mimetype || "image/jpeg";
-  const ext = (mime.split("/")[1] || "jpg").replace("jpeg", "jpg");
-  const fileName = `food-images/${uuidv4()}.${ext}`;
+  const mime = file.mimetype || "image/jpeg";
+  const ext = (mime.split("/")[1] || "jpg").replace("jpeg", "jpg");
+  const fileName = `food-images/${uuidv4()}.${ext}`;
 
-  const { error: uploadError } = await supabase.storage
-   .from("food-images")
-   .upload(fileName, file.buffer, { contentType: mime, upsert: false });
+  const { error: uploadError } = await supabase.storage
+    .from("food-images")
+    .upload(fileName, file.buffer, { contentType: mime, upsert: false });
 
-  if (uploadError) {
-    console.error("Image upload error:", uploadError.message);
-    // 00158: đăng tải ảnh thất bại
-    return null; 
-  }
+  if (uploadError) {
+    console.error("Image upload error:", uploadError.message); // 00158: đăng tải ảnh thất bại
+    return null;
+  }
 
-  const { data: publicData } = await supabase.storage
-   .from("food-images")
-   .getPublicUrl(fileName);
+  const { data: publicData } = await supabase.storage
+    .from("food-images")
+    .getPublicUrl(fileName);
 
-  return publicData?.publicUrl || null;
+  return publicData?.publicUrl || null;
 };
 
 /**
@@ -64,116 +63,115 @@ const uploadImage = async (file) => {
  *         description: Lỗi máy chủ (00152) hoặc Upload ảnh thất bại (00158)
  */
 export const createFood = async (req, res) => {
-  try {
-    const { name, categoryName, unitName, groupId } = req.body;
-    const user = req.user;
+  try {
+    const { name, categoryName, unitName, groupId } = req.body;
+    const user = req.user;
 
-    if (!name ||!categoryName ||!unitName) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Missing required fields (name, categoryName, unitName)",
-          vn: "Thiếu thông tin bắt buộc (tên, danh mục, đơn vị)",
-        },
-        resultCode: "400",
-      });
-    }
-
-    const gId = groupId || user?.groupId;
-    // 00156 X: Hãy vào nhóm trước để tạo thực phẩm
-    if (!gId) { 
-      return res.status(403).json({
-        resultMessage: {
-          en: "Must belong to a group to create food",
-          vn: "Hãy vào nhóm trước để tạo thực phẩm",
-        },
-        resultCode: "00156 X",
-      });
-    }
-
-    // Kiểm tra trùng tên trong group (00151)
-    const { data: existing } = await supabase
-     .from("foods")
-     .select("id")
-     .eq("group_id", gId)
-     .eq("name", name.trim())
-     .maybeSingle();
-
-    if (existing) {
-      return res.status(409).json({
-        resultMessage: {
-          en: "Food already exists in this group",
-          vn: "Thực phẩm đã tồn tại trong nhóm này",
-        },
-        resultCode: "00151",
-      });
-    }
-
-    // Tìm category & unit (00155, 00153)
-    const { data: category } = await supabase
-     .from("categories")
-     .select("id")
-     .eq("name", categoryName)
-     .maybeSingle();
-
-    if (!category) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Category not found",
-          vn: "Không tìm thấy danh mục",
-        },
-        resultCode: "00155",
-      });
-    }
-
-    const { data: unit } = await supabase
-     .from("units")
-     .select("id")
-     .eq("unit_name", unitName)
-     .maybeSingle();
-
-    if (!unit) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Unit not found",
-          vn: "Không tìm thấy đơn vị",
-        },
-        resultCode: "00153",
-      });
-    }
-
-    // Upload ảnh (nếu có) (00158)
-    const imageUrl = await uploadImage(req.file);
-    if (!req.file && imageUrl === null && req.file!== undefined) {
-        // Only return 00158 if file was provided but upload failed
-        return res.status(500).json({
-            resultMessage: {
-                en: "Image upload failed",
-                vn: "đăng tải ảnh thất bại",
-            },
-            resultCode: "00158",
-        });
+    if (!name || !categoryName || !unitName) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Missing required fields (name, categoryName, unitName)",
+          vn: "Thiếu thông tin bắt buộc (tên, danh mục, đơn vị)",
+        },
+        resultCode: "400",
+      });
     }
 
-    const { data, error } = await supabase
-     .from("foods")
-     .insert()
-     .select()
-     .single();
+    const gId = groupId || user?.groupId;
+    // 00156 X: Hãy vào nhóm trước để tạo thực phẩm
+    if (!gId) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "Must belong to a group to create food",
+          vn: "Hãy vào nhóm trước để tạo thực phẩm",
+        },
+        resultCode: "00156 X",
+      });
+    } // Kiểm tra trùng tên trong group (00151)
 
-    if (error) throw error;
+    const { data: existing } = await supabase
+      .from("foods")
+      .select("id")
+      .eq("group_id", gId)
+      .eq("name", name.trim())
+      .maybeSingle();
 
-    res.status(200).json({
-      resultMessage: {
-        en: "Food created successfully",
-        vn: "Thêm thực phẩm thành công",
-      },
-      resultCode: "00160",
-      newFood: data,
-    });
-  } catch (err) {
-    console.error("Error creating food:", err.message);
-    res.status(500).json({ error: "Internal server error", resultCode: "00152" });
-  }
+    if (existing) {
+      return res.status(409).json({
+        resultMessage: {
+          en: "Food already exists in this group",
+          vn: "Thực phẩm đã tồn tại trong nhóm này",
+        },
+        resultCode: "00151",
+      });
+    } // Tìm category & unit (00155, 00153)
+
+    const { data: category } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("name", categoryName)
+      .maybeSingle();
+
+    if (!category) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Category not found",
+          vn: "Không tìm thấy danh mục",
+        },
+        resultCode: "00155",
+      });
+    }
+
+    const { data: unit } = await supabase
+      .from("units")
+      .select("id")
+      .eq("unit_name", unitName)
+      .maybeSingle();
+
+    if (!unit) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Unit not found",
+          vn: "Không tìm thấy đơn vị",
+        },
+        resultCode: "00153",
+      });
+    } // Upload ảnh (nếu có) (00158)
+
+    const imageUrl = await uploadImage(req.file);
+    if (!req.file && imageUrl === null && req.file !== undefined) {
+      // Only return 00158 if file was provided but upload failed
+      return res.status(500).json({
+        resultMessage: {
+          en: "Image upload failed",
+          vn: "đăng tải ảnh thất bại",
+        },
+        resultCode: "00158",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("foods")
+      .insert()
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Food created successfully",
+        vn: "Thêm thực phẩm thành công",
+      },
+      resultCode: "00160",
+      newFood: data,
+    });
+  } catch (err) {
+    console.error("Error creating food:", err.message);
+    res
+      .status(500)
+      .json({ error: "Internal server error", resultCode: "00152" });
+  }
 };
 
 /**
@@ -211,145 +209,146 @@ export const createFood = async (req, res) => {
  *         description: Lỗi máy chủ
  */
 export const updateFood = async (req, res) => {
-  try {
-    const { id, newName, newCategory, newUnit } = req.body;
-    const user = req.user;
+  try {
+    const { id, newName, newCategory, newUnit } = req.body;
+    const user = req.user;
 
-    if (!id) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Missing food id",
-          vn: "Thiếu id của thực phẩm",
-        },
-        resultCode: "400",
-      });
-    }
-
-    // Check if any update field is provided
-    if (!newName &&!newCategory &&!newUnit &&!req.file) {
-        // 00163: Vui lòng cung cấp ít nhất một trong các trường sau
-        return res.status(400).json({
-            resultMessage: {
-                en: "Please provide at least one field to update",
-                vn: "Vui lòng cung cấp ít nhất một trường cần cập nhật",
-            },
-            resultCode: "00163",
-        });
+    if (!id) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Missing food id",
+          vn: "Thiếu id của thực phẩm",
+        },
+        resultCode: "400",
+      });
     }
 
-    const { data: existing } = await supabase
-     .from("foods")
-     .select("id, group_id")
-     .eq("id", id)
-     .maybeSingle();
+    // Check if any update field is provided
+    if (!newName && !newCategory && !newUnit && !req.file) {
+      // 00163: Vui lòng cung cấp ít nhất một trong các trường sau
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide at least one field to update",
+          vn: "Vui lòng cung cấp ít nhất một trường cần cập nhật",
+        },
+        resultCode: "00163",
+      });
+    }
 
-    if (!existing || existing.group_id!== user?.groupId) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Food not found",
-          vn: "Không tìm thấy thực phẩm",
-        },
-        resultCode: "00166",
-      });
-    }
-    
+    const { data: existing } = await supabase
+      .from("foods")
+      .select("id, group_id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (!existing || existing.group_id !== user?.groupId) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Food not found",
+          vn: "Không tìm thấy thực phẩm",
+        },
+        resultCode: "00166",
+      });
+    }
+
     // Authorization Check (00167 X) - Assuming Middleware handles this and we only proceed if Admin/Owner
 
-    const updateData = { updated_at: new Date().toISOString() };
+    const updateData = { updated_at: new Date().toISOString() };
 
-    if (newName!== undefined) {
-      if (!newName.trim()) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Name cannot be empty",
-            vn: "Tên không được để trống",
-          },
-          resultCode: "400",
-        });
-      }
+    if (newName !== undefined) {
+      if (!newName.trim()) {
+        return res.status(400).json({
+          resultMessage: {
+            en: "Name cannot be empty",
+            vn: "Tên không được để trống",
+          },
+          resultCode: "400",
+        });
+      }
       // Check if newName already exists in group (00173)
       const { data: duplicateName } = await supabase
-       .from("foods")
-       .select("id")
-       .eq("group_id", existing.group_id)
-       .eq("name", newName.trim())
-       .maybeSingle();
+        .from("foods")
+        .select("id")
+        .eq("group_id", existing.group_id)
+        .eq("name", newName.trim())
+        .maybeSingle();
 
-      if (duplicateName && duplicateName.id!== id) {
-          return res.status(409).json({
-              resultMessage: {
-                  en: "A food with this new name already exists in the group",
-                  vn: "Một thực phẩm với tên này đã tồn tại",
-              },
-              resultCode: "00173",
-          });
+      if (duplicateName && duplicateName.id !== id) {
+        return res.status(409).json({
+          resultMessage: {
+            en: "A food with this new name already exists in the group",
+            vn: "Một thực phẩm với tên này đã tồn tại",
+          },
+          resultCode: "00173",
+        });
       }
-      updateData.name = newName.trim();
-    }
+      updateData.name = newName.trim();
+    }
 
-    if (newCategory!== undefined) {
-      const { data: category } = await supabase
-       .from("categories")
-       .select("id")
-       .eq("name", newCategory)
-       .maybeSingle();
-      if (!category) {
-        return res.status(404).json({
-          resultMessage: {
-            en: "Category not found",
-            vn: "Không tìm thấy danh mục",
-          },
-          resultCode: "00171",
-        });
-      }
-      updateData.category_id = category.id;
-    }
+    if (newCategory !== undefined) {
+      const { data: category } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("name", newCategory)
+        .maybeSingle();
+      if (!category) {
+        return res.status(404).json({
+          resultMessage: {
+            en: "Category not found",
+            vn: "Không tìm thấy danh mục",
+          },
+          resultCode: "00171",
+        });
+      }
+      updateData.category_id = category.id;
+    }
 
-    if (newUnit!== undefined) {
-      const { data: unit } = await supabase
-       .from("units")
-       .select("id")
-       .eq("unit_name", newUnit)
-       .maybeSingle();
-      if (!unit) {
-        return res.status(404).json({
-          resultMessage: {
-            en: "Unit not found",
-            vn: "Không tìm thấy đơn vị",
-          },
-          resultCode: "00169",
-        });
-      }
-      updateData.unit_id = unit.id;
-    }
+    if (newUnit !== undefined) {
+      const { data: unit } = await supabase
+        .from("units")
+        .select("id")
+        .eq("unit_name", newUnit)
+        .maybeSingle();
+      if (!unit) {
+        return res.status(404).json({
+          resultMessage: {
+            en: "Unit not found",
+            vn: "Không tìm thấy đơn vị",
+          },
+          resultCode: "00169",
+        });
+      }
+      updateData.unit_id = unit.id;
+    } // Nếu có ảnh mới
 
-    // Nếu có ảnh mới
-    const newImageUrl = await uploadImage(req.file);
-    if (newImageUrl) {
-      updateData.image_url = newImageUrl;
-    }
+    const newImageUrl = await uploadImage(req.file);
+    if (newImageUrl) {
+      updateData.image_url = newImageUrl;
+    }
 
-    const { data, error } = await supabase
-     .from("foods")
-     .update(updateData)
-     .eq("id", id)
-     .select()
-     .single();
+    const { data, error } = await supabase
+      .from("foods")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single();
 
-    if (error) throw error;
+    if (error) throw error;
 
-    res.status(200).json({
-      resultMessage: {
-        en: "Food updated successfully",
-        vn: "Cập nhật thực phẩm thành công",
-      },
-      resultCode: "00178",
-      updatedFood: data,
-    });
-  } catch (err) {
-    console.error("Error updating food:", err.message);
-    res.status(500).json({ error: "Internal server error", resultCode: "00168" });
-  }
+    res.status(200).json({
+      resultMessage: {
+        en: "Food updated successfully",
+        vn: "Cập nhật thực phẩm thành công",
+      },
+      resultCode: "00178",
+      updatedFood: data,
+    });
+  } catch (err) {
+    console.error("Error updating food:", err.message);
+    res
+      .status(500)
+      .json({ error: "Internal server error", resultCode: "00168" });
+  }
 };
 
 /**
@@ -383,65 +382,67 @@ export const updateFood = async (req, res) => {
  *         description: Lỗi máy chủ
  */
 export const deleteFood = async (req, res) => {
-  try {
-    const { id } = req.body;
+  try {
+    const { id } = req.body;
 
-    if (!id) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Missing food id",
-          vn: "Thiếu id của thực phẩm",
-        },
-        resultCode: "400",
-      });
-    }
-
-    const { data: existing } = await supabase
-     .from("foods")
-     .select("id")
-     .eq("id", id)
-     .maybeSingle();
-
-    if (!existing) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Food not found",
-          vn: "Không tìm thấy thực phẩm",
-        },
-        resultCode: "00180",
-      });
-    }
-    
-    // Check FK Constraint (Fridge Item) (00181)
-    const { count: fridgeCount } = await supabase
-       .from("fridge_items")
-       .select("id", { count: 'exact' })
-       .eq("food_id", id);
-        
-    if (fridgeCount > 0) {
-        return res.status(409).json({
-            resultMessage: {
-                en: "Cannot delete food due to existing fridge item references",
-                vn: "Không thể xóa Food. Vẫn có mục trong tủ lạnh đang tham chiếu.",
-            },
-            resultCode: "00181",
-        });
+    if (!id) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Missing food id",
+          vn: "Thiếu id của thực phẩm",
+        },
+        resultCode: "400",
+      });
     }
 
-    const { error } = await supabase.from("foods").delete().eq("id", id);
-    if (error) throw error;
+    const { data: existing } = await supabase
+      .from("foods")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
 
-    res.status(200).json({
-      resultMessage: {
-        en: "Food deleted successfully",
-        vn: "Xóa thực phẩm thành công",
-      },
-      resultCode: "00184",
-    });
-  } catch (err) {
-    console.error("Error deleting food:", err.message);
-    res.status(500).json({ error: "Internal server error", resultCode: "00168" });
-  }
+    if (!existing) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Food not found",
+          vn: "Không tìm thấy thực phẩm",
+        },
+        resultCode: "00180",
+      });
+    }
+
+    // Check FK Constraint (Fridge Item) (00181)
+    const { count: fridgeCount } = await supabase
+      .from("fridge_items")
+      .select("id", { count: "exact" })
+      .eq("food_id", id);
+
+    if (fridgeCount > 0) {
+      return res.status(409).json({
+        resultMessage: {
+          en: "Cannot delete food due to existing fridge item references",
+          vn: "Không thể xóa Food. Vẫn có mục trong tủ lạnh đang tham chiếu.",
+        },
+        resultCode: "00181",
+      });
+    }
+
+    const { error } = await supabase.from("foods").delete().eq("id", id);
+    if (error) throw error;
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Food deleted successfully",
+        vn: "Xóa thực phẩm thành công",
+      },
+      resultCode: "00184",
+    });
+  } catch (err) {
+    console.error("Error deleting food:", err.message);
+    res
+      .status(500)
+      .json({ error: "Internal server error", resultCode: "00168" });
+  }
 };
 
 /**
@@ -469,45 +470,45 @@ export const deleteFood = async (req, res) => {
  *         description: Lỗi máy chủ
  */
 export const getFoodsByGroup = async (req, res) => {
-  try {
-    const user = req.user;
-    const groupId = req.query.groupId || user?.groupId;
+  try {
+    const user = req.user;
+    const groupId = req.query.groupId || user?.groupId;
 
-    if (!groupId) {
-        // 00185: Bạn chưa vào nhóm nào
-      return res.status(403).json({
-        resultMessage: {
-          en: "User does not belong to any group",
-          vn: "Bạn chưa vào nhóm nào",
-        },
-        resultCode: "00185",
-      });
-    }
+    if (!groupId) {
+      // 00185: Bạn chưa vào nhóm nào
+      return res.status(403).json({
+        resultMessage: {
+          en: "User does not belong to any group",
+          vn: "Bạn chưa vào nhóm nào",
+        },
+        resultCode: "00185",
+      });
+    }
 
-    const { data, error } = await supabase
-     .from("foods")
-     .select(
-        `id, name, image_url, created_at, updated_at, 
+    const { data, error } = await supabase
+      .from("foods")
+      .select(
+        `id, name, image_url, created_at, updated_at, 
          categories (id, name), 
          units (id, unit_name)`
-      )
-     .eq("group_id", groupId)
-     .order("name", { ascending: true });
+      )
+      .eq("group_id", groupId)
+      .order("name", { ascending: true });
 
-    if (error) throw error;
+    if (error) throw error;
 
-    res.status(200).json({
-      resultMessage: {
-        en: "Get food list successfully",
-        vn: "Lấy danh sách thực phẩm thành công",
-      },
-      resultCode: "00188",
-      foods: data,
-    });
-  } catch (err) {
-    console.error("Error fetching foods:", err.message);
-    res.status(500).json({ error: "Internal server error" });
-  }
+    res.status(200).json({
+      resultMessage: {
+        en: "Get food list successfully",
+        vn: "Lấy danh sách thực phẩm thành công",
+      },
+      resultCode: "00188",
+      foods: data,
+    });
+  } catch (err) {
+    console.error("Error fetching foods:", err.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
 };
 
 /**
@@ -534,40 +535,40 @@ export const getFoodsByGroup = async (req, res) => {
  *         description: Lỗi máy chủ
  */
 export const getFoodById = async (req, res) => {
-  try {
-    const id = req.params.id;
+  try {
+    const id = req.params.id;
 
-    const { data, error } = await supabase
-     .from("foods")
-     .select(
-        `*, 
+    const { data, error } = await supabase
+      .from("foods")
+      .select(
+        `*, 
          categories (id, name),
          units (id, unit_name)`
-      )
-     .eq("id", id)
-     .maybeSingle();
+      )
+      .eq("id", id)
+      .maybeSingle();
 
-    if (error) throw error;
-    if (!data) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Food not found",
-          vn: "Không tìm thấy thực phẩm",
-        },
-        resultCode: "404",
-      });
-    }
+    if (error) throw error;
+    if (!data) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Food not found",
+          vn: "Không tìm thấy thực phẩm",
+        },
+        resultCode: "404",
+      });
+    }
 
-    res.status(200).json({
-      resultMessage: {
-        en: "Get food detail successfully",
-        vn: "Lấy chi tiết thực phẩm thành công",
-      },
-      resultCode: "00178",
-      food: data,
-    });
-  } catch (err) {
-    console.error("Error fetching food by id:", err.message);
-    res.status(500).json({ error: "Internal server error" });
-  }
+    res.status(200).json({
+      resultMessage: {
+        en: "Get food detail successfully",
+        vn: "Lấy chi tiết thực phẩm thành công",
+      },
+      resultCode: "00178",
+      food: data,
+    });
+  } catch (err) {
+    console.error("Error fetching food by id:", err.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
 };
