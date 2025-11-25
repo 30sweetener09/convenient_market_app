@@ -1,3 +1,10 @@
+/**
+ * @swagger
+ * tags:
+ *   name: Shopping List
+ *   description: Shopping list management APIs
+ */
+
 // controllers/mealPlanController.js
 import { supabase } from "../db.js";
 

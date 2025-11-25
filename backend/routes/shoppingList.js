@@ -10,7 +10,7 @@ import {
   deleteTask,
   updateTask,
 } from "../controllers/shoppingListController.js";
-import { authMiddleware } from "../middlewares/authMiddleware.js"; // Adjust path as needed
+import { authMiddleware } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
@@ -18,13 +18,15 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // Shopping List routes
-router.get("/", getListOfTasks);
-router.post("/", createShoppingList);
-router.put("/", updateShoppingList);
-router.delete("/", deleteShoppingList);
-router.post("/tasks", createTasks);
-router.put("/tasks", updateTask);
+router.post("/create", authMiddleware, createShoppingList);
+router.put("/update", authMiddleware, updateShoppingList);
+router.delete("/delete", authMiddleware, deleteShoppingList);
+
+// Tasks Routes
+router.post("/tasks/create", createTasks);
+router.get("/tasks/list", getListOfTasks);
 router.put("/tasks/mark", markTask);
-router.delete("/tasks", deleteTask);
+router.delete("/tasks/delete", deleteTask);
+router.put("/tasks/update", updateTask);
 
 export default router;

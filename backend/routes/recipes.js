@@ -13,9 +13,9 @@ const recipeRoutes = express.Router();
 // Apply authentication middleware to all routes
 recipeRoutes.use(authMiddleware);
 
-recipeRoutes.get("/", getRecipesByFoodId);
-recipeRoutes.post("/", createRecipe);
-recipeRoutes.put("/", updateRecipe);
-recipeRoutes.delete("/", deleteRecipe);
+recipeRoutes.post("/create", createRecipe);
+recipeRoutes.put("/update", updateRecipe);
+recipeRoutes.delete("/delete", deleteRecipe);
+recipeRoutes.get("/get-by-food", getRecipesByFoodId);
 
 export default recipeRoutes;

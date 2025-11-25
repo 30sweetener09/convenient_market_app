@@ -13,9 +13,9 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(authMiddleware);
 
-router.get("/", getMealPlansByDate);
-router.post("/", createMealPlan);
-router.put("/", updateMealPlan);
-router.delete("/", deleteMealPlan);
+router.post("/create", createMealPlan);
+router.put("/update", updateMealPlan);
+router.delete("/delete", deleteMealPlan);
+router.get("/get-by-date", getMealPlansByDate);
 
 export default router;

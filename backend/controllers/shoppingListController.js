@@ -57,12 +57,15 @@ const validateAndFormatDate = (dateString) => {
  *               name:
  *                 type: string
  *                 example: "Shopping list for today"
+ *                 description: Name of the shopping list
  *               assignToUsername:
  *                 type: string
  *                 example: "member6320"
+ *                 description: Username of the person assigned to this list
  *               note:
  *                 type: string
  *                 example: "nếu ngày ấy"
+ *                 description: Optional note for the shopping list
  *               date:
  *                 type: string
  *                 pattern: '^\d{2}/\d{2}/\d{4}$'
@@ -81,14 +84,65 @@ const validateAndFormatDate = (dateString) => {
  *                   properties:
  *                     en:
  *                       type: string
+ *                       example: "Shopping list created successfully."
+ *                     vn:
+ *                       type: string
+ *                       example: "Danh sách mua sắm đã được tạo thành công."
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00249"
+ *                 createdShoppingList:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 1
+ *                     name:
+ *                       type: string
+ *                       example: "Shopping list for today"
+ *                     note:
+ *                       type: string
+ *                       example: "nếu ngày ấy"
+ *                     belongsToGroupAdminId:
+ *                       type: integer
+ *                       example: 123
+ *                     assignedToUserId:
+ *                       type: integer
+ *                       example: 456
+ *                     assignToUsername:
+ *                       type: string
+ *                       example: "member6320"
+ *                     date:
+ *                       type: string
+ *                       format: date
+ *                       example: "2022-12-30"
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *                     UserId:
+ *                       type: integer
+ *                       example: 123
+ *       400:
+ *         description: Bad request - Missing fields or invalid date format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
  *                     vn:
  *                       type: string
  *                 resultCode:
  *                   type: string
- *                 createdShoppingList:
- *                   type: object
- *       400:
- *         description: Bad request - Missing fields or invalid date format
+ *       401:
+ *         description: Unauthorized access
  *       404:
  *         description: User not found
  *       500:
