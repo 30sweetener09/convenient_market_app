@@ -17,6 +17,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+<<<<<<< HEAD
       appBar: AppBar(
         //title: const Text("Quên mật khẩu"),
         // Thuộc tính leading cho phép đặt Widget ở vị trí đầu (thường là bên trái)
@@ -28,6 +29,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           },
         ),
       ),
+=======
+>>>>>>> 6134029d30e5bea7d87cb744d077754cb39bf252
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -37,6 +40,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               mainAxisSize: MainAxisSize.min,
               // crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+<<<<<<< HEAD
                 const Text("Quên mật khẩu",
                     style: TextStyle(
                       color: Color(0xFF396A30),
@@ -54,6 +58,29 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       fontWeight: FontWeight.w300,
                       )),
                 const SizedBox(height: 20),
+=======
+                // Logo
+                SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: Image.asset(
+                    "assets/images/DiChoTienLoi_Logo_Green.png",
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                const Text(
+                  "Quên mật khẩu",
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 40),
+>>>>>>> 6134029d30e5bea7d87cb744d077754cb39bf252
 
                 CustomTextField(
                   controller: _emailController,
@@ -67,7 +94,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
+<<<<<<< HEAD
                       backgroundColor: Color(0xFF396A30),
+=======
+                      backgroundColor: Colors.green,
+>>>>>>> 6134029d30e5bea7d87cb744d077754cb39bf252
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
@@ -84,12 +115,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     child: const Text(
                       "Gửi",
                       style: TextStyle(
+<<<<<<< HEAD
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
+=======
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+>>>>>>> 6134029d30e5bea7d87cb744d077754cb39bf252
                       ),
                     ),
                   ),
                 ),
+<<<<<<< HEAD
                 const SizedBox(height: 40),
                 
                 //logo
@@ -101,6 +138,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     fit: BoxFit.contain,
                   ),
                 ),
+=======
+>>>>>>> 6134029d30e5bea7d87cb744d077754cb39bf252
               ],
             ),
           ),
@@ -108,4 +147,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ),
     );
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 6134029d30e5bea7d87cb744d077754cb39bf252

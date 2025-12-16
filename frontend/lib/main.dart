@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+<<<<<<< HEAD
 import '../screens/home/home_screen.dart';
+=======
+>>>>>>> 6134029d30e5bea7d87cb744d077754cb39bf252
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
-import 'routes/app_routes.dart';
-import 'screens/auth/login_screen.dart';
-import 'widgets/auth_guard.dart';
+import 'screens/splash/splash_screen.dart';
 
 void main() {
   runApp(
@@ -20,6 +21,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
         return MaterialApp(
@@ -36,6 +38,12 @@ class MyApp extends StatelessWidget {
           ),
         );
       },
+=======
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Convenient Market',
+      home: const SplashScreen(), // Load splash trước
+>>>>>>> 6134029d30e5bea7d87cb744d077754cb39bf252
     );
   }
 }

@@ -31,6 +31,8 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Form(
             key: _formKey,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
+              // crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text("Đăng nhập",
                     style: TextStyle(
