@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:di_cho_tien_loi/data/dto/user_dto.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
 
 class AuthProvider extends ChangeNotifier {
   bool isLoggedIn = false;
@@ -110,4 +112,51 @@ class AuthProvider extends ChangeNotifier {
 
     return res;
   }
+  Future<bool> register(UserDTO userdto) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+
+    bool success = false;
+
+    try {
+      final response = await http.post(
+        Uri.parse("$_baseUrl/user/"),
+        headers: {
+          "accept": "*/*",
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: {
+          "name": userdto.name,
+          "email": userdto.email,
+          "password": userdto.password,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        token = data['session']?['access_token'];
+
+        if (token != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('token', token!);
+          isLoggedIn = true;
+        }
+        success = true;
+      } else if (response.statusCode == 400) {
+        final data = jsonDecode(response.body);
+        error = data['error'] ?? "Email đã tồn tại";
+      } else {
+        error = "Đăng ký thất bại";
+      }
+    } catch (e) {
+      error = "Lỗi đăng ký: $e";
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+
+    return success;
+  }
+
 }

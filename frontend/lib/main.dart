@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:frontend/screens/home/home_screen.dart';
+import '../screens/home/home_screen.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'routes/app_routes.dart';
@@ -31,6 +31,9 @@ class MyApp extends StatelessWidget {
 
           // ✅ Các route trong app
           routes: AppRoutes.routes,
+          theme: ThemeData(
+            fontFamily: 'Nunito'
+          ),
         );
       },
     );
