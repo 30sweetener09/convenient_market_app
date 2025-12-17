@@ -1,61 +1,93 @@
-// middlewares/permissions.js
-import { supabase } from "../db.js";
+// middlewares/permission.js
+import { supabaseAdmin } from "../db.js";
 
+/**
+ * Middleware kiểm tra permission của user
+ * @param {string} permissionName - tên permission cần kiểm tra
+ */
 export const requirePermission = (permissionName) => {
   return async (req, res, next) => {
     try {
-      const userId = req.user?.id; // JWT decode từ auth middleware
+      // =============================
+      // 0) Kiểm tra user từ auth middleware
+      // =============================
+      const userId = req.user?.id;
 
       if (!userId) {
-        return res.status(401).json({ error: "Unauthorized: missing user" });
+        return res.status(401).json({
+          resultCode: "00006",
+          message: "Truy cập bị từ chối. Không có token được cung cấp.",
+        });
       }
 
       // =============================
-      // 1) Lấy danh sách role của user
+      // 1) Lấy role của user
       // =============================
-      const { data: userRoles, error: roleErr } = await supabase
+      const { data: userRoles, error: roleErr } = await supabaseAdmin
         .from("user_role")
         .select("role_id")
         .eq("user_id", userId);
 
       if (roleErr) {
-        return res.status(500).json({ error: "Failed to fetch user roles" });
+        console.error("Fetch user_role error:", roleErr);
+        return res.status(500).json({
+          resultCode: "00008",
+          message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+        });
       }
 
       if (!userRoles || userRoles.length === 0) {
-        return res.status(403).json({ error: "User has no roles" });
+        return res.status(403).json({
+          resultCode: "00017",
+          message: "Truy cập bị từ chối. Bạn không có quyền truy cập.",
+        });
       }
 
-      const roleIds = userRoles.map(r => r.role_id);
+      const roleIds = userRoles.map((r) => r.role_id);
 
       // =============================
-      // 2) JOIN ra danh sách permission từ roles
+      // 2) Lấy permission từ role
       // =============================
-      const { data: permissions, error: permErr } = await supabase
+      const { data: rolePermissions, error: permErr } = await supabaseAdmin
         .from("role_permission")
         .select(`
-          permission:permissions(name)
+          permissions (
+            name
+          )
         `)
         .in("role_id", roleIds);
 
       if (permErr) {
-        return res.status(500).json({ error: "Failed to fetch permissions" });
+        console.error("Fetch permissions error:", permErr);
+        return res.status(500).json({
+          resultCode: "00008",
+          message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+        });
       }
 
-      const userPerms = permissions?.map(p => p.permission?.name) || [];
+      const userPermissions =
+        rolePermissions?.map((p) => p.permissions?.name).filter(Boolean) || [];
 
-      if (!userPerms.includes(permissionName)) {
-        return res.status(403).json({ error: "Forbidden: missing permission '" + permissionName + "'" });
+      // =============================
+      // 3) Kiểm tra permission
+      // =============================
+      if (!userPermissions.includes(permissionName)) {
+        return res.status(403).json({
+          resultCode: "00019",
+          message: "Truy cập bị từ chối. Bạn không có quyền truy cập.",
+        });
       }
 
       // =============================
-      // 3) Cho phép đi tiếp
+      // 4) Cho phép đi tiếp
       // =============================
       next();
-
     } catch (err) {
       console.error("Permission middleware error:", err);
-      return res.status(500).json({ error: "Permission check failed" });
+      return res.status(500).json({
+        resultCode: "00008",
+        message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+      });
     }
   };
 };

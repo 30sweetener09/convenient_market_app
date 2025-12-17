@@ -15,21 +15,14 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS: cho phép mọi origin, method, header
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT","PATCH" , "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: false
-}));
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
 
-setupSwagger(app);
+
 
 // Middleware
 registerMiddlewares(app);
+
+setupSwagger(app);
 
 // Gắn Supabase client vào req để dùng ở route
 app.use((req, res, next) => {

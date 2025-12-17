@@ -1,34 +1,35 @@
-import jwt from "jsonwebtoken";
+import { supabaseAdmin } from "../db.js";
 
-
-export const supabaseAuth = (req, res, next) => {
+export const supabaseAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader)
-      return res.status(401).json({ error: "No token provided" });
 
-    const token = authHeader.split(" ")[1];
-
-    const decoded = jwt.decode(token);
-
-    if (!decoded) {
-      return res.status(401).json({ error: "Invalid token" });
+    // 00006 – Không có token
+    if (!authHeader) {
+      return res.status(401).json({
+        resultCode: "00006",
+        message: "Truy cập bị từ chối. Không có token được cung cấp.",
+      });
     }
 
-    const userId =
-      decoded.sub ||
-      decoded.user_id ||
-      decoded.id ||
-      decoded["https://supabase.io/user_id"];
+    const token = authHeader.replace("Bearer ", "");
 
-    if (!userId) {
-      return res.status(401).json({ error: "Token missing user id" });
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+
+    // 00012 – Token không hợp lệ
+    if (error || !data?.user) {
+      return res.status(401).json({
+        resultCode: "00012",
+        message: "Token không hợp lệ. Token có thể đã hết hạn.",
+      });
     }
 
-    req.user = { id: userId };
+    req.user = data.user;
     next();
-  } catch (err) {
-    console.error("Supabase auth error:", err);
-    return res.status(401).json({ error: "Unauthorized" });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
