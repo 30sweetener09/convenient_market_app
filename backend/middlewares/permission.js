@@ -1,41 +1,61 @@
-// middlewares/permission.js
+// middlewares/permissions.js
 import { supabase } from "../db.js";
 
 export const requirePermission = (permissionName) => {
   return async (req, res, next) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user?.id; // JWT decode từ auth middleware
 
-      // Lấy roles của user
-      const { data: userRoles } = await supabase
-        .from("user_roles")
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized: missing user" });
+      }
+
+      // =============================
+      // 1) Lấy danh sách role của user
+      // =============================
+      const { data: userRoles, error: roleErr } = await supabase
+        .from("user_role")
         .select("role_id")
         .eq("user_id", userId);
 
-      if (!userRoles?.length) {
-        return res.status(403).json({ error: "No roles assigned" });
+      if (roleErr) {
+        return res.status(500).json({ error: "Failed to fetch user roles" });
       }
 
-      // Lấy permissions theo role
-      const { data: rolePermissions } = await supabase
-        .from("role_permissions")
-        .select("permission_id")
-        .in("role_id", userRoles.map(r => r.role_id));
+      if (!userRoles || userRoles.length === 0) {
+        return res.status(403).json({ error: "User has no roles" });
+      }
 
-      const { data: permissions } = await supabase
-        .from("permissions")
-        .select("name")
-        .in("id", rolePermissions.map(rp => rp.permission_id));
+      const roleIds = userRoles.map(r => r.role_id);
 
-      const userPerms = permissions.map(p => p.name);
+      // =============================
+      // 2) JOIN ra danh sách permission từ roles
+      // =============================
+      const { data: permissions, error: permErr } = await supabase
+        .from("role_permission")
+        .select(`
+          permission:permissions(name)
+        `)
+        .in("role_id", roleIds);
+
+      if (permErr) {
+        return res.status(500).json({ error: "Failed to fetch permissions" });
+      }
+
+      const userPerms = permissions?.map(p => p.permission?.name) || [];
 
       if (!userPerms.includes(permissionName)) {
-        return res.status(403).json({ error: "Forbidden: insufficient permissions" });
+        return res.status(403).json({ error: "Forbidden: missing permission '" + permissionName + "'" });
       }
 
+      // =============================
+      // 3) Cho phép đi tiếp
+      // =============================
       next();
+
     } catch (err) {
-      res.status(500).json({ error: "Permission check failed" });
+      console.error("Permission middleware error:", err);
+      return res.status(500).json({ error: "Permission check failed" });
     }
   };
 };

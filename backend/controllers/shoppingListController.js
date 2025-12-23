@@ -1,7 +1,13 @@
 // controllers/shoppingListController.js
 import { supabase } from "../db.js";
 
-// Helper function to validate and format date (MM/DD/YYYY → YYYY-MM-DD)
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Validate and format date from MM/DD/YYYY to YYYY-MM-DD
+ * @param {string} dateString - Date in MM/DD/YYYY format
+ * @returns {string|null} - Formatted date or null if invalid
+ */
 const validateAndFormatDate = (dateString) => {
   if (!dateString || typeof dateString !== "string") return null;
 
@@ -30,16 +36,19 @@ const validateAndFormatDate = (dateString) => {
     30,
     31,
   ];
+
   if (dayNum > daysInMonth[monthNum - 1]) return null;
 
   return `${yearNum}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 };
 
+// ==================== SHOPPING LIST CRUD ====================
+
 /**
  * @swagger
- * /shopping-list/create:
+ * /shopping-list:
  *   post:
- *     summary: Create a new shopping list
+ *     summary: Tạo danh sách mua sắm mới
  *     tags: [Shopping List]
  *     security:
  *       - bearerAuth: []
@@ -49,122 +58,52 @@ const validateAndFormatDate = (dateString) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - name
- *               - assignToUsername
- *               - date
+ *             required: [name, assignToUsername, date]
  *             properties:
  *               name:
  *                 type: string
  *                 example: "Shopping list for today"
- *                 description: Name of the shopping list
  *               assignToUsername:
  *                 type: string
  *                 example: "member6320"
- *                 description: Username of the person assigned to this list
  *               note:
  *                 type: string
  *                 example: "nếu ngày ấy"
- *                 description: Optional note for the shopping list
  *               date:
  *                 type: string
  *                 pattern: '^\d{2}/\d{2}/\d{4}$'
  *                 example: "12/30/2022"
- *                 description: Date in MM/DD/YYYY format
  *     responses:
  *       200:
- *         description: Shopping list created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 resultMessage:
- *                   type: object
- *                   properties:
- *                     en:
- *                       type: string
- *                       example: "Shopping list created successfully."
- *                     vn:
- *                       type: string
- *                       example: "Danh sách mua sắm đã được tạo thành công."
- *                 resultCode:
- *                   type: string
- *                   example: "00249"
- *                 createdShoppingList:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                       example: 1
- *                     name:
- *                       type: string
- *                       example: "Shopping list for today"
- *                     note:
- *                       type: string
- *                       example: "nếu ngày ấy"
- *                     belongsToGroupAdminId:
- *                       type: integer
- *                       example: 123
- *                     assignedToUserId:
- *                       type: integer
- *                       example: 456
- *                     assignToUsername:
- *                       type: string
- *                       example: "member6320"
- *                     date:
- *                       type: string
- *                       format: date
- *                       example: "2022-12-30"
- *                     createdAt:
- *                       type: string
- *                       format: date-time
- *                     updatedAt:
- *                       type: string
- *                       format: date-time
- *                     UserId:
- *                       type: integer
- *                       example: 123
+ *         description: Tạo danh sách mua sắm thành công (00249)
  *       400:
- *         description: Bad request - Missing fields or invalid date format
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 resultMessage:
- *                   type: object
- *                   properties:
- *                     en:
- *                       type: string
- *                     vn:
- *                       type: string
- *                 resultCode:
- *                   type: string
+ *         description: Thiếu trường bắt buộc (00238-00242)
  *       401:
- *         description: Unauthorized access
+ *         description: Không có quyền truy cập (00243)
+ *       403:
+ *         description: Không có quyền gán cho user này (00246)
  *       404:
- *         description: User not found
+ *         description: Username không tồn tại (00245)
  *       500:
- *         description: Internal server error
+ *         description: Lỗi máy chủ (00500)
  */
 export const createShoppingList = async (req, res) => {
   try {
     const { name, assignToUsername, note, date } = req.body;
 
-    // 00238 - Vui cung cấp tất cả các trường cần thiết
+    // Validate required fields
     if (!name || !assignToUsername || !date) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide all required fields",
-          vn: "Vui cung cấp tất cả các trường cần thiết",
+          vn: "Vui lòng cung cấp tất cả các trường cần thiết",
         },
         resultCode: "00238",
       });
     }
 
-    // 00239 - Vui lòng cung cấp tên
-    if (!name || name.trim() === "") {
+    // Validate name
+    if (!name.trim()) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide name",
@@ -174,8 +113,8 @@ export const createShoppingList = async (req, res) => {
       });
     }
 
-    // 00240 - Vui lòng cung cấp assignToUsername
-    if (!assignToUsername || assignToUsername.trim() === "") {
+    // Validate assignToUsername
+    if (!assignToUsername.trim()) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide assignToUsername",
@@ -185,7 +124,7 @@ export const createShoppingList = async (req, res) => {
       });
     }
 
-    // 00241 - Định dạng ghi chú không hợp lệ
+    // Validate note format
     if (note && typeof note !== "string") {
       return res.status(400).json({
         resultMessage: {
@@ -196,7 +135,7 @@ export const createShoppingList = async (req, res) => {
       });
     }
 
-    // 00242 - Định dạng ngày không hợp lệ
+    // Validate and format date
     const formattedDate = validateAndFormatDate(date);
     if (!formattedDate) {
       return res.status(400).json({
@@ -208,8 +147,8 @@ export const createShoppingList = async (req, res) => {
       });
     }
 
-    // 00243 - Truy cập không được ủy quyền. Bạn không có quyền.
-    if (!req.user || !req.user.id) {
+    // Check authentication
+    if (!req.user?.id) {
       return res.status(401).json({
         resultMessage: {
           en: "Unauthorized access. You do not have permission.",
@@ -219,12 +158,12 @@ export const createShoppingList = async (req, res) => {
       });
     }
 
-    // 00245 - Tên người dùng được gán không tồn tại.
+    // Check if assigned user exists
     const { data: assignedUser, error: userError } = await supabase
       .from("users")
-      .select("id")
-      .eq("username", assignToUsername)
-      .single();
+      .select("id, group_id")
+      .ilike("name", assignToUsername)
+      .maybeSingle();
 
     if (userError || !assignedUser) {
       return res.status(404).json({
@@ -236,24 +175,19 @@ export const createShoppingList = async (req, res) => {
       });
     }
 
-    // 00246 - Truy cập không được ủy quyền. Bạn không có quyền gán danh sách mua sắm cho người dùng này.
-    // Kiểm tra quyền gán danh sách cho user (có thể thêm logic kiểm tra relationship giữa admin và user)
-    const { data: userRelation, error: relationError } = await supabase
-      .from("users")
-      .select("id, group_id")
-      .eq("id", assignedUser.id)
-      .single();
-
+    // Check permission to assign
     const { data: adminData, error: adminError } = await supabase
       .from("users")
       .select("id, group_id, role")
       .eq("id", req.user.id)
-      .single();
+      .maybeSingle();
+
+    if (adminError) throw adminError;
 
     if (
       adminData &&
-      userRelation &&
-      adminData.group_id !== userRelation.group_id
+      assignedUser &&
+      adminData.group_id !== assignedUser.group_id
     ) {
       return res.status(403).json({
         resultMessage: {
@@ -264,7 +198,7 @@ export const createShoppingList = async (req, res) => {
       });
     }
 
-    // Tạo shopping list
+    // Create shopping list
     const { data, error } = await supabase
       .from("shopping_list")
       .insert([
@@ -284,7 +218,6 @@ export const createShoppingList = async (req, res) => {
 
     if (error) throw error;
 
-    // 00249 - Danh sách mua sắm đã được tạo thành công.
     res.status(200).json({
       resultMessage: {
         en: "Shopping list created successfully.",
@@ -319,772 +252,21 @@ export const createShoppingList = async (req, res) => {
 
 /**
  * @swagger
- * /shopping-list/update:
- *   put:
- *     summary: Update an existing shopping list
- *     tags: [Shopping List]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - listId
- *             properties:
- *               listId:
- *                 type: integer
- *                 example: 1
- *               newName:
- *                 type: string
- *                 example: "Monthly Groceries"
- *               newAssignToUsername:
- *                 type: string
- *                 example: "jane_doe"
- *               newDate:
- *                 type: string
- *                 pattern: '^\d{2}/\d{2}/\d{4}$'
- *                 example: "01/15/2025"
- *               newNote:
- *                 type: string
- *                 example: "Updated note"
- *     responses:
- *       200:
- *         description: Shopping list updated successfully
- *       400:
- *         description: Bad request
- *       403:
- *         description: Permission denied
- *       404:
- *         description: Shopping list or user not found
- */
-export const updateShoppingList = async (req, res) => {
-  try {
-    const { listId, newName, newAssignToUsername, newDate, newNote } = req.body;
-
-    // 00250 - Vui cung cấp tất cả các trường cần thiết
-    if (
-      !listId &&
-      !newName &&
-      !newAssignToUsername &&
-      !newDate &&
-      newNote === undefined
-    ) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide all required fields",
-          vn: "Vui cung cấp tất cả các trường cần thiết",
-        },
-        resultCode: "00250",
-      });
-    }
-
-    // 00251 - Vui lòng cung cấp id danh sách
-    if (!listId) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide list id",
-          vn: "Vui lòng cung cấp id danh sách",
-        },
-        resultCode: "00251",
-      });
-    }
-
-    // 00252 - Vui lòng cung cấp ít nhất một trong những trường sau
-    if (
-      newName === undefined &&
-      newAssignToUsername === undefined &&
-      newDate === undefined &&
-      newNote === undefined
-    ) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide at least one of the following fields: newName, newAssignToUsername, newNote, newDate",
-          vn: "Vui lòng cung cấp ít nhất một trong những trường sau, newName, newAssignToUsername, newNote, newDate",
-        },
-        resultCode: "00252",
-      });
-    }
-
-    // 00253 - Định dạng tên mới không hợp lệ
-    if (
-      newName !== undefined &&
-      (typeof newName !== "string" || newName.trim() === "")
-    ) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Invalid new name format",
-          vn: "Định dạng tên mới không hợp lệ",
-        },
-        resultCode: "00253",
-      });
-    }
-
-    // 00254 - Định dạng tên người được giao mới không hợp lệ
-    if (
-      newAssignToUsername !== undefined &&
-      (typeof newAssignToUsername !== "string" ||
-        newAssignToUsername.trim() === "")
-    ) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Invalid new assignee username format",
-          vn: "Định dạng tên người được giao mới không hợp lệ",
-        },
-        resultCode: "00254",
-      });
-    }
-
-    // 00255 - Định dạng ghi chú mới không hợp lệ
-    if (
-      newNote !== undefined &&
-      newNote !== null &&
-      typeof newNote !== "string"
-    ) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Invalid new note format",
-          vn: "Định dạng ghi chú mới không hợp lệ",
-        },
-        resultCode: "00255",
-      });
-    }
-
-    // 00256 - Định dạng ngày mới không hợp lệ
-    let formattedDate;
-    if (newDate !== undefined) {
-      formattedDate = validateAndFormatDate(newDate);
-      if (!formattedDate) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Invalid new date format",
-            vn: "Định dạng ngày mới không hợp lệ",
-          },
-          resultCode: "00256",
-        });
-      }
-    }
-
-    // 00258 - Người dùng không phải là quản trị viên nhóm
-    if (!req.user || !req.user.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00258",
-      });
-    }
-
-    const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, role, group_id")
-      .eq("id", req.user.id)
-      .single();
-
-    if (adminError || !adminData || adminData.role !== "admin") {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00258",
-      });
-    }
-
-    // 00260 - Không tìm thấy danh sách mua sắm
-    const { data: existingList, error: fetchError } = await supabase
-      .from("shopping_list")
-      .select("*")
-      .eq("id", listId)
-      .single();
-
-    if (fetchError || !existingList) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Shopping list not found",
-          vn: "Không tìm thấy danh sách mua sắm",
-        },
-        resultCode: "00260",
-      });
-    }
-
-    // 00261 - Người dùng không phải là quản trị viên của danh sách mua sắm này
-    if (existingList.belongs_to_admin_id !== req.user.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not the admin of this shopping list",
-          vn: "Người dùng không phải là quản trị viên của danh sách mua sắm này",
-        },
-        resultCode: "00261",
-      });
-    }
-
-    const updateData = { updated_at: new Date().toISOString() };
-
-    // Xử lý newName
-    if (newName !== undefined) {
-      updateData.name = newName.trim();
-    }
-
-    // Xử lý newAssignToUsername
-    if (newAssignToUsername !== undefined) {
-      // 00262 - Người dùng không tồn tại
-      const { data: newUser, error: userError } = await supabase
-        .from("users")
-        .select("id, group_id")
-        .eq("username", newAssignToUsername)
-        .single();
-
-      if (userError || !newUser) {
-        return res.status(404).json({
-          resultMessage: {
-            en: "User does not exist",
-            vn: "Người dùng không tồn tại",
-          },
-          resultCode: "00262",
-        });
-      }
-
-      // 00263 - Người dùng không có quyền gán danh sách này cho tên người dùng
-      if (adminData.group_id !== newUser.group_id) {
-        return res.status(403).json({
-          resultMessage: {
-            en: "User does not have permission to assign this list to the username",
-            vn: "Người dùng không có quyền gán danh sách này cho tên người dùng",
-          },
-          resultCode: "00263",
-        });
-      }
-
-      updateData.assign_to_username = newAssignToUsername;
-      updateData.assigned_to_user_id = newUser.id;
-    }
-
-    // Xử lý newNote
-    if (newNote !== undefined) {
-      updateData.note = newNote ? newNote.trim() : null;
-    }
-
-    // Xử lý newDate
-    if (newDate !== undefined) {
-      updateData.date = formattedDate;
-    }
-
-    // Thực hiện update
-    const { data, error } = await supabase
-      .from("shopping_list")
-      .update(updateData)
-      .eq("id", listId)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // 00266 - Cập nhật danh sách mua sắm thành công
-    res.status(200).json({
-      resultMessage: {
-        en: "Shopping list updated successfully",
-        vn: "Cập nhật danh sách mua sắm thành công",
-      },
-      resultCode: "00266",
-      newShoppingList: {
-        id: data.id,
-        name: data.name,
-        note: data.note,
-        belongsToGroupAdminId: data.belongs_to_admin_id,
-        assignedToUserId: data.assigned_to_user_id,
-        assignToUsername: data.assign_to_username,
-        date: data.date,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        UserId: data.belongs_to_admin_id,
-      },
-    });
-  } catch (err) {
-    console.error("Error updating shopping list:", err.message);
-    res.status(500).json({
-      resultMessage: {
-        en: "Internal server error",
-        vn: "Lỗi máy chủ nội bộ",
-      },
-      resultCode: "00500",
-      error: err.message,
-    });
-  }
-};
-
-/**
- * @swagger
- * /shopping-list/delete:
- *   delete:
- *     summary: Delete a shopping list
- *     tags: [Shopping List]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - listId
- *             properties:
- *               listId:
- *                 type: integer
- *                 example: 1
- *     responses:
- *       200:
- *         description: Shopping list deleted successfully
- *       400:
- *         description: Missing listId
- *       403:
- *         description: Permission denied
- *       404:
- *         description: Shopping list not found
- */
-export const deleteShoppingList = async (req, res) => {
-  try {
-    const { listId } = req.body;
-
-    // 00267 - Cung cấp các trường cần thiết
-    if (!listId) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide required fields",
-          vn: "Cung cấp các trường cần thiết",
-        },
-        resultCode: "00267",
-      });
-    }
-
-    // 00268 - Vui lòng cung cấp id danh sách
-    if (!listId || listId.trim() === "") {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide list id",
-          vn: "Vui lòng cung cấp id danh sách",
-        },
-        resultCode: "00268",
-      });
-    }
-
-    // 00270 - Người dùng không phải là quản trị viên nhóm
-    if (!req.user || !req.user.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00270",
-      });
-    }
-
-    const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, role, group_id")
-      .eq("id", req.user.id)
-      .single();
-
-    if (adminError || !adminData || adminData.role !== "admin") {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00270",
-      });
-    }
-
-    // 00272 - Không tìm thấy danh sách mua sắm
-    const { data: existingList, error: fetchError } = await supabase
-      .from("shopping_list")
-      .select("*")
-      .eq("id", listId)
-      .single();
-
-    if (fetchError || !existingList) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Shopping list not found",
-          vn: "Không tìm thấy danh sách mua sắm",
-        },
-        resultCode: "00272",
-      });
-    }
-
-    // 00273 - Người dùng không phải là quản trị viên của danh sách mua sắm này
-    if (existingList.belongs_to_admin_id !== req.user.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not the admin of this shopping list",
-          vn: "Người dùng không phải là quản trị viên của danh sách mua sắm này",
-        },
-        resultCode: "00273",
-      });
-    }
-
-    // Xóa danh sách mua sắm
-    const { error: deleteError } = await supabase
-      .from("shopping_list")
-      .delete()
-      .eq("id", listId);
-
-    if (deleteError) throw deleteError;
-
-    // 00275 - Xóa danh sách mua sắm thành công
-    res.status(200).json({
-      resultMessage: {
-        en: "Shopping list deleted successfully",
-        vn: "Xóa danh sách mua sắm thành công",
-      },
-      resultCode: "00275",
-    });
-  } catch (err) {
-    console.error("Error deleting shopping list:", err.message);
-    res.status(500).json({
-      resultMessage: {
-        en: "Internal server error",
-        vn: "Lỗi máy chủ nội bộ",
-      },
-      resultCode: "00500",
-      error: err.message,
-    });
-  }
-};
-
-/**
- * @swagger
- * /shopping-list/tasks/create:
- *   post:
- *     summary: Create tasks for a shopping list
- *     tags: [Shopping List Tasks]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - listId
- *               - tasks
- *             properties:
- *               listId:
- *                 type: integer
- *                 example: 1
- *               tasks:
- *                 type: array
- *                 items:
- *                   type: object
- *                   required:
- *                     - foodName
- *                     - quantity
- *                   properties:
- *                     foodName:
- *                       type: string
- *                       example: "Tomatoes"
- *                     quantity:
- *                       type: string
- *                       example: "2 kg"
- *     responses:
- *       200:
- *         description: Tasks created successfully
- *       400:
- *         description: Bad request - Invalid input
- *       403:
- *         description: Permission denied
- *       404:
- *         description: Shopping list not found
- */
-export const createTasks = async (req, res) => {
-  try {
-    const { listId, tasks } = req.body;
-
-    // 00276 - Vui lòng cung cấp tất cả các trường bắt buộc
-    if (!listId || !tasks) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide all required fields",
-          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
-        },
-        resultCode: "00276",
-      });
-    }
-
-    // 00277 - Vui lòng cung cấp một ID của danh sách
-    if (!listId || (typeof listId === "string" && listId.trim() === "")) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide a list ID",
-          vn: "Vui lòng cung cấp một ID của danh sách",
-        },
-        resultCode: "00277",
-      });
-    }
-
-    // 00278 - Vui lòng cung cấp một mảng nhiệm vụ
-    if (!Array.isArray(tasks)) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide a tasks array",
-          vn: "Vui lòng cung cấp một mảng nhiệm vụ",
-        },
-        resultCode: "00278",
-      });
-    }
-
-    if (tasks.length === 0) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide a tasks array",
-          vn: "Vui lòng cung cấp một mảng nhiệm vụ",
-        },
-        resultCode: "00278",
-      });
-    }
-
-    // 00279 - Vui lòng cung cấp một mảng nhiệm vụ với các trường hợp lệ
-    for (let i = 0; i < tasks.length; i++) {
-      const task = tasks[i];
-
-      // Kiểm tra task phải là object
-      if (typeof task !== "object" || task === null) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Please provide a tasks array with valid fields",
-            vn: "Vui lòng cung cấp một mảng nhiệm vụ với các trường hợp lệ",
-          },
-          resultCode: "00279",
-        });
-      }
-
-      // Kiểm tra foodName
-      if (
-        !task.foodName ||
-        typeof task.foodName !== "string" ||
-        task.foodName.trim() === ""
-      ) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Please provide a tasks array with valid fields",
-            vn: "Vui lòng cung cấp một mảng nhiệm vụ với các trường hợp lệ",
-          },
-          resultCode: "00279",
-        });
-      }
-
-      // Kiểm tra quantity
-      if (
-        !task.quantity ||
-        typeof task.quantity !== "string" ||
-        task.quantity.trim() === ""
-      ) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Please provide a tasks array with valid fields",
-            vn: "Vui lòng cung cấp một mảng nhiệm vụ với các trường hợp lệ",
-          },
-          resultCode: "00279",
-        });
-      }
-    }
-
-    // 00281 - Người dùng không phải là quản trị viên của nhóm
-    if (!req.user || !req.user.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên của nhóm",
-        },
-        resultCode: "00281",
-      });
-    }
-
-    const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, role, group_id")
-      .eq("id", req.user.id)
-      .single();
-
-    if (adminError || !adminData || adminData.role !== "admin") {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên của nhóm",
-        },
-        resultCode: "00281",
-      });
-    }
-
-    // 00283 - Không tìm thấy danh sách mua sắm
-    const { data: existingList, error: fetchError } = await supabase
-      .from("shopping_list")
-      .select("id, belongs_to_admin_id")
-      .eq("id", listId)
-      .single();
-
-    if (fetchError || !existingList) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Shopping list not found",
-          vn: "Không tìm thấy danh sách mua sắm",
-        },
-        resultCode: "00283",
-      });
-    }
-
-    // 00284 - Người dùng không phải là quản trị viên của danh sách mua sắm này
-    if (existingList.belongs_to_admin_id !== req.user.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not the admin of this shopping list",
-          vn: "Người dùng không phải là quản trị viên của danh sách mua sắm này",
-        },
-        resultCode: "00284",
-      });
-    }
-
-    // Kiểm tra food_name có tồn tại trong bảng foods
-    const foodNames = tasks.map((task) => task.foodName.trim().toLowerCase());
-    const { data: foodsData, error: foodsError } = await supabase
-      .from("foods")
-      .select("name")
-      .in("name", foodNames);
-
-    if (foodsError) throw foodsError;
-
-    // 00285 - Không tìm thấy một món ăn với tên cung cấp trong mảng
-    const existingFoodNames = foodsData.map((food) => food.name.toLowerCase());
-    const missingFoods = foodNames.filter(
-      (name) => !existingFoodNames.includes(name)
-    );
-
-    if (missingFoods.length > 0) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Food item not found with the provided name in the array",
-          vn: "Không tìm thấy một món ăn với tên cung cấp trong mảng",
-        },
-        resultCode: "00285",
-        missingFoods: missingFoods,
-      });
-    }
-
-    // Kiểm tra xem food đã tồn tại trong shopping list chưa
-    const { data: existingTasks, error: existingTasksError } = await supabase
-      .from("shopping_list_tasks")
-      .select("food_name")
-      .eq("shopping_list_id", listId);
-
-    if (existingTasksError) throw existingTasksError;
-
-    const existingTaskNames = existingTasks.map((task) =>
-      task.food_name.toLowerCase()
-    );
-    const duplicateFoods = foodNames.filter((name) =>
-      existingTaskNames.includes(name)
-    );
-
-    // 00286 - Loại thức ăn này đã có trong danh sách rồi
-    if (duplicateFoods.length > 0) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "This food type already exists in the list",
-          vn: "Loại thức ăn này đã có trong danh sách rồi",
-        },
-        resultCode: "00286",
-        duplicateFoods: duplicateFoods,
-      });
-    }
-
-    // Tạo tasks data
-    const taskData = tasks.map((task) => ({
-      shopping_list_id: listId,
-      food_name: task.foodName.trim(),
-      quantity: task.quantity.trim(),
-      is_done: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }));
-
-    // Insert tasks
-    const { data: insertedTasks, error: insertError } = await supabase
-      .from("shopping_list_tasks")
-      .insert(taskData)
-      .select();
-
-    if (insertError) throw insertError;
-
-    // 00287 - Thêm nhiệm vụ thành công
-    res.status(200).json({
-      resultMessage: {
-        en: "Tasks added successfully",
-        vn: "Thêm nhiệm vụ thành công",
-      },
-      resultCode: "00287",
-      addedTasks: insertedTasks.map((task) => ({
-        id: task.id,
-        shoppingListId: task.shopping_list_id,
-        foodName: task.food_name,
-        quantity: task.quantity,
-        isDone: task.is_done,
-        createdAt: task.created_at,
-        updatedAt: task.updated_at,
-      })),
-    });
-  } catch (err) {
-    console.error("Error creating tasks:", err.message);
-    res.status(500).json({
-      resultMessage: {
-        en: "Internal server error",
-        vn: "Lỗi máy chủ nội bộ",
-      },
-      resultCode: "00500",
-      error: err.message,
-    });
-  }
-};
-
-/**
- * @swagger
- * /shopping-list/tasks/list:
+ * /shopping-list:
  *   get:
- *     summary: Get list of shopping lists with tasks
- *     tags: [Shopping List Tasks]
+ *     summary: Lấy danh sách tất cả shopping lists với tasks
+ *     tags: [Shopping List]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Successfully retrieved shopping lists and tasks
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 resultMessage:
- *                   type: object
- *                   properties:
- *                     en:
- *                       type: string
- *                     vn:
- *                       type: string
- *                 resultCode:
- *                   type: string
- *                 role:
- *                   type: string
- *                 list:
- *                   type: array
- *                   items:
- *                     type: object
+ *         description: Lấy danh sách thành công (00292)
  *       401:
- *         description: Unauthorized
+ *         description: Người dùng chưa thuộc nhóm nào (00288)
+ *       500:
+ *         description: Lỗi máy chủ
  */
-export const getListOfTasks = async (req, res) => {
+export const getAllShoppingLists = async (req, res) => {
   try {
     if (!req.user?.id) {
       return res.status(401).json({
@@ -1153,16 +335,426 @@ export const getListOfTasks = async (req, res) => {
   } catch (err) {
     console.error("Error getting shopping lists:", err.message);
     res.status(500).json({
-      error: "Internal server error",
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
     });
   }
 };
 
 /**
  * @swagger
- * /shopping-list/tasks/mark:
+ * /shopping-list:
  *   put:
- *     summary: Mark/unmark a task as done
+ *     summary: Cập nhật danh sách mua sắm
+ *     tags: [Shopping List]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [listId]
+ *             properties:
+ *               listId:
+ *                 type: integer
+ *               newName:
+ *                 type: string
+ *               newAssignToUsername:
+ *                 type: string
+ *               newDate:
+ *                 type: string
+ *               newNote:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công (00266)
+ *       400:
+ *         description: Lỗi validation (00250-00256)
+ *       403:
+ *         description: Không có quyền (00258, 00261, 00263)
+ *       404:
+ *         description: Không tìm thấy (00260, 00262)
+ *       500:
+ *         description: Lỗi máy chủ (00500)
+ */
+export const updateShoppingList = async (req, res) => {
+  try {
+    const { listId, newName, newAssignToUsername, newDate, newNote } = req.body;
+
+    // Validate listId
+    if (!listId) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide list id",
+          vn: "Vui lòng cung cấp id danh sách",
+        },
+        resultCode: "00251",
+      });
+    }
+
+    // Validate at least one field to update
+    if (
+      newName === undefined &&
+      newAssignToUsername === undefined &&
+      newDate === undefined &&
+      newNote === undefined
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide at least one of the following fields: newName, newAssignToUsername, newNote, newDate",
+          vn: "Vui lòng cung cấp ít nhất một trong những trường sau, newName, newAssignToUsername, newNote, newDate",
+        },
+        resultCode: "00252",
+      });
+    }
+
+    // Validate newName
+    if (
+      newName !== undefined &&
+      (!newName || typeof newName !== "string" || !newName.trim())
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Invalid new name format",
+          vn: "Định dạng tên mới không hợp lệ",
+        },
+        resultCode: "00253",
+      });
+    }
+
+    // Validate newAssignToUsername
+    if (
+      newAssignToUsername !== undefined &&
+      (!newAssignToUsername ||
+        typeof newAssignToUsername !== "string" ||
+        !newAssignToUsername.trim())
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Invalid new assignee username format",
+          vn: "Định dạng tên người được giao mới không hợp lệ",
+        },
+        resultCode: "00254",
+      });
+    }
+
+    // Validate newNote
+    if (
+      newNote !== undefined &&
+      newNote !== null &&
+      typeof newNote !== "string"
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Invalid new note format",
+          vn: "Định dạng ghi chú mới không hợp lệ",
+        },
+        resultCode: "00255",
+      });
+    }
+
+    // Validate and format newDate
+    let formattedDate;
+    if (newDate !== undefined) {
+      formattedDate = validateAndFormatDate(newDate);
+      if (!formattedDate) {
+        return res.status(400).json({
+          resultMessage: {
+            en: "Invalid new date format",
+            vn: "Định dạng ngày mới không hợp lệ",
+          },
+          resultCode: "00256",
+        });
+      }
+    }
+
+    // Check if user is admin
+    if (!req.user?.id) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00258",
+      });
+    }
+
+    const { data: adminData, error: adminError } = await supabase
+      .from("users")
+      .select("id, role, group_id")
+      .eq("id", req.user.id)
+      .maybeSingle();
+
+    if (adminError || !adminData || adminData.role !== "admin") {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00258",
+      });
+    }
+
+    // Check if shopping list exists
+    const { data: existingList, error: fetchError } = await supabase
+      .from("shopping_list")
+      .select("*")
+      .eq("id", listId)
+      .maybeSingle();
+
+    if (fetchError || !existingList) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Shopping list not found",
+          vn: "Không tìm thấy danh sách mua sắm",
+        },
+        resultCode: "00260",
+      });
+    }
+
+    // Check if user is the owner
+    if (existingList.belongs_to_admin_id !== req.user.id) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not the admin of this shopping list",
+          vn: "Người dùng không phải là quản trị viên của danh sách mua sắm này",
+        },
+        resultCode: "00261",
+      });
+    }
+
+    const updateData = { updated_at: new Date().toISOString() };
+
+    // Update name
+    if (newName !== undefined) {
+      updateData.name = newName.trim();
+    }
+
+    // Update assignee
+    if (newAssignToUsername !== undefined) {
+      const { data: newUser, error: userError } = await supabase
+        .from("users")
+        .select("id, group_id")
+        .eq("username", newAssignToUsername)
+        .maybeSingle();
+
+      if (userError || !newUser) {
+        return res.status(404).json({
+          resultMessage: {
+            en: "User does not exist",
+            vn: "Người dùng không tồn tại",
+          },
+          resultCode: "00262",
+        });
+      }
+
+      if (adminData.group_id !== newUser.group_id) {
+        return res.status(403).json({
+          resultMessage: {
+            en: "User does not have permission to assign this list to the username",
+            vn: "Người dùng không có quyền gán danh sách này cho tên người dùng",
+          },
+          resultCode: "00263",
+        });
+      }
+
+      updateData.assign_to_username = newAssignToUsername;
+      updateData.assigned_to_user_id = newUser.id;
+    }
+
+    // Update note
+    if (newNote !== undefined) {
+      updateData.note = newNote ? newNote.trim() : null;
+    }
+
+    // Update date
+    if (newDate !== undefined) {
+      updateData.date = formattedDate;
+    }
+
+    // Perform update
+    const { data, error } = await supabase
+      .from("shopping_list")
+      .update(updateData)
+      .eq("id", listId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Shopping list updated successfully",
+        vn: "Cập nhật danh sách mua sắm thành công",
+      },
+      resultCode: "00266",
+      newShoppingList: {
+        id: data.id,
+        name: data.name,
+        note: data.note,
+        belongsToGroupAdminId: data.belongs_to_admin_id,
+        assignedToUserId: data.assigned_to_user_id,
+        assignToUsername: data.assign_to_username,
+        date: data.date,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        UserId: data.belongs_to_admin_id,
+      },
+    });
+  } catch (err) {
+    console.error("Error updating shopping list:", err.message);
+    res.status(500).json({
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /shopping-list:
+ *   delete:
+ *     summary: Xóa danh sách mua sắm
+ *     tags: [Shopping List]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [listId]
+ *             properties:
+ *               listId:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Xóa thành công (00275)
+ *       400:
+ *         description: Thiếu listId (00268)
+ *       403:
+ *         description: Không có quyền (00270, 00273)
+ *       404:
+ *         description: Không tìm thấy (00272)
+ *       500:
+ *         description: Lỗi máy chủ (00500)
+ */
+export const deleteShoppingList = async (req, res) => {
+  try {
+    const { listId } = req.body;
+
+    // Validate listId
+    if (!listId) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide list id",
+          vn: "Vui lòng cung cấp id danh sách",
+        },
+        resultCode: "00268",
+      });
+    }
+
+    // Check if user is admin
+    if (!req.user?.id) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00270",
+      });
+    }
+
+    const { data: adminData, error: adminError } = await supabase
+      .from("users")
+      .select("id, role, group_id")
+      .eq("id", req.user.id)
+      .maybeSingle();
+
+    if (adminError || !adminData || adminData.role !== "admin") {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00270",
+      });
+    }
+
+    // Check if shopping list exists
+    const { data: existingList, error: fetchError } = await supabase
+      .from("shopping_list")
+      .select("*")
+      .eq("id", listId)
+      .maybeSingle();
+
+    if (fetchError || !existingList) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Shopping list not found",
+          vn: "Không tìm thấy danh sách mua sắm",
+        },
+        resultCode: "00272",
+      });
+    }
+
+    // Check if user is the owner
+    if (existingList.belongs_to_admin_id !== req.user.id) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not the admin of this shopping list",
+          vn: "Người dùng không phải là quản trị viên của danh sách mua sắm này",
+        },
+        resultCode: "00273",
+      });
+    }
+
+    // Delete shopping list
+    const { error: deleteError } = await supabase
+      .from("shopping_list")
+      .delete()
+      .eq("id", listId);
+
+    if (deleteError) throw deleteError;
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Shopping list deleted successfully",
+        vn: "Xóa danh sách mua sắm thành công",
+      },
+      resultCode: "00275",
+    });
+  } catch (err) {
+    console.error("Error deleting shopping list:", err.message);
+    res.status(500).json({
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
+    });
+  }
+};
+
+// ==================== TASKS MANAGEMENT ====================
+
+/**
+ * @swagger
+ * /shopping-list/tasks:
+ *   post:
+ *     summary: Tạo tasks cho shopping list
  *     tags: [Shopping List Tasks]
  *     security:
  *       - bearerAuth: []
@@ -1172,21 +764,272 @@ export const getListOfTasks = async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - taskId
+ *             required: [listId, tasks]
+ *             properties:
+ *               listId:
+ *                 type: integer
+ *               tasks:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     foodName:
+ *                       type: string
+ *                     quantity:
+ *                       type: string
+ *     responses:
+ *       200:
+ *         description: Thêm tasks thành công (00287)
+ *       400:
+ *         description: Lỗi validation (00276-00279, 00286)
+ *       403:
+ *         description: Không có quyền (00281, 00284)
+ *       404:
+ *         description: Không tìm thấy (00283, 00285)
+ *       500:
+ *         description: Lỗi máy chủ (00500)
+ */
+export const createTasks = async (req, res) => {
+  try {
+    const { listId, tasks } = req.body;
+
+    // Validate required fields
+    if (!listId || !tasks) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide all required fields",
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
+        },
+        resultCode: "00276",
+      });
+    }
+
+    // Validate listId
+    if (!listId || (typeof listId === "string" && !listId.trim())) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a list ID",
+          vn: "Vui lòng cung cấp một ID của danh sách",
+        },
+        resultCode: "00277",
+      });
+    }
+
+    // Validate tasks array
+    if (!Array.isArray(tasks) || tasks.length === 0) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a tasks array",
+          vn: "Vui lòng cung cấp một mảng nhiệm vụ",
+        },
+        resultCode: "00278",
+      });
+    }
+
+    // Validate tasks fields
+    for (const task of tasks) {
+      if (
+        typeof task !== "object" ||
+        task === null ||
+        !task.foodName ||
+        typeof task.foodName !== "string" ||
+        !task.foodName.trim() ||
+        !task.quantity ||
+        typeof task.quantity !== "string" ||
+        !task.quantity.trim()
+      ) {
+        return res.status(400).json({
+          resultMessage: {
+            en: "Please provide a tasks array with valid fields",
+            vn: "Vui lòng cung cấp một mảng nhiệm vụ với các trường hợp lệ",
+          },
+          resultCode: "00279",
+        });
+      }
+    }
+
+    // Check if user is admin
+    if (!req.user?.id) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên của nhóm",
+        },
+        resultCode: "00281",
+      });
+    }
+
+    const { data: adminData, error: adminError } = await supabase
+      .from("users")
+      .select("id, role, group_id")
+      .eq("id", req.user.id)
+      .maybeSingle();
+
+    if (adminError || !adminData || adminData.role !== "admin") {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên của nhóm",
+        },
+        resultCode: "00281",
+      });
+    }
+
+    // Check if shopping list exists
+    const { data: existingList, error: fetchError } = await supabase
+      .from("shopping_list")
+      .select("id, belongs_to_admin_id")
+      .eq("id", listId)
+      .maybeSingle();
+
+    if (fetchError || !existingList) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Shopping list not found",
+          vn: "Không tìm thấy danh sách mua sắm",
+        },
+        resultCode: "00283",
+      });
+    }
+
+    // Check if user is the owner
+    if (existingList.belongs_to_admin_id !== req.user.id) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not the admin of this shopping list",
+          vn: "Người dùng không phải là quản trị viên của danh sách mua sắm này",
+        },
+        resultCode: "00284",
+      });
+    }
+
+    // Validate food names exist in foods table
+    const foodNames = tasks.map((task) => task.foodName.trim().toLowerCase());
+    const { data: foodsData, error: foodsError } = await supabase
+      .from("foods")
+      .select("name")
+      .in("name", foodNames);
+
+    if (foodsError) throw foodsError;
+
+    const existingFoodNames = foodsData.map((food) => food.name.toLowerCase());
+    const missingFoods = foodNames.filter(
+      (name) => !existingFoodNames.includes(name)
+    );
+
+    if (missingFoods.length > 0) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Food item not found with the provided name in the array",
+          vn: "Không tìm thấy một món ăn với tên cung cấp trong mảng",
+        },
+        resultCode: "00285",
+        missingFoods: missingFoods,
+      });
+    }
+
+    // Check for duplicate foods in shopping list
+    const { data: existingTasks, error: existingTasksError } = await supabase
+      .from("shopping_list_tasks")
+      .select("food_name")
+      .eq("shopping_list_id", listId);
+
+    if (existingTasksError) throw existingTasksError;
+
+    const existingTaskNames = existingTasks.map((task) =>
+      task.food_name.toLowerCase()
+    );
+    const duplicateFoods = foodNames.filter((name) =>
+      existingTaskNames.includes(name)
+    );
+
+    if (duplicateFoods.length > 0) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "This food type already exists in the list",
+          vn: "Loại thức ăn này đã có trong danh sách rồi",
+        },
+        resultCode: "00286",
+        duplicateFoods: duplicateFoods,
+      });
+    }
+
+    // Prepare task data
+    const taskData = tasks.map((task) => ({
+      shopping_list_id: listId,
+      food_name: task.foodName.trim(),
+      quantity: task.quantity.trim(),
+      is_done: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }));
+
+    // Insert tasks
+    const { data: insertedTasks, error: insertError } = await supabase
+      .from("shopping_list_tasks")
+      .insert(taskData)
+      .select();
+
+    if (insertError) throw insertError;
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Tasks added successfully",
+        vn: "Thêm nhiệm vụ thành công",
+      },
+      resultCode: "00287",
+      addedTasks: insertedTasks.map((task) => ({
+        id: task.id,
+        shoppingListId: task.shopping_list_id,
+        foodName: task.food_name,
+        quantity: task.quantity,
+        isDone: task.is_done,
+        createdAt: task.created_at,
+        updatedAt: task.updated_at,
+      })),
+    });
+  } catch (err) {
+    console.error("Error creating tasks:", err.message);
+    res.status(500).json({
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /shopping-list/tasks/mark:
+ *   put:
+ *     summary: Đánh dấu/bỏ đánh dấu task hoàn thành
+ *     tags: [Shopping List Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [taskId]
  *             properties:
  *               taskId:
  *                 type: integer
- *                 example: 1
  *     responses:
  *       200:
- *         description: Task marked successfully
+ *         description: Đánh dấu thành công (00295)
  *       400:
- *         description: Missing taskId
+ *         description: Thiếu taskId (400)
  *       403:
- *         description: Permission denied
+ *         description: Không có quyền (403)
  *       404:
- *         description: Task not found
+ *         description: Không tìm thấy task (404)
+ *       500:
+ *         description: Lỗi máy chủ
  */
 export const markTask = async (req, res) => {
   try {
@@ -1206,7 +1049,7 @@ export const markTask = async (req, res) => {
       .from("shopping_list_tasks")
       .select("*, shopping_list!inner(belongs_to_admin_id)")
       .eq("id", taskId)
-      .single();
+      .maybeSingle();
 
     if (fetchError || !task) {
       return res.status(404).json({
@@ -1249,159 +1092,6 @@ export const markTask = async (req, res) => {
   } catch (err) {
     console.error("Error marking task:", err.message);
     res.status(500).json({
-      error: "Internal server error",
-    });
-  }
-};
-
-/**
- * @swagger
- * /shopping-list/tasks/delete:
- *   delete:
- *     summary: Delete a task
- *     tags: [Shopping List Tasks]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - taskId
- *             properties:
- *               taskId:
- *                 type: integer
- *                 example: 1
- *     responses:
- *       200:
- *         description: Task deleted successfully
- *       400:
- *         description: Missing taskId
- *       403:
- *         description: Permission denied
- *       404:
- *         description: Task not found
- */
-export const deleteTask = async (req, res) => {
-  try {
-    const { taskId } = req.body;
-
-    // 00293 - Vui lòng cung cấp tất cả các trường bắt buộc
-    if (!taskId) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide all required fields",
-          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
-        },
-        resultCode: "00293",
-      });
-    }
-
-    // 00294 - Vui lòng cung cấp một ID nhiệm vụ trong trường taskId
-    if (typeof taskId !== "string" && typeof taskId !== "number") {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide a task ID in the taskId field",
-          vn: "Vui lòng cung cấp một ID nhiệm vụ trong trường taskId",
-        },
-        resultCode: "00294",
-      });
-    }
-
-    if (typeof taskId === "string" && taskId.trim() === "") {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide a task ID in the taskId field",
-          vn: "Vui lòng cung cấp một ID nhiệm vụ trong trường taskId",
-        },
-        resultCode: "00294",
-      });
-    }
-
-    // 00297 - Người dùng không phải là quản trị viên nhóm
-    if (!req.user || !req.user.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00297",
-      });
-    }
-
-    const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, role, group_id")
-      .eq("id", req.user.id)
-      .single();
-
-    if (adminError || !adminData || adminData.role !== "admin") {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00297",
-      });
-    }
-
-    // 00296 - Không tìm thấy nhiệm vụ với ID đã cung cấp
-    const { data: existingTask, error: fetchError } = await supabase
-      .from("shopping_list_tasks")
-      .select(
-        `
-        *,
-        shopping_list:shopping_list_id (
-          id,
-          belongs_to_admin_id
-        )
-      `
-      )
-      .eq("id", taskId)
-      .single();
-
-    if (fetchError || !existingTask) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Task not found with the provided ID",
-          vn: "Không tìm thấy nhiệm vụ với ID đã cung cấp",
-        },
-        resultCode: "00296",
-      });
-    }
-
-    // Kiểm tra user có phải là admin của shopping list này không
-    if (existingTask.shopping_list?.belongs_to_admin_id !== req.user.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00297",
-      });
-    }
-
-    // Xóa task
-    const { error: deleteError } = await supabase
-      .from("shopping_list_tasks")
-      .delete()
-      .eq("id", taskId);
-
-    if (deleteError) throw deleteError;
-
-    // 00299 - Xóa nhiệm vụ thành công
-    res.status(200).json({
-      resultMessage: {
-        en: "Task deleted successfully",
-        vn: "Xóa nhiệm vụ thành công",
-      },
-      resultCode: "00299",
-    });
-  } catch (err) {
-    console.error("Error deleting task:", err.message);
-    res.status(500).json({
       resultMessage: {
         en: "Internal server error",
         vn: "Lỗi máy chủ nội bộ",
@@ -1414,9 +1104,9 @@ export const deleteTask = async (req, res) => {
 
 /**
  * @swagger
- * /shopping-list/tasks/update:
+ * /shopping-list/tasks:
  *   put:
- *     summary: Update a task
+ *     summary: Cập nhật task
  *     tags: [Shopping List Tasks]
  *     security:
  *       - bearerAuth: []
@@ -1426,45 +1116,32 @@ export const deleteTask = async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - taskId
+ *             required: [taskId]
  *             properties:
  *               taskId:
  *                 type: integer
- *                 example: 1
  *               newFoodName:
  *                 type: string
- *                 example: "Fresh Tomatoes"
  *               newQuantity:
  *                 type: string
- *                 example: "3 kg"
  *     responses:
  *       200:
- *         description: Task updated successfully
+ *         description: Cập nhật thành công (00312)
  *       400:
- *         description: Bad request
+ *         description: Lỗi validation (00300-00304, 00309)
  *       403:
- *         description: Permission denied
+ *         description: Không có quyền (00307)
  *       404:
- *         description: Task not found
+ *         description: Không tìm thấy (00306, 00308)
+ *       500:
+ *         description: Lỗi máy chủ (00500)
  */
 export const updateTask = async (req, res) => {
   try {
     const { taskId, newFoodName, newQuantity } = req.body;
 
-    // 00300 - Vui lòng cung cấp tất cả các trường bắt buộc
-    if (!taskId && newFoodName === undefined && newQuantity === undefined) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide all required fields",
-          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
-        },
-        resultCode: "00300",
-      });
-    }
-
-    // 00301 - Vui lòng cung cấp một ID nhiệm vụ trong trường taskId
-    if (!taskId || (typeof taskId === "string" && taskId.trim() === "")) {
+    // Validate taskId
+    if (!taskId || (typeof taskId === "string" && !taskId.trim())) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide a task ID in the taskId field",
@@ -1474,7 +1151,7 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    // 00302 - Vui lòng cung cấp ít nhất một trong các trường sau
+    // Validate at least one field to update
     if (newFoodName === undefined && newQuantity === undefined) {
       return res.status(400).json({
         resultMessage: {
@@ -1485,10 +1162,10 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    // 00303 - Vui lòng cung cấp một newFoodName hợp lệ
+    // Validate newFoodName
     if (
       newFoodName !== undefined &&
-      (typeof newFoodName !== "string" || newFoodName.trim() === "")
+      (typeof newFoodName !== "string" || !newFoodName.trim())
     ) {
       return res.status(400).json({
         resultMessage: {
@@ -1499,10 +1176,10 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    // 00304 - Vui lòng cung cấp một newQuantity hợp lệ
+    // Validate newQuantity
     if (
       newQuantity !== undefined &&
-      (typeof newQuantity !== "string" || newQuantity.trim() === "")
+      (typeof newQuantity !== "string" || !newQuantity.trim())
     ) {
       return res.status(400).json({
         resultMessage: {
@@ -1513,8 +1190,8 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    // 00307 - Người dùng không phải là quản trị viên nhóm
-    if (!req.user || !req.user.id) {
+    // Check if user is admin
+    if (!req.user?.id) {
       return res.status(403).json({
         resultMessage: {
           en: "User is not a group admin",
@@ -1528,7 +1205,7 @@ export const updateTask = async (req, res) => {
       .from("users")
       .select("id, role, group_id")
       .eq("id", req.user.id)
-      .single();
+      .maybeSingle();
 
     if (adminError || !adminData || adminData.role !== "admin") {
       return res.status(403).json({
@@ -1540,7 +1217,7 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    // 00306 - Không tìm thấy nhiệm vụ với ID đã cung cấp
+    // Check if task exists
     const { data: task, error: fetchError } = await supabase
       .from("shopping_list_tasks")
       .select(
@@ -1553,7 +1230,7 @@ export const updateTask = async (req, res) => {
       `
       )
       .eq("id", taskId)
-      .single();
+      .maybeSingle();
 
     if (fetchError || !task) {
       return res.status(404).json({
@@ -1565,7 +1242,7 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    // Kiểm tra quyền admin của shopping list
+    // Check if user is the owner
     if (task.shopping_list?.belongs_to_admin_id !== req.user.id) {
       return res.status(403).json({
         resultMessage: {
@@ -1576,14 +1253,13 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    // Nếu có newFoodName, kiểm tra xem food có tồn tại trong bảng foods không
+    // If newFoodName, validate it exists in foods table
     if (newFoodName !== undefined) {
-      // 00308 - Không tìm thấy nhiệm vụ với tên đã cung cấp
       const { data: foodData, error: foodError } = await supabase
         .from("foods")
         .select("name")
         .ilike("name", newFoodName.trim())
-        .single();
+        .maybeSingle();
 
       if (foodError || !foodData) {
         return res.status(404).json({
@@ -1595,14 +1271,14 @@ export const updateTask = async (req, res) => {
         });
       }
 
-      // 00309 - Thực phẩm này đã tồn tại trong danh sách mua hàng hiện tại
+      // Check if food already exists in current shopping list
       const { data: existingTask, error: existingError } = await supabase
         .from("shopping_list_tasks")
         .select("id")
         .eq("shopping_list_id", task.shopping_list_id)
         .ilike("food_name", newFoodName.trim())
         .neq("id", taskId)
-        .single();
+        .maybeSingle();
 
       if (existingTask) {
         return res.status(400).json({
@@ -1615,7 +1291,7 @@ export const updateTask = async (req, res) => {
       }
     }
 
-    // Chuẩn bị dữ liệu update
+    // Prepare update data
     const updateData = { updated_at: new Date().toISOString() };
 
     if (newFoodName !== undefined) {
@@ -1626,7 +1302,7 @@ export const updateTask = async (req, res) => {
       updateData.quantity = newQuantity.trim();
     }
 
-    // Thực hiện update
+    // Perform update
     const { data: updatedTask, error: updateError } = await supabase
       .from("shopping_list_tasks")
       .update(updateData)
@@ -1636,7 +1312,6 @@ export const updateTask = async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // 00312 - Cập nhật nhiệm vụ thành công
     res.status(200).json({
       resultMessage: {
         en: "Task updated successfully",
@@ -1655,6 +1330,156 @@ export const updateTask = async (req, res) => {
     });
   } catch (err) {
     console.error("Error updating task:", err.message);
+    res.status(500).json({
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /shopping-list/tasks:
+ *   delete:
+ *     summary: Xóa task
+ *     tags: [Shopping List Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [taskId]
+ *             properties:
+ *               taskId:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Xóa thành công (00299)
+ *       400:
+ *         description: Thiếu/sai taskId (00293, 00294)
+ *       403:
+ *         description: Không có quyền (00297)
+ *       404:
+ *         description: Không tìm thấy task (00296)
+ *       500:
+ *         description: Lỗi máy chủ (00500)
+ */
+export const deleteTask = async (req, res) => {
+  try {
+    const { taskId } = req.body;
+
+    // Validate taskId exists
+    if (!taskId) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide all required fields",
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
+        },
+        resultCode: "00293",
+      });
+    }
+
+    // Validate taskId format
+    if (
+      (typeof taskId === "string" && !taskId.trim()) ||
+      (typeof taskId !== "string" && typeof taskId !== "number")
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a task ID in the taskId field",
+          vn: "Vui lòng cung cấp một ID nhiệm vụ trong trường taskId",
+        },
+        resultCode: "00294",
+      });
+    }
+
+    // Check if user is admin
+    if (!req.user?.id) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00297",
+      });
+    }
+
+    const { data: adminData, error: adminError } = await supabase
+      .from("users")
+      .select("id, role, group_id")
+      .eq("id", req.user.id)
+      .maybeSingle();
+
+    if (adminError || !adminData || adminData.role !== "admin") {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00297",
+      });
+    }
+
+    // Check if task exists
+    const { data: existingTask, error: fetchError } = await supabase
+      .from("shopping_list_tasks")
+      .select(
+        `
+        *,
+        shopping_list:shopping_list_id (
+          id,
+          belongs_to_admin_id
+        )
+      `
+      )
+      .eq("id", taskId)
+      .maybeSingle();
+
+    if (fetchError || !existingTask) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Task not found with the provided ID",
+          vn: "Không tìm thấy nhiệm vụ với ID đã cung cấp",
+        },
+        resultCode: "00296",
+      });
+    }
+
+    // Check if user is the owner
+    if (existingTask.shopping_list?.belongs_to_admin_id !== req.user.id) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "User is not a group admin",
+          vn: "Người dùng không phải là quản trị viên nhóm",
+        },
+        resultCode: "00297",
+      });
+    }
+
+    // Delete task
+    const { error: deleteError } = await supabase
+      .from("shopping_list_tasks")
+      .delete()
+      .eq("id", taskId);
+
+    if (deleteError) throw deleteError;
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Task deleted successfully",
+        vn: "Xóa nhiệm vụ thành công",
+      },
+      resultCode: "00299",
+    });
+  } catch (err) {
+    console.error("Error deleting task:", err.message);
     res.status(500).json({
       resultMessage: {
         en: "Internal server error",
