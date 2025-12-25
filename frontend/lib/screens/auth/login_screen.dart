@@ -6,6 +6,7 @@ import '../../../widgets/custom_text_field.dart';
 import '../../../widgets/custom_button.dart';
 import './forgot_password_screen.dart';
 import './register_screen.dart';
+import '../../../widgets/password_field_text.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,13 +35,15 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               // crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text("Đăng nhập",
-                    style: TextStyle(
-                      color: Color(0xFF396A30),
-                      fontSize: 40, 
-                      fontFamily: 'Unbounded',
-                      fontWeight: FontWeight.w600,
-                      )),
+                const Text(
+                  "Đăng nhập",
+                  style: TextStyle(
+                    color: Color(0xFF396A30),
+                    fontSize: 40,
+                    fontFamily: 'Unbounded',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
 
                 const SizedBox(height: 40),
 
@@ -53,10 +56,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 16),
 
-                CustomTextField(
+                PasswordTextField(
                   controller: _passwordController,
                   label: "Nhập mật khẩu",
-                  obscureText: true,
                   validator: Validators.validatePassword,
                 ),
 
@@ -92,14 +94,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () async {
                     if (_formKey.currentState!.validate()) {
                       await auth.login(
-                          _emailController.text, _passwordController.text);
-                      if (auth.isLoggedIn && context.mounted) {
-                        Navigator.pushReplacementNamed(context, '/home');
+                        _emailController.text.trim(),
+                        _passwordController.text,
+                      );
+                      if (auth.isLoggedIn) {
+                        if (context.mounted) {
+                          // Clear form
+                          _emailController.clear();
+                          _passwordController.clear();
+                          Navigator.pushReplacementNamed(context, '/home');
+                        }
                       }
                     }
                   },
                   backgroundColor: const Color(0xFF396A30),
-                  textColor: Colors.white
+                  textColor: Colors.white,
                 ),
 
                 const SizedBox(height: 16),

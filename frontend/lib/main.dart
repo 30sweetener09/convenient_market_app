@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-<<<<<<< HEAD
 import '../screens/home/home_screen.dart';
-=======
->>>>>>> 6134029d30e5bea7d87cb744d077754cb39bf252
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
-import 'screens/splash/splash_screen.dart';
+import 'routes/app_routes.dart';
 
 void main() {
   runApp(
@@ -21,7 +18,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-<<<<<<< HEAD
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
         return MaterialApp(
@@ -33,17 +29,35 @@ class MyApp extends StatelessWidget {
 
           // ✅ Các route trong app
           routes: AppRoutes.routes,
+          onUnknownRoute: (settings) {
+            debugPrint('Unknown route: ${settings.name}');
+            return MaterialPageRoute(
+              builder: (context) => Scaffold(
+                appBar: AppBar(title: const Text('Lỗi')),
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Trang không tồn tại',
+                        style: TextStyle(fontSize: 20),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+                        child: const Text('Về trang đăng nhập'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
           theme: ThemeData(
             fontFamily: 'Nunito'
           ),
         );
       },
-=======
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Convenient Market',
-      home: const SplashScreen(), // Load splash trước
->>>>>>> 6134029d30e5bea7d87cb744d077754cb39bf252
     );
   }
 }

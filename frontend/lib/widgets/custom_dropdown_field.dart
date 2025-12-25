@@ -6,7 +6,6 @@ class CustomDropdownField extends StatelessWidget {
   final String? value;
   final void Function(String?)? onChanged;
   final String? Function(String?)? validator;
-  final TextEditingController controller;
 
   const CustomDropdownField({
     super.key,
@@ -15,22 +14,28 @@ class CustomDropdownField extends StatelessWidget {
     this.value,
     this.onChanged,
     this.validator,
-    required this.controller,
   });
 
   @override
   Widget build(BuildContext context) {
-    return DropdownMenu<String>(
-      controller: controller,
-      initialSelection: value,
-      label: Text(label),
-      dropdownMenuEntries: items
-          .map((item) => DropdownMenuEntry<String>(
-                value: item,
-                label: item,
-              ))
+    return DropdownButtonFormField<String>(
+      value: value,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      items: items
+          .map(
+            (item) => DropdownMenuItem(
+              value: item,
+              child: Text(item),
+            ),
+          )
           .toList(),
-      onSelected: onChanged,
+      onChanged: onChanged,
+      validator: validator,
     );
   }
 }

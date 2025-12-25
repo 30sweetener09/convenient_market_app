@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/utils/validators.dart';
 import '../../../widgets/custom_text_field.dart';
+import '../../../widgets/return_login_dialog.dart';
+import '../../../providers/auth_provider.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
@@ -15,6 +18,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -78,10 +82,20 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        
-                      }
+                    onPressed: () async {
+                      if (!_formKey.currentState!.validate()) return;
+
+                      final password = _passwordController.text;
+                      // Xử lý logic đặt lại mật khẩu ở đây 
+                      //final success = await auth.changePassword(password);
+
+                      showDialog(
+                        context: context,
+                        builder: (context) => const ReturnLoginDialog(
+                          title: "Đặt lại mật khẩu thành công",
+                          message: "Mật khẩu của bạn đã được đặt lại thành công. Vui lòng đăng nhập lại với mật khẩu mới.",
+                        ),
+                      );
                     },
                     child: const Text(
                       "Xác nhận",

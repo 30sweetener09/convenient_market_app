@@ -24,6 +24,9 @@ class CustomTextField extends StatelessWidget {
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
       ),
+      keyboardType: label.toLowerCase() == "email"
+          ? TextInputType.emailAddress
+          : TextInputType.text,
     );
   }
 }

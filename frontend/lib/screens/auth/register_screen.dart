@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import '../../../widgets/custom_text_field.dart';
 import '../../../widgets/custom_dropdown_field.dart';
 import '../../../core/utils/validators.dart';
-import './login_screen.dart';
+import 'login_screen.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../data/dto/user_dto.dart';
+import '../../../widgets/password_field_text.dart';
+import 'verify_email_dialog.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -18,14 +20,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _dobController = TextEditingController();
-  final _genderController = TextEditingController();
+  String? _selectedGender;
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.read<AuthProvider>();
+    final auth = context.watch<AuthProvider>();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -39,6 +41,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               // crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 30),
+
                 const Text(
                   "Đăng ký",
                   style: TextStyle(
@@ -63,25 +66,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   children: [
                     //ngày sinh - date of birth
                     Expanded(
-                      child: TextField(
+                      child: TextFormField(
                         controller: _dobController,
+                        readOnly: true,
                         decoration: InputDecoration(
                           labelText: "Ngày sinh",
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        readOnly: true,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return "Vui lòng chọn ngày sinh";
+                          }
+                          return null;
+                        },
+
                         onTap: () async {
                           DateTime? pickedDate = await showDatePicker(
                             context: context,
-                            initialDate: DateTime.now(),
+                            initialDate: _dobController.text.isNotEmpty
+                                ? DateTime.parse(_dobController.text)
+                                : DateTime(2000),
                             firstDate: DateTime(1900),
                             lastDate: DateTime.now(),
                           );
                           if (pickedDate != null) {
+                            //format: yyyy-mm-dd
                             String formattedDate =
-                                "${pickedDate.day}/${pickedDate.month}/${pickedDate.year}";
+                                "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
                             setState(() {
                               // Update the text field with the selected date
                               _dobController.text = formattedDate;
@@ -95,9 +108,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     //giới tính - gender
                     Expanded(
                       child: CustomDropdownField(
-                        controller: _genderController,
                         label: "Giới tính",
                         items: ["Nam", "Nữ", "Khác"],
+                        value: _selectedGender,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedGender = value;
+                          });
+                        },
+                        validator: (value) =>
+                            value == null ? "Vui lòng chọn giới tính" : null,
                       ),
                     ),
                   ],
@@ -111,27 +131,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                CustomTextField(
+                PasswordTextField(
                   controller: _passwordController,
                   label: "Mật khẩu",
-                  obscureText: true,
                   validator: Validators.validatePassword,
                 ),
                 const SizedBox(height: 16),
 
-                CustomTextField(
+                PasswordTextField(
                   controller: _confirmController,
                   label: "Xác nhận mật khẩu",
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return "Vui lòng xác nhận mật khẩu";
-                    }
-                    if (value != _passwordController.text) {
-                      return "Mật khẩu không khớp";
-                    }
-                    return null;
-                  },
+                  confirmPassword: true,
+                  originalPasswordController: _passwordController,
                 ),
                 const SizedBox(height: 20),
 
@@ -140,63 +151,85 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF396A30),
+                      backgroundColor: const Color(0xFF396A30),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    onPressed: () async {
-                      if (!_formKey.currentState!.validate()) return;
-                      final success = await auth.register(
-                        UserDTO(
-                          name: _usernameController.text,
-                          email: _emailController.text,
-                          password: _passwordController.text,
-                        ),
-                      );
+                    onPressed: auth.isLoading
+                        ? null
+                        : () async {
+                            final currentContext = context;
 
-                      if (!mounted) return;
-                      if (success) {
-                        // Hiện dialog thành công
-                        showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (dialogContext) => AlertDialog(
-                            title: const Text("🎉 Thành công"),
-                            content: const Text("Đăng ký thành công"),
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pop(dialogContext); // đóng dialog
-                                  Navigator.pushReplacementNamed(
-                                    context,
-                                    '/login',
-                                  );
-                                },
-                                child: const Text("OK"),
+                            auth.resetError();
+                            if (!_formKey.currentState!.validate()) return;
+
+                            if (_selectedGender == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("Vui lòng chọn giới tính"),
+                                ),
+                              );
+                              return;
+                            }
+
+                            final success = await auth.register(
+                              UserDTO(
+                                username: _usernameController.text.trim(),
+                                email: _emailController.text.trim(),
+                                password: _passwordController.text,
+                                birthdate: _dobController.text,
+                                gender: _selectedGender!,
                               ),
-                            ],
-                          ),
-                        );
-                      } else {
-                        // Hiện SnackBar lỗi
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(auth.error ?? "Đăng ký thất bại"),
-                          ),
-                        );
-                      }
-                      // quay lại Login
-                    },
+                            );
+                            if (!mounted) return;
+                            if (success) {
+                              // Clear form on success
+                              _usernameController.clear();
+                              _dobController.clear();
+                              _selectedGender = null;
+                              _emailController.clear();
+                              _passwordController.clear();
+                              _confirmController.clear();
+
+                              // Hiển thị modal thông báo
+                              await showDialog(
+                                context: currentContext,
+                                barrierDismissible: false,
+                                builder: (context) =>
+                                    const VerifyEmailToLoginDialog(),
+                              );
+                            } else {
+                              if (mounted) {
+                                ScaffoldMessenger.of(
+                                  currentContext,
+                                ).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      auth.error ?? "Đăng ký thất bại",
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          },
                     child: auth.isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                      "Đăng ký",
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontFamily: 'Nunito',
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            "Đăng ký",
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontFamily: 'Nunito',
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                   ),
                 ),
 
@@ -243,3 +276,4 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
+
