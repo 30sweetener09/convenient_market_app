@@ -19,7 +19,7 @@ export const sendVerificationCodeService = async (email) => {
 
   // 1️⃣ GỬI MAIL TRƯỚC
   const { data, error } = await resend.emails.send({
-    from: "Your App <no-reply@resend.dev>", // test domain
+    from: "CMA <auth@antnv3467.id.vn> ", // test domain
     to: email,
     subject: "Mã xác thực",
     html: `
