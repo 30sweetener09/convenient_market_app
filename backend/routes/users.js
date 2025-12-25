@@ -14,7 +14,8 @@ import {
   createGroup,
   addMember,
   deleteMember,
-  getGroupMembers
+  getGroupMembers,
+  verifyCode
   
 } from "../controllers/userController.js";
 
@@ -32,6 +33,7 @@ router.get("/", supabaseAuth, getUser);
 router.delete("/", supabaseAuth, requirePermission("delete_user"), deleteUser);
 
 router.post("/verify-email", verifyEmail);
+router.post("/verify-code", verifyCode);
 router.post("/change-password", supabaseAuth, changePassword);
 
 router.patch("/", supabaseAuth, updateUser);

@@ -844,3 +844,65 @@ export const deleteUser = async (req, res) => {
     });
   }
 };
+
+/**
+ * @swagger
+ * /user/verify-code:
+ *   post:
+ *     summary: Xác nhận mã OTP gửi về email
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             required: [email, code]
+ *             properties:
+ *               email:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Xác minh thành công
+ */
+export const verifyCode = async (req, res) => {
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    return res.status(400).json({
+      resultCode: "00053",
+      message: "Vui lòng cung cấp email và mã xác nhận.",
+    });
+  }
+
+  try {
+    await verifyCodeService(email, code);
+
+    return res.status(200).json({
+      resultCode: "00058",
+      message: "Mã xác thực hợp lệ.",
+    });
+  } catch (err) {
+    if (err.message === "INVALID_CODE") {
+      return res.status(400).json({
+        resultCode: "00054",
+        message: "Mã xác thực không đúng.",
+      });
+    }
+
+    if (err.message === "CODE_EXPIRED") {
+      return res.status(400).json({
+        resultCode: "00055",
+        message: "Mã xác thực đã hết hạn.",
+      });
+    }
+
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ.",
+    });
+  }
+};
+
