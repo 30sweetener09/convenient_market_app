@@ -237,48 +237,58 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ).showSnackBar(const SnackBar(content: Text("Vui lòng chọn giới tính")));
       return;
     }
-
-    final success = await auth.register(
-      UserDTO(
-        username: _usernameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        birthdate: _birthdateController.text,
-        gender: _selectedGender!,
-      ),
-    );
+    final email = _emailController.text.trim();
+    final otp = await auth.sendVerificationEmail(email);
     if (!mounted) return;
-    if (success) {
-      // Clear form on success
-      _usernameController.clear();
-      _birthdateController.clear();
-      _selectedGender = null;
-      _emailController.clear();
-      _passwordController.clear();
-      _confirmController.clear();
 
-      // Hiển thị modal thông báo
-      await showDialog(
-        context: context,
-        barrierDismissible: true,
-        builder: (context) => VerifyEmailDialog(
+    if (!otp) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Gửi email xác minh thất bại")),
+      );
+      return;
+    }
+
+    final bool? isVerified = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => VerifyEmailDialog(email: email),
+    );
+    if (isVerified == true) {
+      final success = await auth.register(
+        UserDTO(
+          username: _usernameController.text.trim(),
           email: _emailController.text.trim(),
-          route: '/login',
+          password: _passwordController.text,
+          birthdate: _birthdateController.text,
+          gender: _selectedGender!,
         ),
       );
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(auth.error ?? "Đăng ký thất bại"),
-            backgroundColor: Colors.red,
-          ),
-        );
+
+      if (success && mounted) {
+        // Clear form on success
+        _usernameController.clear();
+        _birthdateController.clear();
+        _selectedGender = null;
+        _emailController.clear();
+        _passwordController.clear();
+        _confirmController.clear();
+
+        Navigator.pushReplacementNamed(context, '/login');
       }
     }
   }
-  Widget _buildLoadingIndicator() => const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white));
-  Widget _buildButtonText() => const Text("Đăng ký", style: TextStyle(fontSize: 24, fontFamily: 'Nunito', fontWeight: FontWeight.w700));
 
-  
+  Widget _buildLoadingIndicator() => const SizedBox(
+    width: 24,
+    height: 24,
+    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+  );
+  Widget _buildButtonText() => const Text(
+    "Đăng ký",
+    style: TextStyle(
+      fontSize: 24,
+      fontFamily: 'Nunito',
+      fontWeight: FontWeight.w700,
+    ),
+  );
 }

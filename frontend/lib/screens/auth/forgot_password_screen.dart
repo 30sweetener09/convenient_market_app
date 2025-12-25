@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/utils/validators.dart';
 import '../../../widgets/custom_text_field.dart';
-import 'reset_password_screen.dart';
 import 'verify_email_dialog.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/auth_provider.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -39,22 +40,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               mainAxisSize: MainAxisSize.min,
               // crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text("Quên mật khẩu",
-                    style: TextStyle(
-                      color: Color(0xFF396A30),
-                      fontSize: 36, 
-                      fontFamily: 'Unbounded',
-                      fontWeight: FontWeight.w600,
-                      )),
+                _titleText(),
                 const SizedBox(height: 20),
-
-                const Text("Hãy nhập email bạn đã sử dụng. Ứng dụng sẽ gửi link đến gmail của bạn để xác minh gmail và đặt lại mật khẩu.",
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 16, 
-                      fontFamily: 'Nunito',
-                      fontWeight: FontWeight.w300,
-                      )),
+                _instructionText(),
                 const SizedBox(height: 20),
 
                 CustomTextField(
@@ -65,42 +53,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 const SizedBox(height: 20),
 
                 // Nút gửi email
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF396A30),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    onPressed: () async {
-                      if (_formKey.currentState!.validate()) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Link khôi phục mật khẩu đã gửi"),
-                          ),
-                        );
-                        await showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (context) => VerifyEmailDialog(
-                            email: _emailController.text.trim(),
-                            route: '/reset_password',
-                          ),
-                        );
-                      }
-                    },
-                    child: const Text(
-                      "Gửi",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
+                _emailSendButton(),
                 const SizedBox(height: 40),
-                
+
                 //logo
                 SizedBox(
                   width: 100,
@@ -116,5 +71,82 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
       ),
     );
+  }
+
+  Widget _titleText() {
+    return const Text(
+      "Quên mật khẩu",
+      style: TextStyle(
+        color: Color(0xFF396A30),
+        fontSize: 36,
+        fontFamily: 'Unbounded',
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _instructionText() {
+    return const Text(
+      "Hãy nhập email bạn đã sử dụng. Ứng dụng sẽ gửi link đến gmail của bạn để xác minh gmail và đặt lại mật khẩu.",
+      style: TextStyle(
+        color: Colors.black,
+        fontSize: 16,
+        fontFamily: 'Nunito',
+        fontWeight: FontWeight.w300,
+      ),
+    );
+  }
+
+  Widget _emailSendButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Color(0xFF396A30),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+        onPressed: () => _handleSendEmail(),
+        child: const Text(
+          "Gửi",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+
+  void _handleSendEmail() async {
+    if (!_formKey.currentState!.validate()) return;
+    final auth = context.read<AuthProvider>(); // Đọc AuthProvider
+    final email = _emailController.text.trim();
+
+    // 1. Gọi API gửi mã trước khi hiện Modal
+    final isSent = await auth.sendVerificationEmail(email);
+    if (!mounted) return;
+
+    if (isSent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Mã xác thực đã được gửi đến Email của bạn"),
+        ),
+      );
+
+      final bool? isVerified = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => VerifyEmailDialog(email: email),
+      );
+
+      if (isVerified == true && mounted) {
+        Navigator.pushNamed(context, '/reset-password', arguments: email);
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(auth.error ?? "Gửi mail thất bại"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }

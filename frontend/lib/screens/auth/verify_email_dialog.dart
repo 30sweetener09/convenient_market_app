@@ -4,8 +4,7 @@ import '../../../providers/auth_provider.dart';
 
 class VerifyEmailDialog extends StatefulWidget {
   final String email;
-  final String? route;
-  const VerifyEmailDialog({required this.email, this.route, super.key});
+  const VerifyEmailDialog({required this.email, super.key});
 
   @override
   State<VerifyEmailDialog> createState() => _VerifyEmailDialogState();
@@ -39,18 +38,13 @@ class _VerifyEmailDialogState extends State<VerifyEmailDialog> {
     final success = await auth.verifyCode(widget.email, code);
     if (!mounted) return;
 
-    if (!success) {
-      // Hiển thị thông báo lỗi
+    if (success) {
+      Navigator.of(context).pop(true);
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Mã xác nhận không đúng hoặc hết hạn"),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text("Mã code không đúng hoặc hết hạn.")),
       );
-      return;
     }
-    Navigator.of(context).pop();
-    Navigator.pushReplacementNamed(context, widget.route ?? '/login');
   }
 
   void _handleResend() async {
@@ -58,6 +52,7 @@ class _VerifyEmailDialogState extends State<VerifyEmailDialog> {
     final success = await auth.sendVerificationEmail(widget.email);
     
     if (success) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Đã gửi lại mã thành công!")),
       );

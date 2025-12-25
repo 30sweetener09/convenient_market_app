@@ -284,7 +284,7 @@ class AuthProvider extends ChangeNotifier {
     return success;
   }
 
-  Future<bool> changePassword (String oldPassword, String newPassword) async {
+  Future<bool> verifyEmail (String verifyToken) async {
     isLoading = true;
     _error = null;
     notifyListeners();
@@ -292,7 +292,49 @@ class AuthProvider extends ChangeNotifier {
     bool success = false;
 
     try {
-      final response = await authorizedGet("/user/change-password");
+      final response = await http.post(
+        Uri.parse("$_baseUrl/user/verify-email"),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+        "token": verifyToken, // ✅ QUAN TRỌNG
+      }),
+      );
+
+      if (response.statusCode == 200) {
+        success = true;
+        debugPrint("Email verified successfully");
+      } else {
+        _error = "Xác minh email thất bại (Mã lỗi: ${response.statusCode})";
+      }
+    } catch (e) {
+      _error = "Lỗi xác minh email: $e";
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+
+    return success;
+  }
+
+  Future<bool> changePassword (String newPassword) async {
+    isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    bool success = false;
+
+    try {
+      final response = await http.post(
+      Uri.parse("$_baseUrl/user/change-password"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token", // Nếu API yêu cầu token từ bước Verify OTP
+      },
+      body: jsonEncode({"newPassword": newPassword}),
+    );
+
 
       if (response.statusCode == 200) {
         success = true;

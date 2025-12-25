@@ -15,9 +15,11 @@ class ResetPasswordScreen extends StatefulWidget {
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
+    final String email = ModalRoute.of(context)!.settings.arguments as String;
     final auth = context.watch<AuthProvider>();
     return Scaffold(
       backgroundColor: Colors.white,
@@ -27,8 +29,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios), // Icon quay lại
           onPressed: () {
-            // Sử dụng Navigator.pop(context) để quay lại màn hình trước
-            Navigator.pop(context);
+            Navigator.pushNamed(context, "/login");
           },
         ),
       ),
@@ -41,23 +42,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               mainAxisSize: MainAxisSize.min,
               // crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text("Đặt lại mật khẩu",
-                    style: TextStyle(
-                      color: Color(0xFF396A30),
-                      fontSize: 40, 
-                      fontFamily: 'Unbounded',
-                      fontWeight: FontWeight.w600,
-                      )),
-                const SizedBox(height: 20),
-
-                const Text("Hãy điền mật khẩu bạn muốn sử dụng ở dưới!",
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 16, 
-                      fontFamily: 'Nunito',
-                      fontWeight: FontWeight.w300,
-                      )),
-                const SizedBox(height: 20),
+                _buildHeader(),
+                const SizedBox(height: 30),
 
                 CustomTextField(
                   controller: _passwordController,
@@ -67,55 +53,26 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 const SizedBox(height: 20),
 
                 CustomTextField(
-                  controller: _passwordController,
+                  controller: _confirmPasswordController,
                   label: "Xác nhận mật khẩu mới",
-                  validator: Validators.validatePassword,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return "Vui lòng xác nhận mật khẩu";
+                    }
+                    if (value != _passwordController.text) {
+                      return "Mật khẩu xác nhận không khớp";
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 20),
 
                 // Nút gửi password
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF396A30),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    onPressed: () async {
-                      if (!_formKey.currentState!.validate()) return;
-
-                      final password = _passwordController.text;
-                      // Xử lý logic đặt lại mật khẩu ở đây 
-                      //final success = await auth.changePassword(password);
-
-                      showDialog(
-                        context: context,
-                        builder: (context) => const ReturnLoginDialog(
-                          title: "Đặt lại mật khẩu thành công",
-                          message: "Mật khẩu của bạn đã được đặt lại thành công. Vui lòng đăng nhập lại với mật khẩu mới.",
-                        ),
-                      );
-                    },
-                    child: const Text(
-                      "Xác nhận",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
+                _buildConfirmButton(auth, email),
+                const SizedBox(height: 40),
 
                 //logo
-                SizedBox(
-                  width: 100,
-                  height: 100,
-                  child: Image.asset(
-                    "assets/images/logo_white.png",
-                    fit: BoxFit.contain,
-                  ),
-                ),
+                _buildLogo()
               ],
             ),
           ),
@@ -123,4 +80,56 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       ),
     );
   }
+  Widget _buildConfirmButton(AuthProvider auth, String email) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF396A30),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+        onPressed: auth.isLoading ? null : () => _handleResetPassword(auth, email),
+        child: auth.isLoading 
+          ? const CircularProgressIndicator(color: Colors.white)
+          : const Text("Xác nhận", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+      ),
+    );
+  }
+
+  void _handleResetPassword(AuthProvider auth, String email) async {
+    if (!_formKey.currentState!.validate()) return;
+
+    // Giả sử API của bạn cần cả email và password mới
+    final success = await auth.changePassword(_passwordController.text);
+
+    if (!mounted) return;
+
+    if (success) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const ReturnLoginDialog(
+          title: "Đặt lại mật khẩu thành công",
+          message: "Mật khẩu của bạn đã được đặt lại thành công. Vui lòng đăng nhập lại.",
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(auth.error ?? "Đặt lại mật khẩu thất bại"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Các hàm helper cho UI sạch hơn...
+  Widget _buildHeader() => const Column(children: [
+    Text("Đặt lại mật khẩu", style: TextStyle(color: Color(0xFF396A30), fontSize: 36, fontWeight: FontWeight.bold)),
+    SizedBox(height: 10),
+    Text("Hãy điền mật khẩu bạn muốn sử dụng ở dưới!", textAlign: TextAlign.center),
+  ]);
+
+  Widget _buildLogo() => SizedBox(width: 100, height: 100, child: Image.asset("assets/images/logo_white.png"));
 }
