@@ -83,7 +83,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         await showDialog(
                           context: context,
                           barrierDismissible: false,
-                          builder: (context) => const VerifyEmailToResetPasswordDialog(),
+                          builder: (context) => VerifyEmailDialog(
+                            email: _emailController.text.trim(),
+                            route: '/reset_password',
+                          ),
                         );
                       }
                     },

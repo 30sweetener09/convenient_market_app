@@ -1,272 +1,164 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/auth_provider.dart';
 
-// Tạo Verify Email Dialog để Login
-class VerifyEmailToLoginDialog extends StatelessWidget {
-  const VerifyEmailToLoginDialog({super.key});
+class VerifyEmailDialog extends StatefulWidget {
+  final String email;
+  final String? route;
+  const VerifyEmailDialog({required this.email, this.route, super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      elevation: 0,
-      backgroundColor: Colors.transparent,
-      child: _buildDialogContent(context),
-    );
-  }
-
-  Widget _buildDialogContent(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color.fromARGB(17, 0, 0, 0),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Icon thành công với animation
-          /*
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.teal[100],
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.email_outlined,
-              size: 40,
-              color: Colors.green[700],
-            ),
-          ),
-          const SizedBox(height: 20),
-          */
-
-          // Tiêu đề
-          Text(
-            "Xác minh email",
-            style: TextStyle(
-              fontFamily: 'Unbounded',
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.green[700],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Nội dung
-          Text(
-            "Chúng tôi đã gửi một mail xác minh đến hộp thư gmail của bạn.",
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-          ),
-
-          const SizedBox(height: 8),
-
-          Text(
-            "Vui lòng nhấp vào liên kết \"Confirm your mail\" trong email để hoàn tất đăng ký.",
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 15, color: Colors.grey[600]),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Lưu ý
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.amber[50],
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: const Color.fromARGB(255, 250, 222, 139),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  color: Colors.amber[700],
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    "Nếu không thấy email, hãy kiểm tra thư mục Spam/Junk",
-                    style: TextStyle(color: Colors.amber[700], fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Nút hành động
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF396A30),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Điều hướng về trang đăng nhập
-                Navigator.pushReplacementNamed(context, '/login');
-              },
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.arrow_back, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    "Quay lại đăng nhập",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  State<VerifyEmailDialog> createState() => _VerifyEmailDialogState();
 }
 
-// Tạo Verify Email Dialog để Reset Password
-class VerifyEmailToResetPasswordDialog extends StatelessWidget {
-  const VerifyEmailToResetPasswordDialog({super.key});
+class _VerifyEmailDialogState extends State<VerifyEmailDialog> {
+  // Tạo danh sách 6 controller để quản lý 6 ô nhập
+  final List<TextEditingController> _otpControllers = 
+      List.generate(6, (index) => TextEditingController());
+  
+  // Tạo danh sách các FocusNode để điều khiển tự động nhảy ô
+  final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
+
+  @override
+  void dispose() {
+    // Giải phóng bộ nhớ
+    for (var controller in _otpControllers) {
+      controller.dispose();
+    }
+    for (var node in _focusNodes) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  void _handleVerify() async {
+    final auth = context.read<AuthProvider>();
+    String code = _otpControllers.map((e) => e.text).join();
+    if (code.length < 6) return;
+
+    final success = await auth.verifyCode(widget.email, code);
+    if (!mounted) return;
+
+    if (!success) {
+      // Hiển thị thông báo lỗi
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Mã xác nhận không đúng hoặc hết hạn"),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).pop();
+    Navigator.pushReplacementNamed(context, widget.route ?? '/login');
+  }
+
+  void _handleResend() async {
+    final auth = context.read<AuthProvider>();
+    final success = await auth.sendVerificationEmail(widget.email);
+    
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Đã gửi lại mã thành công!")),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      elevation: 0,
-      backgroundColor: Colors.transparent,
-      child: _buildDialogContent(context),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
+      backgroundColor: Colors.white,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Xác nhận email",
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Ứng dụng đã gửi một mã code đến gmail của bạn. Hãy nhập mã code để xác minh.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.black54),
+              ),
+              const SizedBox(height: 24),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text("Mã code của bạn:",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 12),
+
+              // Hàng 6 ô nhập OTP
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(6, (index) => _buildOtpBox(index)),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Nút Xác nhận
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _handleVerify,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A633B),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text("Xác nhận", style: TextStyle(color: Colors.white, fontSize: 20)),
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("Chưa nhận được mã code? "),
+                  GestureDetector(
+                    onTap: _handleResend,
+                    child: const Text("Gửi lại", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildDialogContent(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color.fromARGB(17, 0, 0, 0),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Tiêu đề
-          Text(
-            "Xác minh email",
-            style: TextStyle(
-              fontFamily: 'Unbounded',
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.green[700],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Nội dung
-          Text(
-            "Chúng tôi đã gửi một mail xác minh đến hộp thư gmail của bạn.",
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-          ),
-
-          const SizedBox(height: 8),
-
-          Text(
-            "Vui lòng nhấp vào liên kết \"Confirm your mail\" trong email để hoàn tất đăng ký.",
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 15, color: Colors.grey[600]),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Lưu ý
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.amber[50],
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: const Color.fromARGB(255, 250, 222, 139),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  color: Colors.amber[700],
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    "Nếu không thấy email, hãy kiểm tra thư mục Spam/Junk",
-                    style: TextStyle(color: Colors.amber[700], fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Nút hành động
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF396A30),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Điều hướng về trang đăng nhập
-                Navigator.pushReplacementNamed(context, '/reset_pass');
-              },
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Tiếp tục",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward, size: 20),
-                ],
-              ),
-            ),
-          ),
-        ],
+  Widget _buildOtpBox(int index) {
+    return SizedBox(
+      width: 40,
+      height: 50,
+      child: TextFormField(
+        controller: _otpControllers[index],
+        focusNode: _focusNodes[index],
+        textAlign: TextAlign.center,
+        keyboardType: TextInputType.number,
+        maxLength: 1,
+        decoration: InputDecoration(
+          counterText: "",
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          contentPadding: EdgeInsets.zero,
+        ),
+        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        onChanged: (value) {
+          if (value.isNotEmpty && index < 5) {
+            _focusNodes[index + 1].requestFocus();
+          } else if (value.isEmpty && index > 0) {
+            _focusNodes[index - 1].requestFocus();
+          }
+        },
       ),
     );
   }

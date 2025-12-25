@@ -229,7 +229,7 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await http.post(
-        Uri.parse("$_baseUrl/user/send-verification-email"),
+        Uri.parse("$_baseUrl/user/send-verification-code"),
         headers: {
           "accept": "*/*",
           "Content-Type": "application/x-www-form-urlencoded",
@@ -241,7 +241,7 @@ class AuthProvider extends ChangeNotifier {
         success = true;
         debugPrint("Verification email sent to $email");
       } else {
-        _error = "Gửi email xác minh thất bại (Mã lỗi: ${response.statusCode})";
+        _error = "Gửi email xác minh thất bại";
       }
     } catch (e) {
       _error = "Lỗi gửi email xác minh: $e";
@@ -249,10 +249,9 @@ class AuthProvider extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
-
     return success;
   }
-  Future<bool> verifyEmail(String verificationCode) async {
+  Future<bool> verifyCode(String email, String code) async {
     isLoading = true;
     _error = null;
     notifyListeners();
@@ -261,12 +260,12 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await http.post(
-        Uri.parse("$_baseUrl/user/verify-email"),
+        Uri.parse("$_baseUrl/user/verify-code"),
         headers: {
           "accept": "*/*",
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: {"verification_code": verificationCode},
+        body: {"email": email, "code": code},
       );
 
       if (response.statusCode == 200) {
