@@ -77,7 +77,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _loginText() {
     return const Text(
-      "Đăng nhập",
+      "Đăng ký",
       style: TextStyle(
         color: Color(0xFF396A30),
         fontSize: 40,

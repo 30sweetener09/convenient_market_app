@@ -1,3 +1,4 @@
+import 'package:di_cho_tien_loi/providers/recipe_provider.dart';
 import 'package:flutter/material.dart';
 import '../screens/home/home_screen.dart';
 import 'package:provider/provider.dart';
@@ -6,9 +7,12 @@ import 'routes/app_routes.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AuthProvider(),
-      child: const MyApp(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => RecipeProvider()),
+      ],
+      child: const MyApp()
     ),
   );
 }

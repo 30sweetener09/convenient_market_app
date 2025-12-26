@@ -102,6 +102,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> delete() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('token');
+    token = null;
+    isLoggedIn = false;
+    notifyListeners();
+  }
+
   /// Gọi API có token
   Future<http.Response> authorizedGet(String endpoint) async {
     final url = Uri.parse("$_baseUrl$endpoint");
