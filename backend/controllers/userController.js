@@ -175,6 +175,7 @@ export const register = async (req, res) => {
     const userId = data.user.id;
 
     // ===== 3) INSERT USER PROFILE =====
+
     const { error: profileError } = await supabaseAdmin.from("users").insert({
       id: userId,
       email,

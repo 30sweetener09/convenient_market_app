@@ -101,15 +101,19 @@ export const requireGroupPermission = (permissionName) => {
 
     const { data, error } = await supabaseAdmin
       .from("group_members")
+
       .select(
         `
+
         group_roles (
           group_role_permissions (
             group_permissions (name)
           )
         )
+
       `
       )
+
       .eq("group_id", groupId)
       .eq("user_id", userId)
       .single();
