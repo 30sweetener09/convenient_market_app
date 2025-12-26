@@ -91,3 +91,42 @@ export const requirePermission = (permissionName) => {
     }
   };
 };
+
+export const requireGroupPermission = (permissionName) => {
+  return async (req, res, next) => {
+    const userId = req.user.id;
+    const { groupId } = req.params;
+
+    const { data, error } = await supabaseAdmin
+      .from("group_members")
+      .select(`
+        group_roles (
+          group_role_permissions (
+            group_permissions (name)
+          )
+        )
+      `)
+      .eq("group_id", groupId)
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !data) {
+      return res.status(403).json({ error: "Not a group member" });
+    }
+
+    const perms =
+      data.group_roles.group_role_permissions.map(
+        rp => rp.group_permissions.name
+      );
+
+    if (!perms.includes(permissionName)) {
+      return res.status(403).json({
+        error: "Missing group permission: " + permissionName,
+      });
+    }
+
+    next();
+  };
+};
+
+

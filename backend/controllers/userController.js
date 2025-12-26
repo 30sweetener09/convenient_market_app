@@ -171,18 +171,24 @@ export const register = async (req, res) => {
     const userId = data.user.id;
 
     // ===== 3) INSERT USER PROFILE =====
-     await supabaseAdmin.from("users").insert({
-      id: data.user.id,
+     const { error: profileError } = await supabaseAdmin.from("users").insert({
+      id: userId,
       email,
       username,
       gender,
       birthdate,
       language: "vi",
       deviceid: deviceId,
-      timezone,
       createdat: new Date(),
       updatedat: new Date(),
     });
+    if (profileError) {
+      console.error("Profile Insert Error:", profileError);
+      return res.status(500).json({
+        resultCode: "00008",
+        message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+      });
+    }
 
       return res.status(200).json({
       resultCode: "00035",

@@ -12,7 +12,7 @@ const swaggerOptions = {
       description: "API backend cho ứng dụng đa nền tảng"
     },
     servers: [
-      { url: "https://convenient-market-app.onrender.com/api" }
+      { url: "http://localhost:3000/api" }
     ]
   },
   apis: ["./server.js", "./routes/*.js", "./controllers/*.js"], // nơi chứa swagger comment
