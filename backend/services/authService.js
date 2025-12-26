@@ -77,10 +77,7 @@ export const verifyCodeService = async (email, code) => {
   }
 
   // Xóa mã sau khi dùng
-  await supabaseAdmin
-    .from("verification_codes")
-    .delete()
-    .eq("id", data.id);
+  await supabaseAdmin.from("verification_codes").delete().eq("id", data.id);
 
   return true;
 };

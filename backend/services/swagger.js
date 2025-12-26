@@ -9,11 +9,9 @@ const swaggerOptions = {
     info: {
       title: "Đi Chợ Tiện Lợi API",
       version: "1.0.0",
-      description: "API backend cho ứng dụng đa nền tảng"
+      description: "API backend cho ứng dụng đa nền tảng",
     },
-    servers: [
-      { url: "https://convenient-market-app.onrender.com/api" }
-    ]
+    servers: [{ url: "https://convenient-market-app.onrender.com/api" }],
   },
   apis: ["./server.js", "./routes/*.js", "./controllers/*.js"], // nơi chứa swagger comment
 };

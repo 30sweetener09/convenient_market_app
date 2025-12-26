@@ -50,11 +50,13 @@ export const requirePermission = (permissionName) => {
       // =============================
       const { data: rolePermissions, error: permErr } = await supabaseAdmin
         .from("role_permission")
-        .select(`
+        .select(
+          `
           permissions (
             name
           )
-        `)
+        `
+        )
         .in("role_id", roleIds);
 
       if (permErr) {
@@ -99,13 +101,19 @@ export const requireGroupPermission = (permissionName) => {
 
     const { data, error } = await supabaseAdmin
       .from("group_members")
-      .select(`
+
+      .select(
+        `
+
         group_roles (
           group_role_permissions (
             group_permissions (name)
           )
         )
-      `)
+
+      `
+      )
+
       .eq("group_id", groupId)
       .eq("user_id", userId)
       .single();
@@ -114,10 +122,9 @@ export const requireGroupPermission = (permissionName) => {
       return res.status(403).json({ error: "Not a group member" });
     }
 
-    const perms =
-      data.group_roles.group_role_permissions.map(
-        rp => rp.group_permissions.name
-      );
+    const perms = data.group_roles.group_role_permissions.map(
+      (rp) => rp.group_permissions.name
+    );
 
     if (!perms.includes(permissionName)) {
       return res.status(403).json({
@@ -128,5 +135,3 @@ export const requireGroupPermission = (permissionName) => {
     next();
   };
 };
-
-

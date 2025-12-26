@@ -1,7 +1,10 @@
 // controllers/userController.js
 import { supabase, supabaseAdmin } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
-import { sendVerificationCodeService, verifyCodeService } from "../services/authService.js";
+import {
+  sendVerificationCodeService,
+  verifyCodeService,
+} from "../services/authService.js";
 
 /**
  * @swagger
@@ -47,13 +50,13 @@ export const login = async (req, res) => {
       password,
     });
 
-     if (error) {
+    if (error) {
       if (error?.message?.includes("Email not confirmed")) {
-  return res.status(403).json({
-    resultCode: "00044",
-    message: "Email của bạn chưa được xác minh, vui lòng xác minh email.",
-  });
-}
+        return res.status(403).json({
+          resultCode: "00044",
+          message: "Email của bạn chưa được xác minh, vui lòng xác minh email.",
+        });
+      }
 
       return res.status(400).json({
         resultCode: "00045",
@@ -67,8 +70,8 @@ export const login = async (req, res) => {
       user: data.user,
       session: data.session,
     });
-  } catch  {
-     return res.status(500).json({
+  } catch {
+    return res.status(500).json({
       resultCode: "00008",
       message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
     });
@@ -122,11 +125,12 @@ export const register = async (req, res) => {
   if (password.length < 6 || password.length > 20) {
     return res.status(400).json({
       resultCode: "00027",
-      message: "Vui lòng cung cấp mật khẩu dài hơn 6 ký tự và ngắn hơn 20 ký tự.",
+      message:
+        "Vui lòng cung cấp mật khẩu dài hơn 6 ký tự và ngắn hơn 20 ký tự.",
     });
   }
 
-   if (username.length < 3 || username.length > 15) {
+  if (username.length < 3 || username.length > 15) {
     return res.status(400).json({
       resultCode: "00081",
       message: "Tên người dùng phải dài từ 3 đến 15 ký tự.",
@@ -142,7 +146,7 @@ export const register = async (req, res) => {
         message: "Một tài khoản với địa chỉ email này đã tồn tại.",
       });
     }
-    
+
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const deviceId = uuidv4();
 
@@ -171,7 +175,8 @@ export const register = async (req, res) => {
     const userId = data.user.id;
 
     // ===== 3) INSERT USER PROFILE =====
-     const { error: profileError } = await supabaseAdmin.from("users").insert({
+
+    const { error: profileError } = await supabaseAdmin.from("users").insert({
       id: userId,
       email,
       username,
@@ -190,12 +195,11 @@ export const register = async (req, res) => {
       });
     }
 
-      return res.status(200).json({
+    return res.status(200).json({
       resultCode: "00035",
-      message: "Bạn đã đăng ký thành công. Vui lòng kiểm tra email để xác minh.",
+      message:
+        "Bạn đã đăng ký thành công. Vui lòng kiểm tra email để xác minh.",
     });
-
-   
   } catch (err) {
     return res.status(500).json({
       resultCode: "00008",
@@ -251,7 +255,6 @@ export const logout = async (req, res) => {
 export const refreshToken = async (req, res) => {
   const { refreshToken } = req.body;
 
-  
   if (!refreshToken) {
     return res.status(400).json({
       resultCode: "00059",
@@ -266,17 +269,16 @@ export const refreshToken = async (req, res) => {
 
     if (error) {
       if (!data?.session) {
-  return res.status(401).json({
-    resultCode: "00061",
-    message: "Token được cung cấp không khớp với người dùng.",
-  });
-}
+        return res.status(401).json({
+          resultCode: "00061",
+          message: "Token được cung cấp không khớp với người dùng.",
+        });
+      }
       return res.status(401).json({
         resultCode: "00062",
         message: "Token đã hết hạn, vui lòng đăng nhập.",
       });
     }
-
 
     return res.status(200).json({
       resultCode: "00065",
@@ -284,7 +286,7 @@ export const refreshToken = async (req, res) => {
       session: data.session,
     });
   } catch (err) {
-   return res.status(500).json({
+    return res.status(500).json({
       resultCode: "00008",
       message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
     });
@@ -326,13 +328,13 @@ export const sendVerificationCode = async (req, res) => {
       resultCode: "00048",
       message: "Mã đã được gửi đến email của bạn thành công.",
     });
-  } catch(error) {
+  } catch (error) {
     if (err.message?.includes("rate")) {
-    return res.status(429).json({
-      resultCode: "00024",
-      message: "Quá nhiều yêu cầu.",
-    });
-  }
+      return res.status(429).json({
+        resultCode: "00024",
+        message: "Quá nhiều yêu cầu.",
+      });
+    }
     return res.status(500).json({
       resultCode: "00008",
       message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
@@ -355,11 +357,11 @@ export const sendVerificationCode = async (req, res) => {
 export const getUser = async (req, res) => {
   try {
     if (!req.user?.id) {
-  return res.status(401).json({
-    resultCode: "00007",
-    message: "ID người dùng không hợp lệ.",
-  });
-}
+      return res.status(401).json({
+        resultCode: "00007",
+        message: "ID người dùng không hợp lệ.",
+      });
+    }
     const userId = req.user.id;
 
     const { data, error } = await supabaseAdmin
@@ -422,27 +424,26 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-
-  /**
-   * @swagger
-   * /user/verify-email:
-   *   post:
-   *     summary: Xác minh email
-   *     tags: [User]
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/x-www-form-urlencoded:
-   *           schema:
-   *             type: object
-   *             required: [token]
-   *             properties:
-   *               token: { type: string }
-   *     responses:
-   *       200:
-   *         description: Xác minh thành công
-   */
-  export const verifyEmail = async (req, res) => {
+/**
+ * @swagger
+ * /user/verify-email:
+ *   post:
+ *     summary: Xác minh email
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token: { type: string }
+ *     responses:
+ *       200:
+ *         description: Xác minh thành công
+ */
+export const verifyEmail = async (req, res) => {
   const { token } = req.body;
 
   if (!token) {
@@ -461,7 +462,8 @@ export const deleteUser = async (req, res) => {
     if (error) {
       return res.status(400).json({
         resultCode: "00054",
-        message: "Mã bạn nhập không khớp với mã chúng tôi đã gửi đến email của bạn. Vui lòng kiểm tra lại.",
+        message:
+          "Mã bạn nhập không khớp với mã chúng tôi đã gửi đến email của bạn. Vui lòng kiểm tra lại.",
       });
     }
 
@@ -477,95 +479,95 @@ export const deleteUser = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /user/change-password:
+ *   post:
+ *     summary: Đổi mật khẩu
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             required: [newPassword]
+ *             properties:
+ *               newPassword: { type: string }
+ *     responses:
+ *       200:
+ *         description: Đổi mật khẩu thành công
+ */
+export const changePassword = async (req, res) => {
+  const { newPassword } = req.body;
 
-  /**
-   * @swagger
-   * /user/change-password:
-   *   post:
-   *     summary: Đổi mật khẩu
-   *     tags: [User]
-   *     security:
-   *       - bearerAuth: []
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/x-www-form-urlencoded:
-   *           schema:
-   *             type: object
-   *             required: [newPassword]
-   *             properties:
-   *               newPassword: { type: string }
-   *     responses:
-   *       200:
-   *         description: Đổi mật khẩu thành công
-   */
-  export const changePassword = async (req, res) => {
-    const { newPassword } = req.body;
-
-    if (!newPassword) {
+  if (!newPassword) {
     return res.status(400).json({
       resultCode: "00025",
       message: "Vui lòng cung cấp tất cả các trường bắt buộc!.",
     });
   }
 
-   if (newPassword.length < 6 || newPassword.length > 20) {
+  if (newPassword.length < 6 || newPassword.length > 20) {
     return res.status(400).json({
       resultCode: "00027",
-      message: "Vui lòng cung cấp mật khẩu dài hơn 6 ký tự và ngắn hơn 20 ký tự.",
+      message:
+        "Vui lòng cung cấp mật khẩu dài hơn 6 ký tự và ngắn hơn 20 ký tự.",
     });
   }
 
-    try {
-      const { data, error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
+  try {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
 
-      if (error) {
+    if (error) {
       return res.status(400).json({
         resultCode: "00007",
         message: "Không thể đổi mật khẩu.",
       });
     }
 
-      return res.status(200).json({
-        resultCode: "00068",
-        message: "Mật khẩu mới đã được tạo thành công.",
-        user: data.user,
-      });
-    } catch  {
-      return res.status(500).json({
+    return res.status(200).json({
+      resultCode: "00068",
+      message: "Mật khẩu mới đã được tạo thành công.",
+      user: data.user,
+    });
+  } catch {
+    return res.status(500).json({
       resultCode: "00008",
       message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
     });
-    }
-  };
+  }
+};
 
-  /**
-   * @swagger
-   * /user/:
-   *   put:
-   *     summary: Chỉnh sửa thông tin người dùng (bao gồm upload ảnh)
-   *     tags: [User]
-   *     security:
-   *       - bearerAuth: []
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         multipart/form-data:
-   *           schema:
-   *             type: object
-   *             properties:
-   *               username:
-   *                 type: string
-   *               image:
-   *                 type: string
-   *                 format: binary
-   *     responses:
-   *       200:
-   *         description: Cập nhật thành công
-   */
-  export const updateUser = async (req, res) => {
+/**
+ * @swagger
+ * /user/:
+ *   put:
+ *     summary: Chỉnh sửa thông tin người dùng (bao gồm upload ảnh)
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ */
+export const updateUser = async (req, res) => {
   try {
     const userId = req.user.id;
     const { username } = req.body;
@@ -618,20 +620,19 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-
-  /**
-   * @swagger
-   * /user/group:
-   *   post:
-   *     summary: Tạo nhóm mới
-   *     tags: [User]
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: Tạo nhóm thành công
-   */
- export const createGroup = async (req, res) => {
+/**
+ * @swagger
+ * /user/group:
+ *   post:
+ *     summary: Tạo nhóm mới
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Tạo nhóm thành công
+ */
+export const createGroup = async (req, res) => {
   try {
     const ownerId = req.user.id;
 
@@ -664,29 +665,29 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-  /**
-   * @swagger
-   * /user/group/add:
-   *   post:
-   *     summary: Thêm thành viên vào nhóm
-   *     tags: [User]
-   *     security:
-   *       - bearerAuth: []
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/x-www-form-urlencoded:
-   *           schema:
-   *             type: object
-   *             required: [username]
-   *             properties:
-   *               username:
-   *                 type: string
-   *     responses:
-   *       200:
-   *         description: Thêm thành viên thành công
-   */
-  export const addMember = async (req, res) => {
+/**
+ * @swagger
+ * /user/group/add:
+ *   post:
+ *     summary: Thêm thành viên vào nhóm
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             required: [username]
+ *             properties:
+ *               username:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Thêm thành viên thành công
+ */
+export const addMember = async (req, res) => {
   const { username } = req.body;
   const ownerId = req.user.id;
 
@@ -741,27 +742,26 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-
-  /**
-   * @swagger
-   * /user/group/:
-   *   delete:
-   *     summary: Xóa thành viên khỏi nhóm
-   *     tags: [User]
-   *     security:
-   *       - bearerAuth: []
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/x-www-form-urlencoded:
-   *           schema:
-   *             type: object
-   *             required: [username]
-   *             properties:
-   *               username:
-   *                 type: string
-   */
-  export const deleteMember = async (req, res) => {
+/**
+ * @swagger
+ * /user/group/:
+ *   delete:
+ *     summary: Xóa thành viên khỏi nhóm
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             required: [username]
+ *             properties:
+ *               username:
+ *                 type: string
+ */
+export const deleteMember = async (req, res) => {
   const { username } = req.body;
   const ownerId = req.user.id;
 
@@ -803,20 +803,19 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-
-  /**
-   * @swagger
-   * /user/group/:
-   *   get:
-   *     summary: Lấy danh sách thành viên trong nhóm
-   *     tags: [User]
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: Lấy danh sách thành viên thành công
-   */
-  export const getGroupMembers = async (req, res) => {
+/**
+ * @swagger
+ * /user/group/:
+ *   get:
+ *     summary: Lấy danh sách thành viên trong nhóm
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách thành viên thành công
+ */
+export const getGroupMembers = async (req, res) => {
   const ownerId = req.user.id;
 
   try {
@@ -911,4 +910,3 @@ export const verifyCode = async (req, res) => {
     });
   }
 };
-

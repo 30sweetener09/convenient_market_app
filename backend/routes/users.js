@@ -15,8 +15,7 @@ import {
   addMember,
   deleteMember,
   getGroupMembers,
-  verifyCode
-  
+  verifyCode,
 } from "../controllers/userController.js";
 
 import { requirePermission } from "../middlewares/permission.js";
@@ -42,6 +41,5 @@ router.post("/group/add", supabaseAuth, addMember);
 
 router.delete("/group", supabaseAuth, deleteMember);
 router.get("/group", supabaseAuth, getGroupMembers);
-
 
 export default router;
