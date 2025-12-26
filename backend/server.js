@@ -5,33 +5,20 @@ import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
-
+dotenv.config();
 import { supabase } from "./db.js"; // client Supabase
 import registerMiddlewares from "./middlewares/index.js";
 import setupSwagger from "./services/swagger.js";
 import userRoute from "./routes/users.js";
-dotenv.config();
+import shoppingListRoute from "./routes/shoppingList.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS: cho phép mọi origin, method, header
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: false,
-  })
-);
-
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-setupSwagger(app);
-
 // Middleware
 registerMiddlewares(app);
+
+setupSwagger(app);
 
 // Gắn Supabase client vào req để dùng ở route
 app.use((req, res, next) => {
@@ -41,6 +28,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.use("/api/user", userRoute);
+app.use("/api/shopping", shoppingListRoute);
 
 app.get("/", (req, res) => res.send("Smart Schedule API running"));
 

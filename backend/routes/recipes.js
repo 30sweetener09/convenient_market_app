@@ -6,12 +6,13 @@ import {
   deleteRecipe,
   getRecipesByFoodId,
 } from "../controllers/recipeController.js";
-import { authMiddleware } from "../middlewares/authMiddleware.js"; // Adjust path as needed
+import { requirePermission } from "../middlewares/permission.js";
+import { supabaseAuth } from "../middlewares/supabaseAuth.js";
 
 const recipeRoutes = express.Router();
 
 // Apply authentication middleware to all routes
-recipeRoutes.use(authMiddleware);
+recipeRoutes.use(supabaseAuth);
 
 recipeRoutes.post("/create", createRecipe);
 recipeRoutes.put("/update", updateRecipe);

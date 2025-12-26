@@ -1,15 +1,21 @@
 // routes/users.js
 import express from "express";
 import {
-  register,
   login,
+  register,
   logout,
   refreshToken,
   sendVerificationCode,
+  getUser,
+  deleteUser,
   verifyEmail,
   changePassword,
-  getUser,
-  deleteUser
+  updateUser,
+  createGroup,
+  addMember,
+  deleteMember,
+  getGroupMembers,
+  verifyCode,
 } from "../controllers/userController.js";
 
 import { requirePermission } from "../middlewares/permission.js";
@@ -17,21 +23,23 @@ import { supabaseAuth } from "../middlewares/supabaseAuth.js";
 
 const router = express.Router();
 
-// PUBLIC
 router.post("/login", login);
 router.post("/", register);
+router.post("/logout", logout);
 router.post("/refresh-token", refreshToken);
 router.post("/send-verification-code", sendVerificationCode);
-router.post("/verify-email", verifyEmail);
-
-// PROTECTED (token required)
-router.post("/logout", supabaseAuth, logout);
-router.post("/change-password", supabaseAuth, changePassword);
 router.get("/", supabaseAuth, getUser);
-
-// ONLY ADMIN PERMISSION
 router.delete("/", supabaseAuth, requirePermission("delete_user"), deleteUser);
-router.post("/group", supabaseAuth);
 
+router.post("/verify-email", verifyEmail);
+router.post("/verify-code", verifyCode);
+router.post("/change-password", supabaseAuth, changePassword);
+
+router.patch("/", supabaseAuth, updateUser);
+router.post("/group", supabaseAuth, createGroup);
+router.post("/group/add", supabaseAuth, addMember);
+
+router.delete("/group", supabaseAuth, deleteMember);
+router.get("/group", supabaseAuth, getGroupMembers);
 
 export default router;

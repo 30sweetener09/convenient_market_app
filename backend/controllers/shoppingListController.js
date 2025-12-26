@@ -107,7 +107,7 @@ export const createShoppingList = async (req, res) => {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide name",
-          vn: "Vui lòng cung cấp tên",
+          vn: "Vui lòng cung cấp tên danh sách mua sắm",
         },
         resultCode: "00239",
       });
@@ -161,8 +161,8 @@ export const createShoppingList = async (req, res) => {
     // Check if assigned user exists
     const { data: assignedUser, error: userError } = await supabase
       .from("users")
-      .select("id, group_id")
-      .ilike("name", assignToUsername)
+      .select("id, name")
+      .ilike("name", `%${assignToUsername}%`)
       .maybeSingle();
 
     if (userError || !assignedUser) {
@@ -178,7 +178,7 @@ export const createShoppingList = async (req, res) => {
     // Check permission to assign
     const { data: adminData, error: adminError } = await supabase
       .from("users")
-      .select("id, group_id, role")
+      .select("id, belongstogroupadminid")
       .eq("id", req.user.id)
       .maybeSingle();
 
@@ -187,7 +187,7 @@ export const createShoppingList = async (req, res) => {
     if (
       adminData &&
       assignedUser &&
-      adminData.group_id !== assignedUser.group_id
+      adminData.belongstogroupadminid !== assignedUser.belongstogroupadminid
     ) {
       return res.status(403).json({
         resultMessage: {
@@ -487,7 +487,7 @@ export const updateShoppingList = async (req, res) => {
 
     const { data: adminData, error: adminError } = await supabase
       .from("users")
-      .select("id, role, group_id")
+      .select("id, role, belongstogroupadminid")
       .eq("id", req.user.id)
       .maybeSingle();
 
@@ -540,7 +540,7 @@ export const updateShoppingList = async (req, res) => {
     if (newAssignToUsername !== undefined) {
       const { data: newUser, error: userError } = await supabase
         .from("users")
-        .select("id, group_id")
+        .select("id, belongstogroupadminid")
         .eq("username", newAssignToUsername)
         .maybeSingle();
 
@@ -554,7 +554,7 @@ export const updateShoppingList = async (req, res) => {
         });
       }
 
-      if (adminData.group_id !== newUser.group_id) {
+      if (adminData.belongstogroupadminid !== newUser.belongstogroupadminid) {
         return res.status(403).json({
           resultMessage: {
             en: "User does not have permission to assign this list to the username",
@@ -678,7 +678,7 @@ export const deleteShoppingList = async (req, res) => {
 
     const { data: adminData, error: adminError } = await supabase
       .from("users")
-      .select("id, role, group_id")
+      .select("id, role, belongstogroupadminid")
       .eq("id", req.user.id)
       .maybeSingle();
 
@@ -861,7 +861,7 @@ export const createTasks = async (req, res) => {
 
     const { data: adminData, error: adminError } = await supabase
       .from("users")
-      .select("id, role, group_id")
+      .select("id, role, belongstogroupadminid")
       .eq("id", req.user.id)
       .maybeSingle();
 
@@ -1203,7 +1203,7 @@ export const updateTask = async (req, res) => {
 
     const { data: adminData, error: adminError } = await supabase
       .from("users")
-      .select("id, role, group_id")
+      .select("id, role, belongstogroupadminid")
       .eq("id", req.user.id)
       .maybeSingle();
 
@@ -1413,7 +1413,7 @@ export const deleteTask = async (req, res) => {
 
     const { data: adminData, error: adminError } = await supabase
       .from("users")
-      .select("id, role, group_id")
+      .select("id, role, belongstogroupadminid")
       .eq("id", req.user.id)
       .maybeSingle();
 

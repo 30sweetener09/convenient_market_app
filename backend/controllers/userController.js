@@ -1,6 +1,10 @@
 // controllers/userController.js
 import { supabase, supabaseAdmin } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
+import {
+  sendVerificationCodeService,
+  verifyCodeService,
+} from "../services/authService.js";
 
 /**
  * @swagger
@@ -33,8 +37,12 @@ import { v4 as uuidv4 } from "uuid";
  */
 export const login = async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password)
-    return res.status(400).json({ error: "Email and password required" });
+  if (!email || !password) {
+    return res.status(400).json({
+      resultCode: "00038",
+      message: "Vui lòng cung cấp tất cả các trường bắt buộc!",
+    });
+  }
 
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -42,16 +50,31 @@ export const login = async (req, res) => {
       password,
     });
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) {
+      if (error?.message?.includes("Email not confirmed")) {
+        return res.status(403).json({
+          resultCode: "00044",
+          message: "Email của bạn chưa được xác minh, vui lòng xác minh email.",
+        });
+      }
 
-    return res.json({
-      resultCode: "00001",
-      message: "Login success",
+      return res.status(400).json({
+        resultCode: "00045",
+        message: "Bạn đã nhập một email hoặc mật khẩu không hợp lệ.",
+      });
+    }
+
+    return res.status(200).json({
+      resultCode: "00047",
+      message: "Bạn đã đăng nhập thành công",
       user: data.user,
       session: data.session,
     });
-  } catch (err) {
-    return res.status(500).json({ error: "Internal server error" });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
 
@@ -67,45 +90,120 @@ export const login = async (req, res) => {
  *         application/x-www-form-urlencoded:
  *           schema:
  *             type: object
- *             required: [email, password, name]
+ *             required: [email, password, username, birthdate, gender]
  *             properties:
  *               email: { type: string }
  *               password: { type: string }
- *               name: { type: string }
+ *               username: { type: string }
+ *               birthdate: { type: string, format: date }
+ *               gender: { type: string }
+ *
  *     responses:
  *       200:
  *         description: Đăng ký thành công
  */
 export const register = async (req, res) => {
-  const { email, password, name } = req.body;
+  const { email, password, username, birthdate, gender } = req.body;
 
-  if (!email || !password || !name)
-    return res
-      .status(400)
-      .json({ error: "Email, password and name are required" });
+  // 00025 – thiếu field
+  if (!email || !password || !username || !birthdate || !gender) {
+    return res.status(400).json({
+      resultCode: "00025",
+      message: "Vui lòng cung cấp tất cả các trường bắt buộc!",
+    });
+  }
+
+  // 00026 – email không hợp lệ
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({
+      resultCode: "00026",
+      message: "Vui lòng cung cấp một địa chỉ email hợp lệ!",
+    });
+  }
+
+  if (password.length < 6 || password.length > 20) {
+    return res.status(400).json({
+      resultCode: "00027",
+      message:
+        "Vui lòng cung cấp mật khẩu dài hơn 6 ký tự và ngắn hơn 20 ký tự.",
+    });
+  }
+
+  if (username.length < 3 || username.length > 15) {
+    return res.status(400).json({
+      resultCode: "00081",
+      message: "Tên người dùng phải dài từ 3 đến 15 ký tự.",
+    });
+  }
 
   try {
-    const language = "vi";
+    // 00032 – email đã tồn tại
+    const { data: users } = await supabaseAdmin.auth.admin.listUsers();
+    if (users.users.some((u) => u.email === email)) {
+      return res.status(400).json({
+        resultCode: "00032",
+        message: "Một tài khoản với địa chỉ email này đã tồn tại.",
+      });
+    }
+
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const deviceId = uuidv4();
 
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      username,
+      birthdate,
+      gender,
       options: {
-        data: { name, language, timezone, deviceId },
+        data: {
+          language: "vi",
+          timezone,
+          deviceId,
+        },
       },
     });
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) {
+      return res.status(400).json({
+        resultCode: "00008",
+        message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+      });
+    }
 
-    return res.json({
-      resultCode: "00002",
-      message: "Register success",
-      user: data.user,
+    const userId = data.user.id;
+
+    // ===== 3) INSERT USER PROFILE =====
+    const { error: profileError } = await supabaseAdmin.from("users").insert({
+      id: userId,
+      email,
+      username,
+      gender,
+      birthdate,
+      language: "vi",
+      deviceid: deviceId,
+      createdat: new Date(),
+      updatedat: new Date(),
+    });
+    if (profileError) {
+      console.error("Profile Insert Error:", profileError);
+      return res.status(500).json({
+        resultCode: "00008",
+        message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+      });
+    }
+
+    return res.status(200).json({
+      resultCode: "00035",
+      message:
+        "Bạn đã đăng ký thành công. Vui lòng kiểm tra email để xác minh.",
     });
   } catch (err) {
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
 
@@ -121,12 +219,16 @@ export const register = async (req, res) => {
  */
 export const logout = async (req, res) => {
   try {
-    const { error } = await supabase.auth.signOut();
-    if (error) return res.status(400).json({ error: error.message });
-
-    return res.json({ resultCode: "00003", message: "Logged out" });
-  } catch (err) {
-    return res.status(500).json({ error: "Internal server error" });
+    await supabase.auth.signOut();
+    return res.status(200).json({
+      resultCode: "00050",
+      message: "Đăng xuất thành công",
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
 
@@ -152,23 +254,41 @@ export const logout = async (req, res) => {
 export const refreshToken = async (req, res) => {
   const { refreshToken } = req.body;
 
-  if (!refreshToken)
-    return res.status(400).json({ error: "refreshToken required" });
+  if (!refreshToken) {
+    return res.status(400).json({
+      resultCode: "00059",
+      message: "Vui lòng cung cấp token làm mới.",
+    });
+  }
 
   try {
     const { data, error } = await supabase.auth.refreshSession({
       refresh_token: refreshToken,
     });
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) {
+      if (!data?.session) {
+        return res.status(401).json({
+          resultCode: "00061",
+          message: "Token được cung cấp không khớp với người dùng.",
+        });
+      }
+      return res.status(401).json({
+        resultCode: "00062",
+        message: "Token đã hết hạn, vui lòng đăng nhập.",
+      });
+    }
 
-    return res.json({
-      resultCode: "00004",
-      message: "Token refreshed",
+    return res.status(200).json({
+      resultCode: "00065",
+      message: "Token đã được làm mới thành công.",
       session: data.session,
     });
   } catch (err) {
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
 
@@ -194,19 +314,112 @@ export const refreshToken = async (req, res) => {
 export const sendVerificationCode = async (req, res) => {
   const { email } = req.body;
 
-  if (!email) return res.status(400).json({ error: "Email required" });
+  if (!email) {
+    return res.status(400).json({
+      resultCode: "00005",
+      message: "Vui lòng cung cấp đầy đủ thông tin để gửi mã.",
+    });
+  }
 
   try {
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) return res.status(400).json({ error: error.message });
-
-    return res.json({
-      resultCode: "00005",
-      message: "Verification code sent",
-      data,
+    await sendVerificationCodeService(email);
+    return res.status(200).json({
+      resultCode: "00048",
+      message: "Mã đã được gửi đến email của bạn thành công.",
     });
-  } catch (err) {
-    return res.status(500).json({ error: "Internal server error" });
+  } catch (error) {
+    if (err.message?.includes("rate")) {
+      return res.status(429).json({
+        resultCode: "00024",
+        message: "Quá nhiều yêu cầu.",
+      });
+    }
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /user/:
+ *   get:
+ *     summary: Lấy thông tin người dùng hiện tại
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy thông tin thành công
+ */
+export const getUser = async (req, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({
+        resultCode: "00007",
+        message: "ID người dùng không hợp lệ.",
+      });
+    }
+    const userId = req.user.id;
+
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({
+        resultCode: "00052",
+        message: "Không thể tìm thấy người dùng.",
+      });
+    }
+
+    return res.status(200).json({
+      resultCode: "00089",
+      message: "Thông tin người dùng đã được lấy thành công.",
+      user: data,
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /user/:
+ *   delete:
+ *     summary: Xóa tài khoản người dùng
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Xóa tài khoản thành công
+ */
+export const deleteUser = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    await supabaseAdmin.auth.admin.deleteUser(userId);
+    await supabaseAdmin.from("users").delete().eq("id", userId);
+
+    return res.status(200).json({
+      resultCode: "00092",
+      resultMessage: {
+        vn: "Tài khoản của bạn đã bị xóa thành công.",
+        en: "Your account has been deleted successfully.",
+      },
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
 
@@ -232,24 +445,36 @@ export const sendVerificationCode = async (req, res) => {
 export const verifyEmail = async (req, res) => {
   const { token } = req.body;
 
-  if (!token)
-    return res.status(400).json({ error: "Verification token required" });
+  if (!token) {
+    return res.status(400).json({
+      resultCode: "00053",
+      message: "Vui lòng gửi một mã xác nhận.",
+    });
+  }
 
   try {
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { error } = await supabase.auth.verifyOtp({
       token,
       type: "signup",
     });
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) {
+      return res.status(400).json({
+        resultCode: "00054",
+        message:
+          "Mã bạn nhập không khớp với mã chúng tôi đã gửi đến email của bạn. Vui lòng kiểm tra lại.",
+      });
+    }
 
-    return res.json({
-      resultCode: "00006",
-      message: "Email verified",
-      user: data.user,
+    return res.status(200).json({
+      resultCode: "00058",
+      message: "Địa chỉ email của bạn đã được xác minh thành công.",
     });
-  } catch (err) {
-    return res.status(500).json({ error: "Internal server error" });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
 
@@ -277,79 +502,120 @@ export const verifyEmail = async (req, res) => {
 export const changePassword = async (req, res) => {
   const { newPassword } = req.body;
 
-  if (!newPassword)
-    return res.status(400).json({ error: "newPassword required" });
+  if (!newPassword) {
+    return res.status(400).json({
+      resultCode: "00025",
+      message: "Vui lòng cung cấp tất cả các trường bắt buộc!.",
+    });
+  }
+
+  if (newPassword.length < 6 || newPassword.length > 20) {
+    return res.status(400).json({
+      resultCode: "00027",
+      message:
+        "Vui lòng cung cấp mật khẩu dài hơn 6 ký tự và ngắn hơn 20 ký tự.",
+    });
+  }
 
   try {
     const { data, error } = await supabase.auth.updateUser({
       password: newPassword,
     });
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) {
+      return res.status(400).json({
+        resultCode: "00007",
+        message: "Không thể đổi mật khẩu.",
+      });
+    }
 
-    return res.json({
-      resultCode: "00007",
-      message: "Password changed",
+    return res.status(200).json({
+      resultCode: "00068",
+      message: "Mật khẩu mới đã được tạo thành công.",
       user: data.user,
     });
-  } catch (err) {
-    return res.status(500).json({ error: "Internal server error" });
-  }
-};
-
-/**
- * @swagger
- * /user/:
- *   get:
- *     summary: Lấy thông tin người dùng từ access token
- *     tags: [User]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Lấy thông tin thành công
- */
-export const getUser = async (req, res) => {
-  try {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) return res.status(400).json({ error: error.message });
-
-    return res.json({
+  } catch {
+    return res.status(500).json({
       resultCode: "00008",
-      user: data.user,
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
     });
-  } catch (err) {
-    return res.status(500).json({ error: "Internal server error" });
   }
 };
 
 /**
  * @swagger
  * /user/:
- *   delete:
- *     summary: Xóa tài khoản (chỉ Admin hoặc chính chủ)
+ *   put:
+ *     summary: Chỉnh sửa thông tin người dùng (bao gồm upload ảnh)
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *               image:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       200:
- *         description: Xóa tài khoản thành công
+ *         description: Cập nhật thành công
  */
-export const deleteUser = async (req, res) => {
+export const updateUser = async (req, res) => {
   try {
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(req.user.id);
+    const userId = req.user.id;
+    const { username } = req.body;
 
-    if (error) return res.status(400).json({ error: error.message });
+    const updateData = {
+      updatedat: new Date(),
+    };
 
-    return res.json({
-      resultCode: "00092",
-      resultMessage: {
-        en: "Your account was deleted successfully.",
-        vn: "Tài khoản của bạn đã bị xóa thành công.",
-      },
+    if (username) updateData.username = username;
+
+    if (req.file) {
+      const filePath = `${userId}/${Date.now()}-${req.file.originalname}`;
+
+      const { error } = await supabaseAdmin.storage
+        .from("avatars")
+        .upload(filePath, req.file.buffer, {
+          contentType: req.file.mimetype,
+        });
+
+      if (!error) {
+        const { data } = supabaseAdmin.storage
+          .from("avatars")
+          .getPublicUrl(filePath);
+
+        updateData.photourl = data.publicUrl;
+      }
+    }
+
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update(updateData)
+      .eq("id", userId);
+
+    if (error) {
+      return res.status(400).json({
+        resultCode: "00008",
+        message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+      });
+    }
+
+    return res.status(200).json({
+      resultCode: "00086",
+      message: "Thông tin hồ sơ của bạn đã được thay đổi thành công.",
     });
-  } catch (err) {
-    return res.status(500).json({ error: "Internal server error" });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
 
@@ -367,20 +633,279 @@ export const deleteUser = async (req, res) => {
  */
 export const createGroup = async (req, res) => {
   try {
-    const adminId = req.user.id;
+    const ownerId = req.user.id;
 
-    return res.json({
+    const { data, error } = await supabaseAdmin
+      .from("groups")
+      .insert({ owner_id: ownerId })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await supabaseAdmin.from("group_members").insert({
+      group_id: data.id,
+      user_id: ownerId,
+    });
+
+    return res.status(200).json({
       resultCode: "00095",
       resultMessage: {
-        en: "Your group has been created successfully",
         vn: "Tạo nhóm thành công",
+        en: "Group created successfully",
       },
-      adminId: adminId,
+      groupId: data.id,
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ.",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /user/group/add:
+ *   post:
+ *     summary: Thêm thành viên vào nhóm
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             required: [username]
+ *             properties:
+ *               username:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Thêm thành viên thành công
+ */
+export const addMember = async (req, res) => {
+  const { username } = req.body;
+  const ownerId = req.user.id;
+
+  if (!username) {
+    return res.status(400).json({
+      resultCode: "00100",
+      message: "Thiếu username",
+    });
+  }
+
+  try {
+    const { data: group } = await supabaseAdmin
+      .from("groups")
+      .select("id")
+      .eq("owner_id", ownerId)
+      .single();
+
+    if (!group) {
+      return res.status(403).json({
+        resultCode: "00096",
+        message: "Bạn chưa tạo nhóm",
+      });
+    }
+
+    const { data: user } = await supabaseAdmin
+      .from("users")
+      .select("id")
+      .eq("username", username)
+      .single();
+
+    if (!user) {
+      return res.status(404).json({
+        resultCode: "00099",
+        message: "Không tồn tại user này",
+      });
+    }
+
+    await supabaseAdmin.from("group_members").insert({
+      group_id: group.id,
+      user_id: user.id,
+    });
+
+    return res.status(200).json({
+      resultCode: "00102",
+      message: "Người dùng thêm vào nhóm thành công",
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Lỗi máy chủ nội bộ",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /user/group/:
+ *   delete:
+ *     summary: Xóa thành viên khỏi nhóm
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             required: [username]
+ *             properties:
+ *               username:
+ *                 type: string
+ */
+export const deleteMember = async (req, res) => {
+  const { username } = req.body;
+  const ownerId = req.user.id;
+
+  try {
+    const { data: group } = await supabaseAdmin
+      .from("groups")
+      .select("id")
+      .eq("owner_id", ownerId)
+      .single();
+
+    const { data: user } = await supabaseAdmin
+      .from("users")
+      .select("id")
+      .eq("username", username)
+      .single();
+
+    if (!user) {
+      return res.status(404).json({
+        resultCode: "00099",
+        message: "Không tồn tại user này",
+      });
+    }
+
+    await supabaseAdmin
+      .from("group_members")
+      .delete()
+      .eq("group_id", group.id)
+      .eq("user_id", user.id);
+
+    return res.status(200).json({
+      resultCode: "00106",
+      message: "Xóa thành công",
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Lỗi máy chủ nội bộ",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /user/group/:
+ *   get:
+ *     summary: Lấy danh sách thành viên trong nhóm
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách thành viên thành công
+ */
+export const getGroupMembers = async (req, res) => {
+  const ownerId = req.user.id;
+
+  try {
+    const { data: group } = await supabaseAdmin
+      .from("groups")
+      .select("id")
+      .eq("owner_id", ownerId)
+      .single();
+
+    if (!group) {
+      return res.status(404).json({
+        resultCode: "00096",
+        message: "Bạn không thuộc về nhóm nào",
+      });
+    }
+
+    const { data } = await supabaseAdmin
+      .from("group_members")
+      .select("users(username, email, photourl)")
+      .eq("group_id", group.id);
+
+    return res.status(200).json({
+      resultCode: "00098",
+      message: "Thành công",
+      members: data,
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Lỗi máy chủ nội bộ",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /user/verify-code:
+ *   post:
+ *     summary: Xác nhận mã OTP gửi về email
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             required: [email, code]
+ *             properties:
+ *               email:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Xác minh thành công
+ */
+export const verifyCode = async (req, res) => {
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    return res.status(400).json({
+      resultCode: "00053",
+      message: "Vui lòng cung cấp email và mã xác nhận.",
+    });
+  }
+
+  try {
+    await verifyCodeService(email, code);
+
+    return res.status(200).json({
+      resultCode: "00058",
+      message: "Mã xác thực hợp lệ.",
     });
   } catch (err) {
-    console.error(err);
+    if (err.message === "INVALID_CODE") {
+      return res.status(400).json({
+        resultCode: "00054",
+        message: "Mã xác thực không đúng.",
+      });
+    }
+
+    if (err.message === "CODE_EXPIRED") {
+      return res.status(400).json({
+        resultCode: "00055",
+        message: "Mã xác thực đã hết hạn.",
+      });
+    }
+
     return res.status(500).json({
-      error: "Internal server error",
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ.",
     });
   }
 };

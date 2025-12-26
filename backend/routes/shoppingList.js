@@ -2,31 +2,32 @@
 import express from "express";
 import {
   createShoppingList,
+  getAllShoppingLists,
   updateShoppingList,
   deleteShoppingList,
   createTasks,
-  getListOfTasks,
   markTask,
   deleteTask,
   updateTask,
 } from "../controllers/shoppingListController.js";
-import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { requirePermission } from "../middlewares/permission.js";
+import { supabaseAuth } from "../middlewares/supabaseAuth.js";
 
 const router = express.Router();
 
 // Apply authentication middleware to all routes
-router.use(authMiddleware);
+router.use(supabaseAuth);
 
 // Shopping List routes
-router.post("/create", authMiddleware, createShoppingList);
-router.put("/update", authMiddleware, updateShoppingList);
-router.delete("/delete", authMiddleware, deleteShoppingList);
+router.post("/create", requirePermission("create_list"), createShoppingList);
+router.get("/getAll", getAllShoppingLists);
+router.put("/update", requirePermission("edit_list"), updateShoppingList);
+router.delete("/delete", requirePermission("delete_list"), deleteShoppingList);
 
 // Tasks Routes
-router.post("/tasks/create", createTasks);
-router.get("/tasks/list", getListOfTasks);
+router.post("/tasks/create", requirePermission("manage_tasks"), createTasks);
 router.put("/tasks/mark", markTask);
-router.delete("/tasks/delete", deleteTask);
-router.put("/tasks/update", updateTask);
+router.put("/tasks/update", requirePermission("manage_tasks"), updateTask);
+router.delete("/tasks/delete", requirePermission("manage_tasks"), deleteTask);
 
 export default router;
