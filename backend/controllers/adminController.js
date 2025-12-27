@@ -5,31 +5,32 @@ import { supabase } from "../db.js";
 
 /**
  * @swagger
- * /admin/category:
+ * /admin/category/create:
  *   post:
- *     summary: Tạo danh mục (Category) mới
+ *     summary: Tạo danh mục
  *     tags: [Admin]
  *     security:
  *       - bearerAuth:
  *     requestBody:
  *       required: true
  *       content:
- *         application/x-www-form-urlencoded:
+ *         application/json:
  *           schema:
  *             type: object
+ *             example: "Rau củ"
  *             properties:
  *               name:
  *                 type: string
  *                 description: "Tên danh mục mới."
  *     responses:
  *       200:
- *         description: Tạo category thành công (00135)
+ *         description: Tạo category thành công
  *       400:
- *         description: Thiếu tên (400)
+ *         description: Thiếu tên category
  *       409:
- *         description: Category đã tồn tại (00132)
+ *         description: Đã tồn tại category có tên này
  *       403:
- *         description: Truy cập bị từ chối (Cần System Admin)
+ *         description: Truy cập bị từ chối
  *       500:
  *         description: Lỗi máy chủ
  */
@@ -43,12 +44,13 @@ export const createCategory = async (req, res) => {
           en: "Missing category name",
           vn: "Thiếu tên category",
         },
-        resultCode: "400",
+        resultCode: "00131",
       });
     }
 
+    // Check duplicate
     const { data: existing } = await supabase
-     .from("categories")
+     .from("foodcategory")
      .select("id")
      .eq("name", name.trim())
      .maybeSingle();
@@ -56,15 +58,16 @@ export const createCategory = async (req, res) => {
     if (existing) {
       return res.status(409).json({
         resultMessage: {
-          en: "Category already exists",
-          vn: "Category đã tồn tại",
+          en: "This category name already exists",
+          vn: "Đã tồn tại category có tên này",
         },
         resultCode: "00132",
       });
     }
 
+    // Insert
     const { data, error } = await supabase
-     .from("categories")
+     .from("foodcategory")
      .insert([{ name: name.trim() }])
      .select()
      .single();
@@ -87,32 +90,32 @@ export const createCategory = async (req, res) => {
 
 /**
  * @swagger
- * /admin/category:
+ * /admin/category/list:
  *   get:
- *     summary: Lấy tất cả danh mục (Category)
+ *     summary: Lấy tất cả danh mục
  *     tags: [Admin]
  *     security:
  *       - bearerAuth:
  *     responses:
  *       200:
- *         description: Lấy danh sách category thành công (00129)
+ *         description: Lấy các category thành công
  *       403:
- *         description: Truy cập bị từ chối (Cần System Admin)
+ *         description: Truy cập bị từ chối
  *       500:
  *         description: Lỗi máy chủ
  */
 export const getAllCategories = async (req, res) => {
   try {
     const { data, error } = await supabase
-     .from("categories")
+     .from("foodcategory")
      .select("*")
      .order("name", { ascending: true });
     if (error) throw error;
 
     res.status(200).json({
       resultMessage: {
-        en: "Get category list successful",
-        vn: "Lấy danh sách category thành công",
+        en: "Successfully retrieved categories",
+        vn: "Lấy các category thành công",
       },
       resultCode: "00129",
       categories: data,
@@ -125,36 +128,40 @@ export const getAllCategories = async (req, res) => {
 
 /**
  * @swagger
- * /admin/category:
+ * /admin/category/update:
  *   put:
- *     summary: Cập nhật tên danh mục (Category)
+ *     summary: Chỉnh sửa danh mục theo tên
  *     tags: [Admin]
  *     security:
  *       - bearerAuth:
  *     requestBody:
  *       required: true
  *       content:
- *         application/x-www-form-urlencoded:
+ *         application/json:
  *           schema:
  *             type: object
  *             properties:
  *               oldName:
  *                 type: string
- *                 description: "Tên danh mục hiện tại (00138)."
+ *                 example: "Rau củ"
+ *                 description: "Tên danh mục hiện tại."
  *               newName:
  *                 type: string
- *                 description: "Tên mới (00137)."
+ *                 example: "Rau củ quả"
+ *                 description: "Tên mới."
  *     responses:
  *       200:
- *         description: Cập nhật category thành công (00141)
+ *         description: Sửa đổi category thành công
  *       400:
- *         description: Thiếu tên (400) hoặc Tên cũ trùng tên mới (00137)
+ *         description: Thiếu thông tin name cũ, name mới
+ *       402:
+ *         description: Tên cũ trùng với tên mới
  *       404:
- *         description: Category cũ không tìm thấy (00138)
+ *         description: Không tìm thấy category với tên cung cấp
  *       409:
- *         description: Tên mới đã tồn tại (00132)
+ *         description: Tên mới đã tồn tại
  *       403:
- *         description: Truy cập bị từ chối (Cần System Admin)
+ *         description: Truy cập bị từ chối
  *       500:
  *         description: Lỗi máy chủ
  */
@@ -165,10 +172,10 @@ export const updateCategory = async (req, res) => {
     if (!oldName ||!newName?.trim()) {
       return res.status(400).json({
         resultMessage: {
-          en: "Missing oldName or newName",
-          vn: "Thiếu tên cũ hoặc tên mới",
+          en: "Missing information old name, new name",
+          vn: "Thiếu thông tin name cũ, name mới",
         },
-        resultCode: "400",
+        resultCode: "00136",
       });
     }
 
@@ -183,7 +190,7 @@ export const updateCategory = async (req, res) => {
     }
 
     const { data: category } = await supabase
-     .from("categories")
+     .from("foodcategory")
      .select("*")
      .eq("name", oldName)
      .maybeSingle();
@@ -191,8 +198,8 @@ export const updateCategory = async (req, res) => {
     if (!category) {
       return res.status(404).json({
         resultMessage: {
-          en: "Category not found",
-          vn: "Không tìm thấy category",
+          en: "Could not find category with the provided name",
+          vn: "Không tìm thấy category với tên cung cấp",
         },
         resultCode: "00138",
       });
@@ -200,7 +207,7 @@ export const updateCategory = async (req, res) => {
     
     // Check if newName already exists (00138 X/00132)
     const { data: existingNewName } = await supabase
-     .from("categories")
+     .from("foodcategory")
      .select("id")
      .eq("name", newName.trim())
      .maybeSingle();
@@ -211,13 +218,13 @@ export const updateCategory = async (req, res) => {
                 en: "New category name already exists",
                 vn: "Tên mới đã tồn tại",
             },
-            resultCode: "00132",
+            resultCode: "00138x",
         });
     }
 
 
     const { data, error } = await supabase
-     .from("categories")
+     .from("foodcategory")
      .update({ name: newName.trim() })
      .eq("id", category.id)
      .select()
@@ -227,8 +234,8 @@ export const updateCategory = async (req, res) => {
 
     res.status(200).json({
       resultMessage: {
-        en: "Category updated successfully",
-        vn: "Cập nhật category thành công",
+        en: "Successfully updated category",
+        vn: "Sửa đổi category thành công",
       },
       resultCode: "00141",
       category: data,
@@ -241,33 +248,34 @@ export const updateCategory = async (req, res) => {
 
 /**
  * @swagger
- * /admin/category:
+ * /admin/category/delete:
  *   delete:
- *     summary: Xóa danh mục (Category)
+ *     summary: Xóa danh mục theo tên
  *     tags: [Admin]
  *     security:
  *       - bearerAuth:
  *     requestBody:
  *       required: true
  *       content:
- *         application/x-www-form-urlencoded:
+ *         application/json:
  *           schema:
  *             type: object
  *             properties:
  *               name:
  *                 type: string
- *                 description: "Tên danh mục cần xóa (00143)."
+ *                 example: "Rau củ quả"
+ *                 description: "Tên danh mục cần xóa."
  *     responses:
  *       200:
- *         description: Xóa category thành công (00146)
+ *         description: Xóa category thành công
  *       400:
- *         description: Thiếu tên (400)
+ *         description: Thiếu thông tin tên của category
  *       404:
- *         description: Category không tìm thấy (00143)
+ *         description: Không tìm thấy category với tên cung cấp
  *       409:
- *         description: Vi phạm ràng buộc (Vẫn còn Food tham chiếu) (Sử dụng 00144 hoặc mã tùy chỉnh)
+ *         description: Vi phạm ràng buộc
  *       403:
- *         description: Truy cập bị từ chối (Cần System Admin)
+ *         description: Truy cập bị từ chối
  *       500:
  *         description: Lỗi máy chủ
  */
@@ -277,15 +285,15 @@ export const deleteCategory = async (req, res) => {
     if (!name) {
       return res.status(400).json({
         resultMessage: {
-          en: "Missing category name",
-          vn: "Thiếu tên category",
+          en: "Missing category name information",
+          vn: "Thiếu thông tin tên của category",
         },
-        resultCode: "400",
+        resultCode: "00142",
       });
     }
 
     const { data: category } = await supabase
-     .from("categories")
+     .from("foodcategory")
      .select("id")
      .eq("name", name)
      .maybeSingle();
@@ -293,8 +301,8 @@ export const deleteCategory = async (req, res) => {
     if (!category) {
       return res.status(404).json({
         resultMessage: {
-          en: "Category not found",
-          vn: "Không tìm thấy category",
+          en: "Could not find category with the provided name",
+          vn: "Không tìm thấy category với tên cung cấp",
         },
         resultCode: "00143",
       });
@@ -302,9 +310,9 @@ export const deleteCategory = async (req, res) => {
     
     // Check FK Constraint (Food table)
     const { count, error: countError } = await supabase
-     .from("foods")
+     .from("food")
      .select("id", { count: 'exact' })
-     .eq("category_id", category.id);
+     .eq("id", category.id);
 
     if (countError) throw countError;
 
@@ -314,12 +322,12 @@ export const deleteCategory = async (req, res) => {
                 en: "Cannot delete category due to existing food references",
                 vn: "Không thể xóa Category vì còn thực phẩm tham chiếu",
             },
-            resultCode: "00144", // Using 00144 for server/conflict error
+            resultCode: "00144",
         });
     }
 
     const { error } = await supabase
-     .from("categories")
+     .from("foodcategory")
      .delete()
      .eq("id", category.id);
 
@@ -342,33 +350,34 @@ export const deleteCategory = async (req, res) => {
 
 /**
  * @swagger
- * /admin/unit:
+ * /admin/units/create:
  *   post:
- *     summary: Tạo đơn vị đo lường (Unit) mới
+ *     summary: Tạo đơn vị
  *     tags: [Admin]
  *     security:
  *       - bearerAuth:
  *     requestBody:
  *       required: true
  *       content:
- *         application/x-www-form-urlencoded:
+ *         application/json:
  *           schema:
  *             type: object
  *             properties:
  *               name:
  *                 type: string
- *                 description: "Tên đơn vị mới (unitName)."
+ *                 example: "Kilogram"
+ *                 description: "Tên đơn vị mới."
  *     responses:
  *       200:
- *         description: Tạo đơn vị thành công (00116)
+ *         description: Tạo đơn vị thành công
  *       400:
- *         description: Thiếu tên đơn vị (00112)
+ *         description: Thiếu thông tin tên của đơn vị
  *       409:
- *         description: Đơn vị đã tồn tại (00113)
+ *         description: Đã tồn tại đơn vị có tên này
  *       403:
- *         description: Truy cập bị từ chối (Cần System Admin)
+ *         description: Truy cập bị từ chối
  *       500:
- *         description: Lỗi máy chủ (00115)
+ *         description: Lỗi máy chủ
  */
 export const createUnit = async (req, res) => {
   try {
@@ -377,32 +386,32 @@ export const createUnit = async (req, res) => {
     if (!name?.trim()) {
       return res.status(400).json({
         resultMessage: {
-          en: "Missing unit name",
-          vn: "Thiếu tên đơn vị",
+          en: "Missing unit name information",
+          vn: "Thiếu thông tin tên của đơn vị",
         },
         resultCode: "00112",
       });
     }
 
     const { data: existing } = await supabase
-     .from("units")
+     .from("unitofmeasurement")
      .select("id")
-     .eq("unit_name", name.trim())
+     .eq("unitname", name.trim())
      .maybeSingle();
 
     if (existing) {
       return res.status(409).json({
         resultMessage: {
-          en: "Unit already exists",
-          vn: "Đơn vị đã tồn tại",
+          en: "Unit with this name already exists",
+          vn: "Đã tồn tại đơn vị có tên này",
         },
         resultCode: "00113",
       });
     }
 
     const { data, error } = await supabase
-     .from("units")
-     .insert([{ unit_name: name.trim() }])
+     .from("unitofmeasurement")
+     .insert([{ unitname: name.trim() }])
      .select()
      .single();
 
@@ -424,32 +433,32 @@ export const createUnit = async (req, res) => {
 
 /**
  * @swagger
- * /admin/unit:
+ * /admin/units/list:
  *   get:
- *     summary: Lấy tất cả đơn vị đo lường (Unit)
+ *     summary: Lấy tất cả các đơn vị
  *     tags: [Admin]
  *     security:
  *       - bearerAuth:
  *     responses:
  *       200:
- *         description: Lấy danh sách đơn vị thành công (00110)
+ *         description: Lấy các unit thành công
  *       403:
- *         description: Truy cập bị từ chối (Cần System Admin)
+ *         description: Truy cập bị từ chối
  *       500:
- *         description: Lỗi máy chủ (00114)
+ *         description: Lỗi máy chủ
  */
 export const getAllUnits = async (req, res) => {
   try {
     const { data, error } = await supabase
-     .from("units")
+     .from("unitofmeasurement")
      .select("*")
-     .order("unit_name", { ascending: true });
+     .order("unitname", { ascending: true });
     if (error) throw error;
 
     res.status(200).json({
       resultMessage: {
-        en: "Get unit list successful",
-        vn: "Lấy danh sách đơn vị thành công",
+        en: "Successfully retrieved units",
+        vn: "Lấy các unit thành công",
       },
       resultCode: "00110",
       units: data,
@@ -462,38 +471,42 @@ export const getAllUnits = async (req, res) => {
 
 /**
  * @swagger
- * /admin/unit:
+ * /admin/units/update:
  *   put:
- *     summary: Cập nhật tên đơn vị đo lường (Unit)
+ *     summary: Chỉnh sửa đơn vị theo tên
  *     tags: [Admin]
  *     security:
  *       - bearerAuth:
  *     requestBody:
  *       required: true
  *       content:
- *         application/x-www-form-urlencoded:
+ *         application/json:
  *           schema:
  *             type: object
  *             properties:
  *               oldName:
  *                 type: string
- *                 description: "Tên đơn vị hiện tại (unitName)."
+ *                 example: "Kilogram"
+ *                 description: "Tên đơn vị hiện tại."
  *               newName:
  *                 type: string
- *                 description: "Tên mới (00118)."
+ *                 example: "Kg"
+ *                 description: "Tên mới."
  *     responses:
  *       200:
- *         description: Cập nhật đơn vị thành công (00122)
+ *         description: Sửa đổi đơn vị thành công 
  *       400:
- *         description: Thiếu tên (00117) hoặc Tên cũ trùng tên mới (00118)
+ *         description: Thiếu thông tin name cũ, name mới
+ *       402:
+ *         description: Tên cũ trùng với tên mới
  *       404:
- *         description: Đơn vị cũ không tìm thấy (00119)
+ *         description: Không tìm thấy đơn vị với tên cung cấp
  *       409:
- *         description: Tên mới đã tồn tại (00113)
+ *         description: Tên mới đã tồn tại
  *       403:
- *         description: Truy cập bị từ chối (Cần System Admin)
+ *         description: Truy cập bị từ chối
  *       500:
- *         description: Lỗi máy chủ (00120)
+ *         description: Lỗi máy chủ
  */
 export const updateUnit = async (req, res) => {
   try {
@@ -502,8 +515,8 @@ export const updateUnit = async (req, res) => {
     if (!oldName ||!newName?.trim()) {
       return res.status(400).json({
         resultMessage: {
-          en: "Missing oldName or newName",
-          vn: "Thiếu tên cũ hoặc tên mới",
+          en: "Missing information old name, new name",
+          vn: "Thiếu thông tin name cũ, name mới",
         },
         resultCode: "00117",
       });
@@ -520,41 +533,41 @@ export const updateUnit = async (req, res) => {
     }
 
     const { data: unit } = await supabase
-     .from("units")
+     .from("unitofmeasurement")
      .select("*")
-     .eq("unit_name", oldName)
+     .eq("unitname", oldName)
      .maybeSingle();
 
     if (!unit) {
       return res.status(404).json({
         resultMessage: {
-          en: "Unit not found",
-          vn: "Không tìm thấy đơn vị",
+          en: "Could not find unit with the provided name",
+          vn: "Không tìm thấy đơn vị với tên cung cấp",
         },
         resultCode: "00119",
       });
     }
 
-    // Check if newName already exists (00113)
+    // Check if newName already exists
     const { data: existingNewName } = await supabase
-     .from("units")
+     .from("unitofmeasurement")
      .select("id")
-     .eq("unit_name", newName.trim())
+     .eq("unitname", newName.trim())
      .maybeSingle();
 
     if (existingNewName) {
         return res.status(409).json({
             resultMessage: {
                 en: "New unit name already exists",
-                vn: "Đơn vị đã tồn tại",
+                vn: "Tên mới đã tồn tại",
             },
-            resultCode: "00113",
+            resultCode: "00119x",
         });
     }
 
     const { data, error } = await supabase
-     .from("units")
-     .update({ unit_name: newName.trim() })
+     .from("unitofmeasurement")
+     .update({ unitname: newName.trim() })
      .eq("id", unit.id)
      .select()
      .single();
@@ -564,7 +577,7 @@ export const updateUnit = async (req, res) => {
     res.status(200).json({
       resultMessage: {
         en: "Unit updated successfully",
-        vn: "Cập nhật đơn vị thành công",
+        vn: "Sửa đổi đơn vị thành công",
       },
       resultCode: "00122",
       unit: data,
@@ -577,35 +590,36 @@ export const updateUnit = async (req, res) => {
 
 /**
  * @swagger
- * /admin/unit:
+ * /admin/units/delete:
  *   delete:
- *     summary: Xóa đơn vị đo lường (Unit)
+ *     summary: Xóa đơn vị theo tên
  *     tags: [Admin]
  *     security:
  *       - bearerAuth:
  *     requestBody:
  *       required: true
  *       content:
- *         application/x-www-form-urlencoded:
+ *         application/json:
  *           schema:
  *             type: object
  *             properties:
  *               name:
  *                 type: string
- *                 description: "Tên đơn vị cần xóa (unitName)."
+ *                 example: "Kg"
+ *                 description: "Tên đơn vị cần xóa."
  *     responses:
  *       200:
- *         description: Xóa đơn vị thành công (00128)
+ *         description: Xóa đơn vị thành công
  *       400:
- *         description: Thiếu tên đơn vị (00123)
+ *         description: Thiếu thông tin tên của đơn vị
  *       404:
- *         description: Đơn vị không tìm thấy (00125)
+ *         description: Không tìm thấy đơn vị với tên cung cấp
  *       409:
- *         description: Vi phạm ràng buộc (Vẫn còn Food tham chiếu) (00126)
+ *         description: Vi phạm ràng buộc
  *       403:
- *         description: Truy cập bị từ chối (Cần System Admin)
+ *         description: Truy cập bị từ chối
  *       500:
- *         description: Lỗi máy chủ (00126)
+ *         description: Lỗi máy chủ
  */
 export const deleteUnit = async (req, res) => {
   try {
@@ -614,24 +628,24 @@ export const deleteUnit = async (req, res) => {
     if (!name) {
       return res.status(400).json({
         resultMessage: {
-          en: "Missing unit name",
-          vn: "Thiếu tên đơn vị",
+          en: "Missing unit name information",
+          vn: "Thiếu thông tin tên của đơn vị",
         },
         resultCode: "00123",
       });
     }
 
     const { data: unit } = await supabase
-     .from("units")
+     .from("unitofmeasurement")
      .select("id")
-     .eq("unit_name", name)
+     .eq("unitname", name)
      .maybeSingle();
 
     if (!unit) {
       return res.status(404).json({
         resultMessage: {
-          en: "Unit not found",
-          vn: "Không tìm thấy đơn vị",
+          en: "Could not find unit with the provided name",
+          vn: "Không tìm thấy đơn vị với tên cung cấp",
         },
         resultCode: "00125",
       });
@@ -639,9 +653,9 @@ export const deleteUnit = async (req, res) => {
     
     // Check FK Constraint (Food table)
     const { count, error: countError } = await supabase
-     .from("foods")
+     .from("food")
      .select("id", { count: 'exact' })
-     .eq("unit_id", unit.id);
+     .eq("id", unit.id);
 
     if (countError) throw countError;
 
@@ -649,13 +663,13 @@ export const deleteUnit = async (req, res) => {
         return res.status(409).json({
             resultMessage: {
                 en: "Cannot delete unit due to existing food references",
-                vn: "Không thể xóa Đơn vị vì còn thực phẩm tham chiếu",
+                vn: "Không thể xóa đơn vị vì còn thực phẩm tham chiếu",
             },
             resultCode: "00126",
         });
     }
 
-    const { error } = await supabase.from("units").delete().eq("id", unit.id);
+    const { error } = await supabase.from("unitofmeasurement").delete().eq("id", unit.id);
     if (error) throw error;
 
     res.status(200).json({
