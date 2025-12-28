@@ -10,24 +10,26 @@ import {
   updateUnit,
   deleteUnit,
 } from "../controllers/adminController.js";
-import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { requirePermission } from "../middlewares/permission.js";
+import { supabaseAuth } from "../middlewares/supabaseAuth.js";
 
 const router = express.Router();
 
+router.use(supabaseAuth);
 /**
  * CATEGORY ROUTES
  */
-router.post("/categories", authMiddleware, createCategory);
-router.get("/categories", authMiddleware, getAllCategories);
-router.put("/categories", authMiddleware, updateCategory);
-router.delete("/categories", authMiddleware, deleteCategory);
+router.post("/category/create", createCategory);
+router.get("/category/list", getAllCategories);
+router.put("/category/update", updateCategory);
+router.delete("/category/delete", deleteCategory);
 
 /**
  * UNIT ROUTES
  */
-router.post("/units", authMiddleware, createUnit);
-router.get("/units", authMiddleware, getAllUnits);
-router.put("/units", authMiddleware, updateUnit);
-router.delete("/units", authMiddleware, deleteUnit);
+router.post("/units/create", createUnit);
+router.get("/units/list", getAllUnits);
+router.put("/units/update", updateUnit);
+router.delete("/units/delete", deleteUnit);
 
 export default router;
