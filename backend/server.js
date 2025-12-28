@@ -12,6 +12,7 @@ import setupSwagger from "./services/swagger.js";
 import userRoute from "./routes/users.js";
 import shoppingListRoute from "./routes/shoppingList.js";
 import recipeRoutes from "./routes/recipes.js";
+import adminRoute from "./routes/admin.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,6 +32,7 @@ app.use((req, res, next) => {
 app.use("/api/user", userRoute);
 app.use("/api/shopping", shoppingListRoute);
 app.use("/api/recipes", recipeRoutes);
+app.use("/api/admin", adminRoute);
 
 app.get("/", (req, res) => res.send("Smart Schedule API running"));
 
