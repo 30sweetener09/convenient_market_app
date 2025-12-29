@@ -11,7 +11,12 @@ import registerMiddlewares from "./middlewares/index.js";
 import setupSwagger from "./services/swagger.js";
 import userRoute from "./routes/users.js";
 import shoppingListRoute from "./routes/shoppingList.js";
+<<<<<<< HEAD
 import adminRoute from "./routes/admin.js"
+=======
+import recipeRoutes from "./routes/recipes.js";
+import adminRoute from "./routes/admin.js";
+>>>>>>> c421d8d2c5aedc12b1e5527be6dd38178dc844d5
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,6 +35,10 @@ app.use((req, res, next) => {
 // Routes
 app.use("/api/user", userRoute);
 app.use("/api/shopping", shoppingListRoute);
+<<<<<<< HEAD
+=======
+app.use("/api/recipes", recipeRoutes);
+>>>>>>> c421d8d2c5aedc12b1e5527be6dd38178dc844d5
 app.use("/api/admin", adminRoute);
 
 app.get("/", (req, res) => res.send("Smart Schedule API running"));
