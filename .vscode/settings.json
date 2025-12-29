@@ -1,0 +1,15 @@
+{
+  "sqltools.connections": [
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 5432,
+      "driver": "PostgreSQL",
+      "name": "convenient_market_local",
+      "database": "convenient_market_db",
+      "username": "postgres",
+      "password": "123456"
+    }
+  ]
+}

@@ -8,10 +8,13 @@ import { supabase } from "../db.js";
  * @param {string} dateString - Date in MM/DD/YYYY format
  * @returns {string|null} - Formatted date or null if invalid
  */
+const nameRegex = /^[a-zA-ZÀ-ỹ0-9 ]+$/;
+const xssPattern = /<script\b[^>]*>([\s\S]*?)<\/script>/gim;
+
 const validateAndFormatDate = (dateString) => {
   if (!dateString || typeof dateString !== "string") return null;
 
-  const parts = dateString.split("/");
+  const parts = dateString.split("-");
   if (parts.length !== 3) return null;
 
   const [month, day, year] = parts;
@@ -90,20 +93,12 @@ const validateAndFormatDate = (dateString) => {
 export const createShoppingList = async (req, res) => {
   try {
     const { name, assignToUsername, note, date } = req.body;
-
-    // Validate required fields
-    if (!name || !assignToUsername || !date) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide all required fields",
-          vn: "Vui lòng cung cấp tất cả các trường cần thiết",
-        },
-        resultCode: "00238",
-      });
-    }
+    const groupId = req.params.groupId;
+    const userID = req.user.id;
+    console.log(req.params);
 
     // Validate name
-    if (!name.trim()) {
+    if (!name.trim() || !name) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide name",
@@ -114,7 +109,7 @@ export const createShoppingList = async (req, res) => {
     }
 
     // Validate assignToUsername
-    if (!assignToUsername.trim()) {
+    if (!assignToUsername.trim() || !assignToUsername) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide assignToUsername",
@@ -124,8 +119,19 @@ export const createShoppingList = async (req, res) => {
       });
     }
 
+    if (
+      !nameRegex.test(assignToUsername) ||
+      assignToUsername.length < 2 ||
+      assignToUsername.length > 50
+    ) {
+      return res.status(400).json({
+        resultCode: "00240x",
+        resultMessage: { vn: "Định dạng tên không hợp lệ" },
+      });
+    }
+
     // Validate note format
-    if (note && typeof note !== "string") {
+    if (xssPattern.test(note) || note.length > 500) {
       return res.status(400).json({
         resultMessage: {
           en: "Invalid note format",
@@ -148,24 +154,31 @@ export const createShoppingList = async (req, res) => {
     }
 
     // Check authentication
-    if (!req.user?.id) {
-      return res.status(401).json({
+    const { data: groupAdmin, error: groupError } = await supabase
+      .from("groups")
+      .select("id, created_by")
+      .eq("id", groupId)
+      .eq("created_by", userID)
+      .maybeSingle();
+
+    if (groupError || !groupAdmin) {
+      return res.status(403).json({
         resultMessage: {
-          en: "Unauthorized access. You do not have permission.",
-          vn: "Truy cập không được ủy quyền. Bạn không có quyền.",
+          en: "Access denied. Only group admins can perform this action.",
+          vn: "Truy cập không được ủy quyền, bạn không phải admin",
         },
         resultCode: "00243",
       });
     }
 
     // Check if assigned user exists
-    const { data: assignedUser, error: userError } = await supabase
+    const { data: assignedUser, error: assignedError } = await supabase
       .from("users")
-      .select("id, name")
-      .ilike("name", `%${assignToUsername}%`)
+      .select("id")
+      .ilike("username", assignToUsername)
       .maybeSingle();
 
-    if (userError || !assignedUser) {
+    if (assignedError || !assignedUser) {
       return res.status(404).json({
         resultMessage: {
           en: "Assigned username does not exist.",
@@ -176,19 +189,14 @@ export const createShoppingList = async (req, res) => {
     }
 
     // Check permission to assign
-    const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, belongstogroupadminid")
-      .eq("id", req.user.id)
+    const { data: groupMember } = await supabase
+      .from("group_members")
+      .select("user_id")
+      .eq("group_id", groupId)
+      .eq("user_id", assignedUser.id)
       .maybeSingle();
 
-    if (adminError) throw adminError;
-
-    if (
-      adminData &&
-      assignedUser &&
-      adminData.belongstogroupadminid !== assignedUser.belongstogroupadminid
-    ) {
+    if (!groupMember) {
       return res.status(403).json({
         resultMessage: {
           en: "Unauthorized access. You do not have permission to assign shopping list to this user.",
@@ -200,17 +208,18 @@ export const createShoppingList = async (req, res) => {
 
     // Create shopping list
     const { data, error } = await supabase
-      .from("shopping_list")
+      .from("shoppinglist")
       .insert([
         {
           name: name.trim(),
           note: note ? note.trim() : null,
-          assign_to_username: assignToUsername,
-          assigned_to_user_id: assignedUser.id,
+          assignedtousername: assignToUsername,
+          assignedtouserid: assignedUser.id,
           date: formattedDate,
-          belongs_to_admin_id: req.user.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          belongstogroupadminid: userID,
+          group_id: groupId,
+          createdat: new Date().toISOString(),
+          updatedat: new Date().toISOString(),
         },
       ])
       .select()
@@ -218,28 +227,17 @@ export const createShoppingList = async (req, res) => {
 
     if (error) throw error;
 
-    res.status(200).json({
+    return res.status(200).json({
       resultMessage: {
         en: "Shopping list created successfully.",
         vn: "Danh sách mua sắm đã được tạo thành công.",
       },
       resultCode: "00249",
-      createdShoppingList: {
-        id: data.id,
-        name: data.name,
-        note: data.note,
-        belongsToGroupAdminId: data.belongs_to_admin_id,
-        assignedToUserId: data.assigned_to_user_id,
-        assignToUsername: data.assign_to_username,
-        date: data.date,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        UserId: data.belongs_to_admin_id,
-      },
+      createdShoppingList: data,
     });
   } catch (err) {
     console.error("Error creating shopping list:", err.message);
-    res.status(500).json({
+    return res.status(500).json({
       resultMessage: {
         en: "Internal server error",
         vn: "Lỗi máy chủ nội bộ",
@@ -385,14 +383,15 @@ export const getAllShoppingLists = async (req, res) => {
  */
 export const updateShoppingList = async (req, res) => {
   try {
-    const { listId, newName, newAssignToUsername, newDate, newNote } = req.body;
+    const { currentName, newName, newAssignToUsername, newDate, newNote } =
+      req.body;
 
     // Validate listId
-    if (!listId) {
+    if (!currentName) {
       return res.status(400).json({
         resultMessage: {
-          en: "Please provide list id",
-          vn: "Vui lòng cung cấp id danh sách",
+          en: "Please provide current list name",
+          vn: "Vui lòng cung cấp tên danh sách hiện tại",
         },
         resultCode: "00251",
       });
@@ -400,10 +399,10 @@ export const updateShoppingList = async (req, res) => {
 
     // Validate at least one field to update
     if (
-      newName === undefined &&
-      newAssignToUsername === undefined &&
-      newDate === undefined &&
-      newNote === undefined
+      !newName?.trim() &&
+      !newAssignToUsername?.trim() &&
+      !newDate?.trim() &&
+      !newNote?.trim()
     ) {
       return res.status(400).json({
         resultMessage: {
@@ -415,25 +414,21 @@ export const updateShoppingList = async (req, res) => {
     }
 
     // Validate newName
-    if (
-      newName !== undefined &&
-      (!newName || typeof newName !== "string" || !newName.trim())
-    ) {
+    if (!nameRegex.test(newName) || newName.length < 2 || newName.length > 50) {
       return res.status(400).json({
+        resultCode: "00253",
         resultMessage: {
           en: "Invalid new name format",
           vn: "Định dạng tên mới không hợp lệ",
         },
-        resultCode: "00253",
       });
     }
 
     // Validate newAssignToUsername
     if (
-      newAssignToUsername !== undefined &&
-      (!newAssignToUsername ||
-        typeof newAssignToUsername !== "string" ||
-        !newAssignToUsername.trim())
+      !nameRegex.test(newAssignToUsername) ||
+      newAssignToUsername.length < 2 ||
+      newAssignToUsername.length > 50
     ) {
       return res.status(400).json({
         resultMessage: {
@@ -445,11 +440,7 @@ export const updateShoppingList = async (req, res) => {
     }
 
     // Validate newNote
-    if (
-      newNote !== undefined &&
-      newNote !== null &&
-      typeof newNote !== "string"
-    ) {
+    if (xssPattern.test(newNote) || newNote.length > 500) {
       return res.status(400).json({
         resultMessage: {
           en: "Invalid new note format",
@@ -474,24 +465,17 @@ export const updateShoppingList = async (req, res) => {
       }
     }
 
-    // Check if user is admin
-    if (!req.user?.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00258",
-      });
-    }
+    const groupId = req.params.groupId;
 
-    const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, role, belongstogroupadminid")
-      .eq("id", req.user.id)
+    // Check if user is admin
+    const { data: groupAdmin, error: groupError } = await supabase
+      .from("groups")
+      .select("id, created_by")
+      .eq("id", groupId)
+      .eq("created_by", req.user.id)
       .maybeSingle();
 
-    if (adminError || !adminData || adminData.role !== "admin") {
+    if (groupError || !groupAdmin) {
       return res.status(403).json({
         resultMessage: {
           en: "User is not a group admin",
@@ -503,9 +487,9 @@ export const updateShoppingList = async (req, res) => {
 
     // Check if shopping list exists
     const { data: existingList, error: fetchError } = await supabase
-      .from("shopping_list")
+      .from("shoppinglist")
       .select("*")
-      .eq("id", listId)
+      .eq("name", currentName)
       .maybeSingle();
 
     if (fetchError || !existingList) {
@@ -519,28 +503,36 @@ export const updateShoppingList = async (req, res) => {
     }
 
     // Check if user is the owner
-    if (existingList.belongs_to_admin_id !== req.user.id) {
+    const { data: isAdmin, error: isAdminError } = await supabase
+      .from("shoppinglist")
+      .select("name, belongstogroupadminid, group_id")
+      .eq("group_id", groupId)
+      .eq("belongstogroupadminid", req.user.id)
+      .eq("name", currentName)
+      .maybeSingle();
+
+    if (isAdminError || !isAdmin) {
       return res.status(403).json({
         resultMessage: {
-          en: "User is not the admin of this shopping list",
+          en: "The user is not an administrator of this shopping list",
           vn: "Người dùng không phải là quản trị viên của danh sách mua sắm này",
         },
         resultCode: "00261",
       });
     }
 
-    const updateData = { updated_at: new Date().toISOString() };
+    const updateData = { updatedat: new Date().toISOString() };
 
     // Update name
     if (newName !== undefined) {
       updateData.name = newName.trim();
     }
 
-    // Update assignee
+    // Update assignusername
     if (newAssignToUsername !== undefined) {
       const { data: newUser, error: userError } = await supabase
         .from("users")
-        .select("id, belongstogroupadminid")
+        .select("id")
         .eq("username", newAssignToUsername)
         .maybeSingle();
 
@@ -553,8 +545,15 @@ export const updateShoppingList = async (req, res) => {
           resultCode: "00262",
         });
       }
+      // Check permission to assign
+      const { data: groupNewMember } = await supabase
+        .from("group_members")
+        .select("user_id")
+        .eq("group_id", groupId)
+        .eq("user_id", newUser.id)
+        .maybeSingle();
 
-      if (adminData.belongstogroupadminid !== newUser.belongstogroupadminid) {
+      if (!groupNewMember) {
         return res.status(403).json({
           resultMessage: {
             en: "User does not have permission to assign this list to the username",
@@ -564,8 +563,8 @@ export const updateShoppingList = async (req, res) => {
         });
       }
 
-      updateData.assign_to_username = newAssignToUsername;
-      updateData.assigned_to_user_id = newUser.id;
+      updateData.assignedtousername = newAssignToUsername;
+      updateData.assignedtouserid = newUser.id;
     }
 
     // Update note
@@ -580,11 +579,11 @@ export const updateShoppingList = async (req, res) => {
 
     // Perform update
     const { data, error } = await supabase
-      .from("shopping_list")
+      .from("shoppinglist")
       .update(updateData)
-      .eq("id", listId)
+      .eq("name", currentName)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
 
@@ -594,18 +593,6 @@ export const updateShoppingList = async (req, res) => {
         vn: "Cập nhật danh sách mua sắm thành công",
       },
       resultCode: "00266",
-      newShoppingList: {
-        id: data.id,
-        name: data.name,
-        note: data.note,
-        belongsToGroupAdminId: data.belongs_to_admin_id,
-        assignedToUserId: data.assigned_to_user_id,
-        assignToUsername: data.assign_to_username,
-        date: data.date,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        UserId: data.belongs_to_admin_id,
-      },
     });
   } catch (err) {
     console.error("Error updating shopping list:", err.message);
