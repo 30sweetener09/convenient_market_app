@@ -266,73 +266,64 @@ export const createShoppingList = async (req, res) => {
  */
 export const getAllShoppingLists = async (req, res) => {
   try {
-    if (!req.user?.id) {
+    const userId = req.user?.id;
+
+    if (!userId) {
       return res.status(401).json({
         resultMessage: {
-          en: "This user does not belong to any groups",
-          vn: "Người dùng này chưa thuộc nhóm nào",
+          en: "Unauthorized",
+          vn: "Chưa xác thực",
         },
-        resultCode: "00288",
       });
     }
 
-    const { data: lists, error } = await supabase
-      .from("shopping_list")
-      .select(
-        `
-        *,
-        users!shopping_list_assigned_to_user_id_fkey (username)
-      `
-      )
-      .eq("belongs_to_admin_id", req.user.id)
-      .order("created_at", { ascending: false });
+    // Chỉ lấy danh sách shopping lists, không lấy tasks
+    const { data: lists, error: listError } = await supabase
+      .from("shoppinglist")
+      .select("*")
+      .eq("belongstogroupadminid", userId)
+      .order("createdat", { ascending: false });
 
-    if (error) throw error;
+    if (listError) {
+      console.error(" List Error:", listError);
+      throw listError;
+    }
 
-    const listWithTasks = await Promise.all(
-      lists.map(async (list) => {
-        const { data: tasks } = await supabase
-          .from("shopping_list_tasks")
-          .select("*")
-          .eq("shopping_list_id", list.id)
-          .order("created_at", { ascending: true });
+    if (!lists || lists.length === 0) {
+      return res.status(200).json({
+        resultMessage: {
+          en: "No shopping lists found",
+          vn: "Không tìm thấy danh sách mua sắm",
+        },
+        data: [],
+      });
+    }
 
-        return {
-          id: list.id,
-          name: list.name,
-          note: list.note,
-          belongsToGroupAdminId: list.belongs_to_admin_id,
-          assignedToUserId: list.assigned_to_user_id,
-          assignToUsername: list.assign_to_username,
-          date: list.date,
-          createdAt: list.created_at,
-          updatedAt: list.updated_at,
-          UserId: list.belongs_to_admin_id,
-          username: list.users?.username || null,
-          details: (tasks || []).map((task) => ({
-            id: task.id,
-            foodName: task.food_name,
-            quantity: task.quantity,
-            isDone: task.is_done,
-            createdAt: task.created_at,
-            updatedAt: task.updated_at,
-          })),
-        };
-      })
-    );
+    // Trả về danh sách shopping lists (không có details)
+    const result = lists.map((list) => ({
+      id: list.id,
+      name: list.name,
+      note: list.note,
+      date: list.date,
+      userid: list.userid,
+      belongstogroup: list.belongstogroup,
+      assignedtouse: list.assignedtouse,
+      group_id: list.group_id,
+      createdat: list.createdat,
+      updatedat: list.updatedat,
+    }));
 
-    res.status(200).json({
+    return res.status(200).json({
       resultMessage: {
-        en: "Get list of shopping lists and tasks successful",
+        en: "Get list of shopping lists successful",
         vn: "Lấy danh sách các shopping list thành công",
       },
-      resultCode: "00292",
-      role: "admin",
-      list: listWithTasks,
+      resultCode: "00288",
+      data: result,
     });
   } catch (err) {
-    console.error("Error getting shopping lists:", err.message);
-    res.status(500).json({
+    console.error("Error getting shopping lists:", err);
+    return res.status(500).json({
       resultMessage: {
         en: "Internal server error",
         vn: "Lỗi máy chủ nội bộ",
@@ -639,37 +630,28 @@ export const updateShoppingList = async (req, res) => {
  */
 export const deleteShoppingList = async (req, res) => {
   try {
-    const { listId } = req.body;
+    const { listName } = req.body;
+    const groupId = req.params.groupId;
 
     // Validate listId
-    if (!listId) {
+    if (!listName) {
       return res.status(400).json({
         resultMessage: {
-          en: "Please provide list id",
-          vn: "Vui lòng cung cấp id danh sách",
+          en: "Please provide list name",
+          vn: "Vui lòng cung cấp tên danh sách",
         },
         resultCode: "00268",
       });
     }
 
-    // Check if user is admin
-    if (!req.user?.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00270",
-      });
-    }
-
     const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, role, belongstogroupadminid")
-      .eq("id", req.user.id)
+      .from("groups")
+      .select("id, created_by")
+      .eq("id", groupId)
+      .eq("created_by", req.user.id)
       .maybeSingle();
 
-    if (adminError || !adminData || adminData.role !== "admin") {
+    if (adminError || !adminData) {
       return res.status(403).json({
         resultMessage: {
           en: "User is not a group admin",
@@ -681,9 +663,9 @@ export const deleteShoppingList = async (req, res) => {
 
     // Check if shopping list exists
     const { data: existingList, error: fetchError } = await supabase
-      .from("shopping_list")
+      .from("shoppinglist")
       .select("*")
-      .eq("id", listId)
+      .eq("name", listName)
       .maybeSingle();
 
     if (fetchError || !existingList) {
@@ -697,10 +679,19 @@ export const deleteShoppingList = async (req, res) => {
     }
 
     // Check if user is the owner
-    if (existingList.belongs_to_admin_id !== req.user.id) {
+
+    const { data: isAdmin, error: isAdminError } = await supabase
+      .from("shoppinglist")
+      .select("name, belongstogroupadminid, group_id")
+      .eq("group_id", groupId)
+      .eq("belongstogroupadminid", req.user.id)
+      .eq("name", listName)
+      .maybeSingle();
+
+    if (isAdminError || !isAdmin) {
       return res.status(403).json({
         resultMessage: {
-          en: "User is not the admin of this shopping list",
+          en: "The user is not an administrator of this shopping list",
           vn: "Người dùng không phải là quản trị viên của danh sách mua sắm này",
         },
         resultCode: "00273",
@@ -709,9 +700,9 @@ export const deleteShoppingList = async (req, res) => {
 
     // Delete shopping list
     const { error: deleteError } = await supabase
-      .from("shopping_list")
+      .from("shoppinglist")
       .delete()
-      .eq("id", listId);
+      .eq("name", listName);
 
     if (deleteError) throw deleteError;
 
@@ -778,10 +769,11 @@ export const deleteShoppingList = async (req, res) => {
  */
 export const createTasks = async (req, res) => {
   try {
-    const { listId, tasks } = req.body;
+    const { listName, tasks } = req.body;
+    const groupId = req.params.groupId;
 
     // Validate required fields
-    if (!listId || !tasks) {
+    /*if (!listName || !tasks) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide all required fields",
@@ -789,14 +781,14 @@ export const createTasks = async (req, res) => {
         },
         resultCode: "00276",
       });
-    }
+    }*/
 
     // Validate listId
-    if (!listId || (typeof listId === "string" && !listId.trim())) {
+    if (!listName || (typeof listName === "string" && !listName.trim())) {
       return res.status(400).json({
         resultMessage: {
-          en: "Please provide a list ID",
-          vn: "Vui lòng cung cấp một ID của danh sách",
+          en: "Please provide a list name",
+          vn: "Vui lòng cung cấp một name của danh sách",
         },
         resultCode: "00277",
       });
@@ -836,27 +828,18 @@ export const createTasks = async (req, res) => {
     }
 
     // Check if user is admin
-    if (!req.user?.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên của nhóm",
-        },
-        resultCode: "00281",
-      });
-    }
-
     const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, role, belongstogroupadminid")
-      .eq("id", req.user.id)
+      .from("groups")
+      .select("id, created_by")
+      .eq("id", groupId)
+      .eq("created_by", req.user.id)
       .maybeSingle();
 
-    if (adminError || !adminData || adminData.role !== "admin") {
+    if (adminError || !adminData) {
       return res.status(403).json({
         resultMessage: {
           en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên của nhóm",
+          vn: "Người dùng không phải là quản trị viên nhóm",
         },
         resultCode: "00281",
       });
@@ -864,9 +847,9 @@ export const createTasks = async (req, res) => {
 
     // Check if shopping list exists
     const { data: existingList, error: fetchError } = await supabase
-      .from("shopping_list")
-      .select("id, belongs_to_admin_id")
-      .eq("id", listId)
+      .from("shoppinglist")
+      .select("*")
+      .eq("name", listName)
       .maybeSingle();
 
     if (fetchError || !existingList) {
@@ -880,10 +863,18 @@ export const createTasks = async (req, res) => {
     }
 
     // Check if user is the owner
-    if (existingList.belongs_to_admin_id !== req.user.id) {
+    const { data: isAdmin, error: isAdminError } = await supabase
+      .from("shoppinglist")
+      .select("name, belongstogroupadminid, group_id")
+      .eq("group_id", groupId)
+      .eq("belongstogroupadminid", req.user.id)
+      .eq("name", listName)
+      .maybeSingle();
+
+    if (isAdminError || !isAdmin) {
       return res.status(403).json({
         resultMessage: {
-          en: "User is not the admin of this shopping list",
+          en: "The user is not an administrator of this shopping list",
           vn: "Người dùng không phải là quản trị viên của danh sách mua sắm này",
         },
         resultCode: "00284",
@@ -891,17 +882,20 @@ export const createTasks = async (req, res) => {
     }
 
     // Validate food names exist in foods table
-    const foodNames = tasks.map((task) => task.foodName.trim().toLowerCase());
+    const foodNames = tasks.map((task) => task.foodName.trim()); // Đừng toLowerCase ở đây vội
+
     const { data: foodsData, error: foodsError } = await supabase
-      .from("foods")
+      .from("food")
       .select("name")
       .in("name", foodNames);
 
     if (foodsError) throw foodsError;
 
-    const existingFoodNames = foodsData.map((food) => food.name.toLowerCase());
+    const existingFoodNames = foodsData.map((food) =>
+      food.name.trim().toLowerCase()
+    );
     const missingFoods = foodNames.filter(
-      (name) => !existingFoodNames.includes(name)
+      (name) => !existingFoodNames.includes(name.toLowerCase())
     );
 
     if (missingFoods.length > 0) {
@@ -916,44 +910,44 @@ export const createTasks = async (req, res) => {
     }
 
     // Check for duplicate foods in shopping list
-    const { data: existingTasks, error: existingTasksError } = await supabase
-      .from("shopping_list_tasks")
-      .select("food_name")
-      .eq("shopping_list_id", listId);
+    const foodNamess = tasks.map((task) => task.foodName.trim().toLowerCase());
 
-    if (existingTasksError) throw existingTasksError;
-
-    const existingTaskNames = existingTasks.map((task) =>
-      task.food_name.toLowerCase()
-    );
-    const duplicateFoods = foodNames.filter((name) =>
-      existingTaskNames.includes(name)
+    const duplicatesInArray = foodNamess.filter(
+      (name, index) => foodNamess.indexOf(name) !== index
     );
 
-    if (duplicateFoods.length > 0) {
+    if (duplicatesInArray.length > 0) {
       return res.status(400).json({
         resultMessage: {
           en: "This food type already exists in the list",
           vn: "Loại thức ăn này đã có trong danh sách rồi",
         },
         resultCode: "00286",
-        duplicateFoods: duplicateFoods,
       });
     }
 
     // Prepare task data
+    const { data: isUserName, error: UserNameError } = await supabase
+      .from("shoppinglist")
+      .select("name, belongstogroupadminid, assignedtousername")
+      .eq("name", listName)
+      .maybeSingle();
+
+    if (UserNameError) throw UserNameError;
+
     const taskData = tasks.map((task) => ({
-      shopping_list_id: listId,
-      food_name: task.foodName.trim(),
+      name: task.foodName.trim(),
       quantity: task.quantity.trim(),
-      is_done: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      isdone: false,
+      shoppinglistname: listName,
+      username: isUserName.assignedtousername,
+      createdat: new Date().toISOString(),
+      updatedat: new Date().toISOString(),
     }));
 
     // Insert tasks
     const { data: insertedTasks, error: insertError } = await supabase
-      .from("shopping_list_tasks")
+      .from("task")
       .insert(taskData)
       .select();
 
@@ -965,15 +959,6 @@ export const createTasks = async (req, res) => {
         vn: "Thêm nhiệm vụ thành công",
       },
       resultCode: "00287",
-      addedTasks: insertedTasks.map((task) => ({
-        id: task.id,
-        shoppingListId: task.shopping_list_id,
-        foodName: task.food_name,
-        quantity: task.quantity,
-        isDone: task.is_done,
-        createdAt: task.created_at,
-        updatedAt: task.updated_at,
-      })),
     });
   } catch (err) {
     console.error("Error creating tasks:", err.message);
