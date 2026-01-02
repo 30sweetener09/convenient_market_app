@@ -6,6 +6,12 @@ import { v4 as uuidv4 } from "uuid";
 const uploadImage = async (file) => {
   if (!file || !file.buffer) return null;
   
+  // Validate Mimetype (Chỉ cho phép ảnh)
+  if (!file.mimetype.startsWith("image/")) {
+      console.error("Invalid file type:", file.mimetype);
+      return null;
+  }
+
   // Xử lý đuôi file
   const mime = file.mimetype || "image/jpeg";
   const ext = (mime.split("/")[1] || "jpg").replace("jpeg", "jpg");
@@ -27,8 +33,8 @@ const uploadImage = async (file) => {
  * @swagger
  * /food/create:
  *   post:
- *     summary: Tạo thực phẩm
- *     description: Tạo thực phẩm mới
+ *     summary: Tạo thực phẩm mới
+ *     description: Tạo một món ăn hoặc nguyên liệu mới kèm theo ảnh minh họa.
  *     tags: [Food]
  *     security:
  *       - bearerAuth: []
@@ -43,22 +49,26 @@ const uploadImage = async (file) => {
  *               name:
  *                 type: string
  *                 description: Tên thực phẩm
- *                 example: "Thịt bò"
+ *                 example: "Thịt gà ta"
  *               foodCategoryName:
  *                 type: string
- *                 description: Tên danh mục
- *                 example: "Bữa trưa"
+ *                 description: Tên danh mục (Phải tồn tại trong DB)
+ *                 example: "Thịt"
  *               unitName:
  *                 type: string
- *                 description: Tên đơn vị
+ *                 description: Tên đơn vị đo (Phải tồn tại trong DB)
  *                 example: "Kg"
+ *               type:
+ *                 type: string
+ *                 description: Loại thực phẩm (Ingredient hoặc Meal)
+ *                 example: "Ingredient"
  *               image:
  *                 type: string
  *                 format: binary
- *                 description: Ảnh thực phẩm
+ *                 description: File ảnh thực phẩm
  *     responses:
  *       200:
- *         description: Tạo thực phẩm thành công
+ *         description: Tạo thành công
  *         content:
  *           application/json:
  *             schema:
@@ -67,73 +77,69 @@ const uploadImage = async (file) => {
  *                 resultMessage:
  *                   type: object
  *                   properties:
- *                     en: { type: string, example: "Food creation successful" }
- *                     vn: { type: string, example: "Tạo thực phẩm thành công" }
- *                 resultCode: { type: string, example: "00160" }
- *                 newFood:
- *                   type: object
- *                   properties:
- *                     imageUrl: { type: string }
- *                     type: { type: string, example: "ingredient" }
- *                     id: { type: integer }
- *                     name: { type: string }
- *                     UnitOfMeasurementId: { type: integer }
- *                     FoodCategoryId: { type: integer }
- *                     UserId: { type: integer }
- *                     updatedAt: { type: string }
- *                     createdAt: { type: string }
+ *                     en: { type: string }
+ *                     vn: { type: string }
+ *                 resultCode: { type: string }
+ *                 newFood: { type: object }
+ *             example:
+ *               resultMessage:
+ *                 en: "Food creation successful"
+ *                 vn: "Tạo thực phẩm thành công"
+ *               resultCode: "00160"
+ *               newFood:
+ *                 id: 15
+ *                 name: "Thịt gà ta"
+ *                 imageUrl: "https://supabasestorage.../food_images/abc.jpg"
+ *                 type: "Ingredient"
+ *                 foodcategoryid: 2
+ *                 unitofmeasurementid: 5
+ *                 userid: "user-uuid-123"
+ *                 createdAt: "2024-01-05T10:00:00Z"
+ *                 updatedAt: "2024-01-05T10:00:00Z"
+ *       400:
+ *         description: Thiếu thông tin
+ *       409:
+ *         description: Trùng tên thực phẩm
  */
 export const createFood = async (req, res) => {
   try {
     const { name, foodCategoryName, unitName, type } = req.body;
     const user = req.user;
 
-    // ---------------------------------------------------------
-    // 1. VALIDATION: Kiểm tra các trường bắt buộc (Bao gồm cả FILE)
-    // ---------------------------------------------------------
+    // 1. VALIDATION
     if (!name || !foodCategoryName || !unitName || !req.file) {
       return res.status(200).json({
         resultMessage: { 
           en: "Please provide all required fields!", 
-          vn: "Vui lòng cung cấp tất cả các trường bắt buộc!", 
-        },
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc!" },
         resultCode: "00147",
       });
     }
 
-    // ---------------------------------------------------------
-    // 2. XỬ LÝ LOẠI THỰC PHẨM (TYPE)
-    // Nếu client không gửi, mặc định là 'Ingredient'.
-    // Nếu gửi 'Meal' (không phân biệt hoa thường) -> 'Meal', ngược lại -> 'Ingredient'
-    // ---------------------------------------------------------
+    // 2. TYPE
     let finalType = 'Ingredient';
-    if (type && type.trim().toLowerCase() === 'Meal') {
+    if (type && type.trim().toLowerCase() === 'meal') {
         finalType = 'Meal';
     }
 
-    // ---------------------------------------------------------
-    // 3. KIỂM TRA TRÙNG TÊN (Trong phạm vi User này)
-    // ---------------------------------------------------------
+    // 3. CHECK DUPLICATE
     const { data: existing } = await supabase
       .from("food")
       .select("id")
       .eq("userid", user.id)
-      .eq("name", name.trim())
+      .ilike("name", name.trim())
       .maybeSingle();
 
     if (existing) {
       return res.status(200).json({
         resultMessage: { 
           en: "Food with this name already exists", 
-          vn: "Đã tồn tại thức ăn với tên này", 
-        },
+          vn: "Đã tồn tại thức ăn với tên này" },
         resultCode: "00151",
       });
     }
 
-    // ---------------------------------------------------------
-    // 4. TÌM CATEGORY ID
-    // ---------------------------------------------------------
+    // 4. FIND CATEGORY
     const { data: category } = await supabase
       .from("foodcategory")
       .select("id")
@@ -143,16 +149,13 @@ export const createFood = async (req, res) => {
     if (!category) {
         return res.status(200).json({
             resultMessage: { 
-              en: "Category not found with provided name", 
-              vn: "Không tìm thấy category với tên cung cấp", 
-            },
+              en: "Category not found", 
+              vn: "Không tìm thấy category với tên cung cấp" },
             resultCode: "00155",
         });
     }
 
-    // ---------------------------------------------------------
-    // 5. TÌM UNIT ID
-    // ---------------------------------------------------------
+    // 5. FIND UNIT
     const { data: unit } = await supabase
       .from("unitofmeasurement")
       .select("id")
@@ -162,54 +165,43 @@ export const createFood = async (req, res) => {
     if (!unit) {
         return res.status(200).json({
             resultMessage: { 
-              en: "Unit not found with provided name", 
-              vn: "Không tìm thấy đơn vị với tên cung cấp", 
-            },
+              en: "Unit not found", 
+              vn: "Không tìm thấy đơn vị với tên cung cấp" },
             resultCode: "00153",
         });
     }
 
-    // ---------------------------------------------------------
-    // 6. UPLOAD ẢNH & KIỂM TRA LỖI UPLOAD
-    // ---------------------------------------------------------
+    // 6. UPLOAD IMAGE
     const imageUrl = await uploadImage(req.file);
-    
     if (!imageUrl) {
         return res.status(200).json({
-            resultMessage: {
-                en: "Image upload failed",
-                vn: "Đăng tải ảnh thất bại"
-            },
+            resultMessage: { 
+              en: "Image upload failed", 
+              vn: "Đăng tải ảnh thất bại" },
             resultCode: "00158"
         });
     }
 
-    // ---------------------------------------------------------
-    // 7. INSERT VÀO DATABASE
-    // ---------------------------------------------------------
+    // 7. INSERT
     const { data, error } = await supabase
       .from("food")
       .insert({
         name: name.trim(),
-        imageurl: imageUrl,             // Lưu URL ảnh từ Storage
-        type: finalType,                // Lưu type ('Ingredient' hoặc 'Meal')
-        foodcategoryid: category.id,    // ID của danh mục tìm được
-        unitofmeasurementid: unit.id,   // ID của đơn vị tìm được
-        userid: user.id,                // ID người dùng hiện tại
+        imageurl: imageUrl,
+        type: finalType,
+        foodcategoryid: category.id,
+        unitofmeasurementid: unit.id,
+        userid: user.id,
       })
       .select()
       .single();
 
-    if (error) {
-        throw error; // Ném lỗi xuống catch
-    }
+    if (error) throw error;
 
-    // Trả về kết quả thành công
     return res.status(200).json({
       resultMessage: { 
         en: "Food creation successful", 
-        vn: "Tạo thực phẩm thành công" 
-      },
+        vn: "Tạo thực phẩm thành công" },
       resultCode: "00160",
       newFood: data,
     });
@@ -217,10 +209,7 @@ export const createFood = async (req, res) => {
   } catch (err) {
     console.error("Create Food API Error:", err);
     return res.status(500).json({ 
-        resultMessage: { 
-            en: "Internal Server Error", 
-            vn: "server error" // Theo đúng text trong ảnh tài liệu bạn gửi (00152)
-        },
+        resultMessage: { en: "Internal Server Error", vn: "server error" },
         resultCode: "00152" 
     });
   }
@@ -232,7 +221,7 @@ export const createFood = async (req, res) => {
  * /food/update:
  *   put:
  *     summary: Cập nhật thực phẩm
- *     description: Cập nhật thông tin thực phẩm. Cần gửi ít nhất 1 trong các trường thay đổi (newName, newCategory, newUnit, image).
+ *     description: Sửa đổi thông tin thực phẩm. Chỉ cần gửi các trường muốn thay đổi.
  *     tags: [Food]
  *     security:
  *       - bearerAuth: []
@@ -246,27 +235,27 @@ export const createFood = async (req, res) => {
  *             properties:
  *               name:
  *                 type: string
- *                 description: Tên hiện tại của thực phẩm
- *                 example: "Thịt bò cũ"
+ *                 description: Tên thực phẩm hiện tại (để tìm kiếm)
+ *                 example: "Thịt gà ta"
  *               newName:
  *                 type: string
- *                 description: Tên mới (nếu muốn đổi tên)
- *                 example: "Thịt bò Wagyu"
+ *                 description: Tên mới (nếu muốn đổi)
+ *                 example: "Thịt gà công nghiệp"
  *               newCategory:
  *                 type: string
- *                 description: Tên mới của danh mục
- *                 example: "Thịt"
+ *                 description: Danh mục mới
+ *                 example: "Gia cầm"
  *               newUnit:
  *                 type: string
- *                 description: Tên mới của đơn vị
- *                 example: "Kg"
+ *                 description: Đơn vị mới
+ *                 example: "Con"
  *               image:
  *                 type: string
  *                 format: binary
- *                 description: Ảnh mới của thực phẩm
+ *                 description: File ảnh mới
  *     responses:
  *       200:
- *         description: Trả về kết quả (Thành công hoặc Lỗi nghiệp vụ)
+ *         description: Cập nhật thành công
  *         content:
  *           application/json:
  *             schema:
@@ -274,74 +263,91 @@ export const createFood = async (req, res) => {
  *               properties:
  *                 resultMessage:
  *                   type: object
- *                   properties:
- *                     en: { type: string }
- *                     vn: { type: string }
- *                 resultCode: { type: string, example: "00178" }
- *                 food: { type: object }
+ *                 resultCode:
+ *                   type: string
+ *                 food:
+ *                   type: object
+ *             example:
+ *               resultMessage:
+ *                 en: "Successfully"
+ *                 vn: "Thành công"
+ *               resultCode: "00178"
+ *               food:
+ *                 id: 15
+ *                 name: "Thịt gà công nghiệp"
+ *                 imageUrl: "https://supabasestorage.../new_image.jpg"
+ *                 type: "Ingredient"
+ *                 foodcategoryid: 3
+ *                 unitofmeasurementid: 2
+ *                 userid: "user-uuid-123"
+ *                 createdAt: "2024-01-05T10:00:00Z"
+ *                 updatedAt: "2024-01-06T12:00:00Z"
  */
 export const updateFood = async (req, res) => {
   try {
     const { name, newName, newCategory, newUnit } = req.body;
     const user = req.user;
 
-    // 1. VALIDATION: Kiểm tra tên thực phẩm đầu vào (Mã 00162)
+    // 1. VALIDATION NAME
     if (!name) {
       return res.status(200).json({ 
-        resultMessage: { en: "Please provide valid food name!", vn: "Vui lòng cung cấp tên thực phẩm hợp lệ!" },
+        resultMessage: { 
+          en: "Please provide valid food name!", 
+          vn: "Vui lòng cung cấp tên thực phẩm hợp lệ!" },
         resultCode: "00162" 
       });
     }
 
-    // 2. VALIDATION: Kiểm tra xem có trường nào để update không (Mã 00163)
-    // Nếu không gửi newName, newCategory, newUnit và cũng không gửi file -> Báo lỗi
+    // 2. CHECK UPDATE FIELDS
     if (!newName && !newCategory && !newUnit && !req.file) {
        return res.status(200).json({
           resultMessage: { 
-             en: "Please provide at least one field: newName, newCategory, newUnit", 
-             vn: "Vui lòng cung cấp ít nhất một trong các trường sau, newName, newCategory, newUnit" 
-          },
+            en: "Please provide at least one field to update", 
+            vn: "Vui lòng cung cấp ít nhất một trường để cập nhật" },
           resultCode: "00163"
        });
     }
 
-    // 3. TÌM THỰC PHẨM CẦN SỬA (Mã 00167)
+    // 3. FIND FOOD
     const { data: existing } = await supabase
       .from("food")
       .select("id, userid")
       .eq("userid", user.id)
-      .eq("name", name.trim())
+      .ilike("name", name.trim())
       .maybeSingle();
 
     if (!existing) {
         return res.status(200).json({
-            resultMessage: { en: "Food not found", vn: "Thực phẩm với tên đã cung cấp không tồn tại" },
+            resultMessage: { 
+              en: "Food not found", 
+              vn: "Thực phẩm với tên đã cung cấp không tồn tại" },
             resultCode: "00167",
         });
     }
 
-    // Object chứa dữ liệu sẽ update
-    const updateData = { updatedat: new Date().toISOString() }; // Lưu ý: updatedat viết thường
+    const updateData = { updatedat: new Date().toISOString() };
 
-    // 4. XỬ LÝ ĐỔI TÊN (newName) & CHECK TRÙNG (Mã 00173)
-    if (newName && newName.trim() !== name.trim()) {
+    // 4. CHECK DUPLICATE NEW NAME
+    if (newName && newName.trim().toLowerCase() !== name.trim().toLowerCase()) {
         const { data: duplicate } = await supabase
             .from("food")
             .select("id")
             .eq("userid", user.id)
-            .eq("name", newName.trim())
+            .ilike("name", newName.trim())
             .maybeSingle();
 
         if (duplicate) {
             return res.status(200).json({
-                resultMessage: { en: "Food with this name already exists", vn: "Một thực phẩm với tên này đã tồn tại" },
+                resultMessage: { 
+                  en: "Food with this name already exists", 
+                  vn: "Một thực phẩm với tên này đã tồn tại" },
                 resultCode: "00173"
             });
         }
         updateData.name = newName.trim();
     }
 
-    // 5. XỬ LÝ CATEGORY (Mã 00171)
+    // 5. CATEGORY
     if (newCategory) {
         const { data: cat } = await supabase
             .from("foodcategory")
@@ -351,14 +357,16 @@ export const updateFood = async (req, res) => {
 
         if (!cat) {
             return res.status(200).json({
-                resultMessage: { en: "Category not found", vn: "Không tìm thấy danh mục với tên đã cung cấp" },
+                resultMessage: { 
+                  en: "Category not found", 
+                  vn: "Không tìm thấy danh mục" },
                 resultCode: "00171" 
             });
         }
-        updateData.foodcategoryid = cat.id; // Lưu ý: viết thường tên cột
+        updateData.foodcategoryid = cat.id;
     }
 
-    // 6. XỬ LÝ UNIT (Mã 00169)
+    // 6. UNIT
     if (newUnit) {
         const { data: un } = await supabase
             .from("unitofmeasurement")
@@ -368,20 +376,22 @@ export const updateFood = async (req, res) => {
 
         if (!un) {
             return res.status(200).json({ 
-                resultMessage: { en: "Unit not found", vn: "Không tìm thấy đơn vị với tên đã cung cấp" },
+                resultMessage: { 
+                  en: "Unit not found", 
+                  vn: "Không tìm thấy đơn vị" },
                 resultCode: "00169" 
             });
         }
-        updateData.unitofmeasurementid = un.id; // Lưu ý: viết thường tên cột
+        updateData.unitofmeasurementid = un.id;
     }
 
-    // 7. XỬ LÝ ẢNH
+    // 7. IMAGE
     if (req.file) {
         const url = await uploadImage(req.file);
         if (url) updateData.imageurl = url;
     }
 
-    // 8. UPDATE VÀO DB (Mã 00178)
+    // 8. UPDATE
     const { data, error } = await supabase
        .from("food")
        .update(updateData)
@@ -392,14 +402,15 @@ export const updateFood = async (req, res) => {
     if (error) throw error;
 
     res.status(200).json({
-        resultMessage: { en: "Successfully", vn: "Thành công" },
+        resultMessage: { 
+          en: "Successfully", 
+          vn: "Thành công" },
         resultCode: "00178",
         food: data,
     });
 
   } catch (err) {
     console.error(err);
-    // Mã 00168: server error
     res.status(500).json({ 
         resultMessage: { en: "Server error", vn: "server error" },
         resultCode: "00168" 
@@ -407,12 +418,13 @@ export const updateFood = async (req, res) => {
   }
 };
 
+
 /**
  * @swagger
  * /food/delete:
  *   delete:
  *     summary: Xoá thực phẩm
- *     description: This HTTP DELETE request is used to delete a food item. Payload includes "name".
+ *     description: Xoá thực phẩm khỏi danh sách (yêu cầu không còn trong tủ lạnh).
  *     tags: [Food]
  *     security:
  *       - bearerAuth: []
@@ -427,10 +439,10 @@ export const updateFood = async (req, res) => {
  *               name:
  *                 type: string
  *                 description: Tên thực phẩm cần xoá
- *                 example: "Tes222dsdh"
+ *                 example: "Thịt gà ta"
  *     responses:
  *       200:
- *         description: Xoá thực phẩm thành công
+ *         description: Xoá thành công
  *         content:
  *           application/json:
  *             schema:
@@ -438,35 +450,43 @@ export const updateFood = async (req, res) => {
  *               properties:
  *                 resultMessage:
  *                   type: object
- *                   properties:
- *                     en: { type: string, example: "Food deletion successfull" }
- *                     vn: { type: string, example: "Xóa thực phẩm thành công" }
- *                 resultCode: { type: string, example: "00184" }
+ *                 resultCode:
+ *                   type: string
+ *             example:
+ *               resultMessage:
+ *                 en: "Food deletion successfull"
+ *                 vn: "Xóa thực phẩm thành công"
+ *               resultCode: "00184"
  */
 export const deleteFood = async (req, res) => {
     try {
-        const { name } = req.body; // Payload uses Name
+        const { name } = req.body;
         const user = req.user;
         
         if (!name) return res.status(400).json({ resultCode: "00400" });
 
-        // 1. Find by Name & Owner
+        // 1. Find
         const { data: existing } = await supabase
           .from("food")
           .select("id, userid")
           .eq("userid", user.id)
-          .eq("name", name.trim())
+          .ilike("name", name.trim())
           .maybeSingle();
 
         if (!existing) return res.status(404).json({
-            resultMessage: { en: "Food not found", vn: "Không tìm thấy thực phẩm" },
+            resultMessage: { 
+              en: "Food not found", 
+              vn: "Không tìm thấy thực phẩm" },
             resultCode: "00180",
         });
 
         // 2. Check Constraint
-        const { count } = await supabase.from("fridge").select("id", {count: 'exact', head: true}).eq("FoodId", existing.id);
+        const { count } = await supabase.from("fridge").select("id", {count: 'exact', head: true}).eq("foodid", existing.id);
+        
         if (count > 0) return res.status(409).json({
-            resultMessage: { en: "Cannot delete food due to references", vn: "Không thể xóa Food. Vẫn có mục trong tủ lạnh đang tham chiếu." },
+            resultMessage: { 
+              en: "Cannot delete food", 
+              vn: "Không thể xóa Food. Vẫn có mục trong tủ lạnh đang tham chiếu." },
             resultCode: "00181",
         });
 
@@ -475,20 +495,24 @@ export const deleteFood = async (req, res) => {
         if (error) throw error;
 
         res.status(200).json({
-            resultMessage: { en: "Food deletion successfull", vn: "Xóa thực phẩm thành công" },
+            resultMessage: { 
+              en: "Food deletion successfull", 
+              vn: "Xóa thực phẩm thành công" },
             resultCode: "00184",
         });
     } catch (err) {
+        console.error("Delete Food Error:", err);
         res.status(500).json({ resultCode: "00168" });
     }
 };
+
 
 /**
  * @swagger
  * /food/list:
  *   get:
- *     summary: Get all foods in group
- *     description: Lấy danh sách thực phẩm của nhóm mà user đang tham gia.
+ *     summary: Lấy danh sách thực phẩm
+ *     description: Lấy danh sách thực phẩm của bản thân và Admin nhóm.
  *     tags: [Food]
  *     security:
  *       - bearerAuth: []
@@ -502,45 +526,83 @@ export const deleteFood = async (req, res) => {
  *               properties:
  *                 resultMessage:
  *                   type: object
- *                   properties:
- *                     en: { type: string }
- *                     vn: { type: string }
- *                 resultCode: { type: string, example: "00188" }
+ *                 resultCode:
+ *                   type: string
  *                 foods:
  *                   type: array
+ *             example:
+ *               resultMessage:
+ *                 en: "Successfull retrieve all foods"
+ *                 vn: "Lấy danh sách thực phẩm thành công"
+ *               resultCode: "00188"
+ *               foods:
+ *                 - id: 1
+ *                   name: "Cơm trắng"
+ *                   imageUrl: "https://url-anh..."
+ *                   type: "Ingredient"
+ *                   createdAt: "2024-01-01T00:00:00Z"
+ *                   updatedAt: "2024-01-01T00:00:00Z"
+ *                   UserId: "uuid-user-1"
+ *                   UnitOfMeasurement:
+ *                     id: 5
+ *                     unitName: "Bát"
+ *                   FoodCategory:
+ *                     id: 2
+ *                     name: "Tinh bột"
+ *                 - id: 2
+ *                   name: "Thịt gà"
+ *                   imageUrl: "https://url-anh..."
+ *                   type: "Ingredient"
+ *                   createdAt: "2024-01-02T00:00:00Z"
+ *                   updatedAt: "2024-01-02T00:00:00Z"
+ *                   UserId: "uuid-admin-1"
+ *                   UnitOfMeasurement:
+ *                     id: 1
+ *                     unitName: "Kg"
+ *                   FoodCategory:
+ *                     id: 1
+ *                     name: "Thịt"
  */
 export const getFoodsByGroup = async (req, res) => {
     try {
         const user = req.user;
         
-        // 1. Xác định Group ID (Ưu tiên lấy từ User Context)
-        const groupId = req.query.groupId || user?.groupId;
+        // 1. Get User Info
+        const { data: userInfo, error: userError } = await supabase
+            .from("users")
+            .select("id, belongstogroupadminid")
+            .eq("id", user.id)
+            .single();
 
-        if (!groupId) {
-            return res.status(200).json({ // Trả 200 kèm mã lỗi nghiệp vụ
-                resultMessage: { en: "User does not belong to any group", vn: "Bạn chưa vào nhóm nào" },
-                resultCode: "00185", // Mã lỗi: Bạn chưa vào nhóm nào
+        if (userError || !userInfo) {
+             return res.status(200).json({
+                resultMessage: { 
+                  en: "User info not found", 
+                  vn: "Không tìm thấy thông tin người dùng" },
+                resultCode: "00185",
             });
         }
 
-        // 2. Query trực tiếp Food dựa trên User thuộc Group đó
-        // Logic: Lấy tất cả Food mà người tạo (UserId) đang thuộc về Group có ID = groupId
-        
+        // 2. Allowed Owners
+        const allowedOwnerIds = [user.id];
+        if (userInfo.belongstogroupadminid) {
+            allowedOwnerIds.push(userInfo.belongstogroupadminid);
+        }
+
+        // 3. Query
         const { data, error } = await supabase
             .from("food")
             .select(`
                 id, name, imageurl, type, createdat, updatedat, userid,
                 unitofmeasurement:unitofmeasurementid ( id, unitname ),
-                foodcategory:foodcategoryid ( id, name ),
-                users!inner ( group_id ) 
+                foodcategory:foodcategoryid ( id, name )
             `)
-            // !inner: Chỉ lấy những food mà user tạo ra food đó có group_id trùng khớp
-            .eq("users.group_id", groupId) 
+            .in("userid", allowedOwnerIds)
             .order("name", { ascending: true });
 
         if (error) throw error;
 
-        // Map lại dữ liệu để trả về cấu trúc đẹp (phẳng hóa object nếu cần)
+        // 4. Map Data
         const formattedFoods = data.map(item => ({
             id: item.id,
             name: item.name,
@@ -560,7 +622,9 @@ export const getFoodsByGroup = async (req, res) => {
         }));
 
         return res.status(200).json({
-            resultMessage: { en: "Successfull retrieve all foods", vn: "Lấy danh sách thực phẩm thành công" },
+            resultMessage: { 
+              en: "Successfull retrieve all foods", 
+              vn: "Lấy danh sách thực phẩm thành công" },
             resultCode: "00188",
             foods: formattedFoods,
         });
@@ -568,7 +632,9 @@ export const getFoodsByGroup = async (req, res) => {
     } catch (err) {
         console.error("Get Foods Error:", err);
         return res.status(500).json({ 
-            resultMessage: { en: "Server error", vn: "Lỗi máy chủ nội bộ" },
+            resultMessage: { 
+              en: "Server error", 
+              vn: "Lỗi máy chủ nội bộ" },
             resultCode: "00157" 
         });
     }
@@ -578,14 +644,13 @@ export const getFoodsByGroup = async (req, res) => {
  * @swagger
  * /food/unit:
  *   get:
- *     summary: Get units
- *     description: This endpoint retrieves a list of food units.
+ *     summary: Lấy danh sách đơn vị
  *     tags: [Food]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Successfully retrieved units
+ *         description: Thành công
  *         content:
  *           application/json:
  *             schema:
@@ -593,14 +658,24 @@ export const getFoodsByGroup = async (req, res) => {
  *               properties:
  *                 resultMessage:
  *                   type: object
- *                   properties:
- *                     en: { type: string, example: "Successfully retrieved units" }
- *                     vn: { type: string, example: "Lấy các unit thành công" }
- *                 resultCode: { type: string, example: "00110" }
+ *                 resultCode:
+ *                   type: string
  *                 units:
  *                   type: array
- *                   items:
- *                     type: object
+ *             example:
+ *               resultMessage:
+ *                 en: "Successfully retrieved units"
+ *                 vn: "Lấy các unit thành công"
+ *               resultCode: "00110"
+ *               units:
+ *                 - id: 1
+ *                   unitname: "Kg"
+ *                   createdat: "2024-01-01T00:00:00Z"
+ *                   updatedat: "2024-01-01T00:00:00Z"
+ *                 - id: 2
+ *                   unitname: "Lít"
+ *                   createdat: "2024-01-01T00:00:00Z"
+ *                   updatedat: "2024-01-01T00:00:00Z"
  */
 export const getUnits = async (req, res) => {
     try {
@@ -612,14 +687,18 @@ export const getUnits = async (req, res) => {
         if (error) throw error;
 
         res.status(200).json({
-            resultMessage: { en: "Successfully retrieved units", vn: "Lấy các unit thành công" },
+            resultMessage: { 
+              en: "Successfully retrieved units", 
+              vn: "Lấy các unit thành công" },
             resultCode: "00110",
             units: data
         });
     } catch (err) {
         console.error("Get Units Error:", err);
         res.status(500).json({ 
-            resultMessage: { en: "Server error", vn: "server error" },
+            resultMessage: { 
+              en: "Server error", 
+              vn: "server error" },
             resultCode: "00114" 
         });
     }
@@ -629,14 +708,13 @@ export const getUnits = async (req, res) => {
  * @swagger
  * /food/category:
  *   get:
- *     summary: Get categories
- *     description: Truy xuất danh sách các danh mục thực phẩm
+ *     summary: Lấy danh sách danh mục
  *     tags: [Food]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Successfully retrieved categories
+ *         description: Thành công
  *         content:
  *           application/json:
  *             schema:
@@ -644,14 +722,24 @@ export const getUnits = async (req, res) => {
  *               properties:
  *                 resultMessage:
  *                   type: object
- *                   properties:
- *                     en: { type: string, example: "Successfully retrieved categories" }
- *                     vn: { type: string, example: "Lấy các category thành công" }
- *                 resultCode: { type: string, example: "00129" }
+ *                 resultCode:
+ *                   type: string
  *                 categories:
  *                   type: array
- *                   items:
- *                     type: object
+ *             example:
+ *               resultMessage:
+ *                 en: "Successfully retrieved categories"
+ *                 vn: "Lấy các category thành công"
+ *               resultCode: "00129"
+ *               categories:
+ *                 - id: 1
+ *                   name: "Thịt"
+ *                   createdat: "2024-01-01T00:00:00Z"
+ *                   updatedat: "2024-01-01T00:00:00Z"
+ *                 - id: 2
+ *                   name: "Rau củ"
+ *                   createdat: "2024-01-01T00:00:00Z"
+ *                   updatedat: "2024-01-01T00:00:00Z"
  */
 export const getCategories = async (req, res) => {
     try {
@@ -664,16 +752,17 @@ export const getCategories = async (req, res) => {
 
         res.status(200).json({
             resultMessage: { 
-              en: "Successfully retrieved categories",
-              vn: "Lấy các category thành công" 
-            },
+              en: "Successfully retrieved categories", 
+              vn: "Lấy các category thành công" },
             resultCode: "00129",
             categories: data
         });
     } catch (err) {
         console.error("Get Categories Error:", err);
         res.status(500).json({ 
-            resultMessage: { en: "Server error", vn: "server error" },
+            resultMessage: { 
+              en: "Server error", 
+              vn: "server error" },
             resultCode: "00133" 
         });
     }
