@@ -1183,7 +1183,7 @@ export const getAllRecipes = async (req, res) => {
 
     if (error) throw error;
 
-    const formattedRecipe = recipe.map((recipe) => ({
+    const formattedRecipe = recipes.map((recipe) => ({
       id: recipe.id,
       name: recipe.name,
       description: recipe.description,
