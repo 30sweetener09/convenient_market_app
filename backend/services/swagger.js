@@ -21,6 +21,13 @@ const swaggerOptions = {
         },
       },
     },
+
+    // (không bắt buộc) global security
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
   },
   apis: ["./server.js", "./routes/*.js", "./controllers/*.js"], // nơi chứa swagger comment
 };

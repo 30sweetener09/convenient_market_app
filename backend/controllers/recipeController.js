@@ -742,7 +742,7 @@ export const updateRecipe = async (req, res) => {
 
 /**
  * @swagger
- * /api/recipes/delete:
+ * /recipe/delete:
  *   delete:
  *     summary: Delete a recipe
  *     description: Delete a recipe by its ID
