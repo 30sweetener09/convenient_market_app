@@ -1,10 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import './widgets/menu_item.dart';
 import 'modals/logout_dialog.dart';
 import 'modals/delete_acc_dialog.dart';
-import 'modals/profile_modal.dart';
+import 'modals/edit_profile_modal.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/user_provider.dart';
 import '../../../providers/auth_provider.dart';
@@ -132,6 +133,7 @@ class _UserScreenState extends State<UserScreen> {
             title: 'Sửa thông tin cá nhân',
             description: 'Thay đổi ảnh đại diện và tên',
             onTap: () {
+              _showEditProfileModal();
             },
           ),
           MenuItem(
@@ -203,6 +205,38 @@ class _UserScreenState extends State<UserScreen> {
           ),
         ],
       ),
+    );
+  }
+   void _showEditProfileModal() {
+    final userProvider = context.read<UserProvider>();
+    final user = userProvider.user;
+    
+    if (user == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return EditProfileModal(
+          currentUsername: user.username,
+          currentPhotoUrl: user.photoUrl ?? '',
+          onSave: (String newUsername, File? imageFile, String? imageUrl) async {
+            // Gọi API cập nhật thông tin
+            await userProvider.updateUserInfo(
+              username: newUsername,
+              
+            imageFile: imageFile,
+            imageUrl: imageUrl,
+            );
+            if (mounted) {
+              setState(() {});
+            }
+          },
+        );
+      },
     );
   }
 }

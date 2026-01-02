@@ -336,7 +336,6 @@ class AuthProvider extends ChangeNotifier {
       body: jsonEncode({"newPassword": newPassword}),
     );
 
-
       if (response.statusCode == 200) {
         success = true;
         debugPrint("Password changed successfully");

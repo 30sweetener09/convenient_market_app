@@ -28,4 +28,10 @@ class UserDTO {
       password: '', // Không bao giờ lấy mật khẩu từ API
     );
   }
+  Map<String, dynamic> toApiMap() {
+    return {
+      'username': username,
+      'image': photoUrl, // Map photoUrl thành 'image' cho API
+    };
+  }
 }
