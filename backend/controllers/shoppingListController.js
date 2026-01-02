@@ -1346,6 +1346,8 @@ export const updateTask = async (req, res) => {
 export const deleteTask = async (req, res) => {
   try {
     const { taskId } = req.body;
+    const groupId = req.params.groupId;
+    const userID = req.user.id;
 
     // Validate taskId exists
     if (!taskId) {
@@ -1373,27 +1375,18 @@ export const deleteTask = async (req, res) => {
     }
 
     // Check if user is admin
-    if (!req.user?.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00297",
-      });
-    }
-
-    const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, role, belongstogroupadminid")
-      .eq("id", req.user.id)
+    const { data: groupAdmin, error: groupError } = await supabase
+      .from("groups")
+      .select("id, created_by")
+      .eq("id", groupId)
+      .eq("created_by", userID)
       .maybeSingle();
 
-    if (adminError || !adminData || adminData.role !== "admin") {
+    if (groupError || !groupAdmin) {
       return res.status(403).json({
         resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
+          en: "Access denied. Only group admins can perform this action.",
+          vn: "Truy cập không được ủy quyền, bạn không phải admin",
         },
         resultCode: "00297",
       });
@@ -1401,16 +1394,8 @@ export const deleteTask = async (req, res) => {
 
     // Check if task exists
     const { data: existingTask, error: fetchError } = await supabase
-      .from("shopping_list_tasks")
-      .select(
-        `
-        *,
-        shopping_list:shopping_list_id (
-          id,
-          belongs_to_admin_id
-        )
-      `
-      )
+      .from("task")
+      .select("id")
       .eq("id", taskId)
       .maybeSingle();
 
@@ -1425,7 +1410,15 @@ export const deleteTask = async (req, res) => {
     }
 
     // Check if user is the owner
-    if (existingTask.shopping_list?.belongs_to_admin_id !== req.user.id) {
+    const { data: groupAdmintodelete, error: grouptodeleteError } =
+      await supabase
+        .from("groups")
+        .select("id, created_by")
+        .eq("id", groupId)
+        .eq("created_by", req.user.id)
+        .maybeSingle();
+
+    if (grouptodeleteError || !groupAdmintodelete) {
       return res.status(403).json({
         resultMessage: {
           en: "User is not a group admin",
@@ -1437,7 +1430,7 @@ export const deleteTask = async (req, res) => {
 
     // Delete task
     const { error: deleteError } = await supabase
-      .from("shopping_list_tasks")
+      .from("task")
       .delete()
       .eq("id", taskId);
 
