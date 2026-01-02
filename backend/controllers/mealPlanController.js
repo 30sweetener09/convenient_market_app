@@ -8,6 +8,9 @@
 // controllers/mealPlanController.js
 import { supabase } from "../db.js";
 
+const nameRegex = /^[a-zA-ZÀ-ỹ0-9 ]+$/;
+const xssPattern = /<script\b[^>]*>([\s\S]*?)<\/script>/gim;
+
 // Helper function to validate and format date
 const validateAndFormatDate = (dateString) => {
   if (!dateString || typeof dateString !== "string") return null;
@@ -139,6 +142,8 @@ const formatDateToDisplay = (dateString) => {
 export const createMealPlan = async (req, res) => {
   try {
     const { foodName, timestamp, name } = req.body;
+    // foodName: Tên món ăn,
+    // name: tên mealplan
 
     // 00313 - Vui lòng cung cấp tất cả các trường bắt buộc
     if (!foodName || !timestamp || !name) {
@@ -152,7 +157,11 @@ export const createMealPlan = async (req, res) => {
     }
 
     // 00314 - Vui lòng cung cấp một tên thực phẩm hợp lệ
-    if (typeof foodName !== "string" || foodName.trim() === "") {
+    if (
+      !nameRegex.test(foodName) ||
+      foodName.length < 2 ||
+      foodName.length > 50
+    ) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide a valid food name",
@@ -164,7 +173,9 @@ export const createMealPlan = async (req, res) => {
 
     // 00315 - Vui lòng cung cấp một dấu thời gian hợp lệ
     const formattedDate = validateAndFormatDate(timestamp);
-    if (!formattedDate) {
+    const now = Date.now();
+
+    if (!formattedDate || new Date(timestamp).getTime() <= now) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide a valid timestamp",
@@ -175,7 +186,7 @@ export const createMealPlan = async (req, res) => {
     }
 
     // 00316 - Vui lòng cung cấp một tên hợp lệ cho bữa ăn, sáng, trưa, tối
-    const validMealNames = ["sáng", "trưa", "tối", "sang", "trua", "toi"];
+    const validMealNames = ["breakfast", "launch", "dinner"];
     if (
       typeof name !== "string" ||
       name.trim() === "" ||
@@ -191,27 +202,19 @@ export const createMealPlan = async (req, res) => {
     }
 
     // 00319 - Người dùng không phải là quản trị viên nhóm
-    if (!req.user || !req.user.id) {
+    const groupId = req.params.groupId;
+    const { data: groupAdmin, error: groupError } = await supabase
+      .from("groups")
+      .select("id, created_by")
+      .eq("id", groupId)
+      .eq("created_by", req.user.id)
+      .maybeSingle();
+
+    if (groupError || !groupAdmin) {
       return res.status(403).json({
         resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00319",
-      });
-    }
-
-    const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, role, group_id")
-      .eq("id", req.user.id)
-      .single();
-
-    if (adminError || !adminData || adminData.role !== "admin") {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
+          en: "Access denied. Only group admins can perform this action.",
+          vn: "Truy cập không được ủy quyền, bạn không phải admin",
         },
         resultCode: "00319",
       });
@@ -219,7 +222,7 @@ export const createMealPlan = async (req, res) => {
 
     // 00317 - Không tìm thấy thực phẩm với tên đã cung cấp
     const { data: food, error: foodError } = await supabase
-      .from("foods")
+      .from("food")
       .select("id, name")
       .ilike("name", foodName.trim())
       .single();
@@ -236,22 +239,19 @@ export const createMealPlan = async (req, res) => {
 
     // Chuẩn hóa tên bữa ăn
     let normalizedMealName = name.trim().toLowerCase();
-    if (normalizedMealName === "sang") normalizedMealName = "sáng";
-    if (normalizedMealName === "trua") normalizedMealName = "trưa";
-    if (normalizedMealName === "toi") normalizedMealName = "tối";
 
     // Insert meal plan
     const { data: mealPlanData, error: insertError } = await supabase
-      .from("meal_plans")
+      .from("mealplan")
       .insert([
         {
           name: normalizedMealName,
-          timestamp: formattedDate,
+          timestamp: timestamp,
           status: "NOT_PASS_YET",
-          food_id: food.id,
-          user_id: req.user.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          foodid: food.id,
+          userid: req.user.id,
+          createdat: new Date().toISOString(),
+          updatedat: new Date().toISOString(),
         },
       ])
       .select()
@@ -271,10 +271,10 @@ export const createMealPlan = async (req, res) => {
         name: mealPlanData.name,
         timestamp: mealPlanData.timestamp,
         status: mealPlanData.status,
-        FoodId: mealPlanData.food_id,
-        UserId: mealPlanData.user_id,
-        updatedAt: mealPlanData.updated_at,
-        createdAt: mealPlanData.created_at,
+        FoodId: mealPlanData.foodid,
+        UserId: mealPlanData.userid,
+        updatedAt: mealPlanData.updatedat,
+        createdAt: mealPlanData.createdat,
       },
     });
   } catch (err) {
@@ -424,8 +424,9 @@ export const updateMealPlan = async (req, res) => {
 
     // 00334 - Vui lòng cung cấp một tên thực phẩm mới hợp lệ!
     if (
-      newFoodName !== undefined &&
-      (typeof newFoodName !== "string" || newFoodName.trim() === "")
+      !nameRegex.test(newFoodName) ||
+      newFoodName.length < 2 ||
+      newFoodName.length > 50
     ) {
       return res.status(400).json({
         resultMessage: {
@@ -437,60 +438,51 @@ export const updateMealPlan = async (req, res) => {
     }
 
     // 00335 - Vui lòng cung cấp một dấu thời gian hợp lệ!
-    let formattedDate;
-    if (newTimestamp !== undefined) {
-      formattedDate = validateAndFormatDate(newTimestamp);
-      if (!formattedDate) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Please provide a valid timestamp!",
-            vn: "Vui lòng cung cấp một dấu thời gian hợp lệ!",
-          },
-          resultCode: "00335",
-        });
-      }
-    }
+    const formattedDate = validateAndFormatDate(newTimestamp);
+    const now = Date.now();
 
-    // 00336 - Vui lòng cung cấp một tên hợp lệ, sáng, trưa, tối!
-    const validMealNames = ["sáng", "trưa", "tối", "sang", "trua", "toi"];
-    if (newName !== undefined) {
-      if (
-        typeof newName !== "string" ||
-        newName.trim() === "" ||
-        !validMealNames.includes(newName.trim().toLowerCase())
-      ) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Please provide a valid name: breakfast (sáng), lunch (trưa), dinner (tối)!",
-            vn: "Vui lòng cung cấp một tên hợp lệ, sáng, trưa, tối!",
-          },
-          resultCode: "00336",
-        });
-      }
-    }
-
-    // 00339 - Người dùng không phải là quản trị viên nhóm
-    if (!req.user || !req.user.id) {
-      return res.status(403).json({
+    // Kiểm tra 1: Định dạng hợp lệ
+    // Kiểm tra 2: Phải muộn hơn thời gian hiện tại
+    if (!formattedDate || new Date(newTimestamp).getTime() <= now) {
+      return res.status(400).json({
         resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
+          en: "Please provide a valid newtimestamp",
+          vn: "Vui lòng cung cấp một dấu thời gian mới hợp lệ",
         },
-        resultCode: "00339",
+        resultCode: "00335",
       });
     }
 
-    const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, role, group_id")
-      .eq("id", req.user.id)
-      .single();
+    // 00336 - Vui lòng cung cấp một tên hợp lệ, sáng, trưa, tối!
+    const validMealNames = ["breakfast", "launch", "dinner"];
+    if (
+      typeof newName !== "string" ||
+      newName.trim() === "" ||
+      !validMealNames.includes(newName.trim().toLowerCase())
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a new valid meal name: breakfast (sáng), lunch (trưa), dinner (tối)",
+          vn: "Vui lòng cung cấp một tên mới hợp lệ cho bữa ăn, sáng, trưa, tối",
+        },
+        resultCode: "00336",
+      });
+    }
 
-    if (adminError || !adminData || adminData.role !== "admin") {
+    // 00339 - Người dùng không phải là quản trị viên nhóm
+    const groupId = req.params.groupId;
+    const { data: groupAdmin, error: groupError } = await supabase
+      .from("groups")
+      .select("id, created_by")
+      .eq("id", groupId)
+      .eq("created_by", req.user.id)
+      .maybeSingle();
+
+    if (groupError || !groupAdmin) {
       return res.status(403).json({
         resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
+          en: "Access denied. Only group admins can perform this action.",
+          vn: "Truy cập không được ủy quyền, bạn không phải admin",
         },
         resultCode: "00339",
       });
@@ -498,7 +490,7 @@ export const updateMealPlan = async (req, res) => {
 
     // 00337 - Không tìm thấy kế hoạch với ID đã cung cấp
     const { data: existingPlan, error: fetchError } = await supabase
-      .from("meal_plans")
+      .from("mealplan")
       .select("*")
       .eq("id", planId)
       .single();
@@ -513,25 +505,14 @@ export const updateMealPlan = async (req, res) => {
       });
     }
 
-    // Kiểm tra meal plan có thuộc về user này không
-    if (existingPlan.user_id !== req.user.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00339",
-      });
-    }
-
     // Build update object
-    const updateData = { updated_at: new Date().toISOString() };
+    const updateData = { updatedat: new Date().toISOString() };
 
     // Xử lý newFoodName
     if (newFoodName !== undefined) {
       // 00341 - Tên thực phẩm mới không tồn tại
       const { data: food, error: foodError } = await supabase
-        .from("foods")
+        .from("food")
         .select("id, name")
         .ilike("name", newFoodName.trim())
         .single();
@@ -546,16 +527,12 @@ export const updateMealPlan = async (req, res) => {
         });
       }
 
-      updateData.food_id = food.id;
+      updateData.foodid = food.id;
     }
 
     // Xử lý newName
     if (newName !== undefined) {
       let normalizedMealName = newName.trim().toLowerCase();
-      if (normalizedMealName === "sang") normalizedMealName = "sáng";
-      if (normalizedMealName === "trua") normalizedMealName = "trưa";
-      if (normalizedMealName === "toi") normalizedMealName = "tối";
-
       updateData.name = normalizedMealName;
     }
 
@@ -574,7 +551,7 @@ export const updateMealPlan = async (req, res) => {
 
     // Update meal plan
     const { data: updatedPlanData, error: updateError } = await supabase
-      .from("meal_plans")
+      .from("mealplan")
       .update(updateData)
       .eq("id", planId)
       .select()
@@ -594,10 +571,10 @@ export const updateMealPlan = async (req, res) => {
         name: updatedPlanData.name,
         timestamp: updatedPlanData.timestamp,
         status: updatedPlanData.status,
-        FoodId: updatedPlanData.food_id,
-        UserId: updatedPlanData.user_id,
-        updatedAt: updatedPlanData.updated_at,
-        createdAt: updatedPlanData.created_at,
+        FoodId: updatedPlanData.foodid,
+        UserId: updatedPlanData.userid,
+        updatedAt: updatedPlanData.updatedat,
+        createdAt: updatedPlanData.createdat,
       },
     });
   } catch (err) {
@@ -728,7 +705,7 @@ export const deleteMealPlan = async (req, res) => {
 
     // 00325 - Không tìm thấy kế hoạch với ID đã cung cấp
     const { data: existingPlan, error: fetchError } = await supabase
-      .from("meal_plans")
+      .from("mealplan")
       .select("*")
       .eq("id", planId)
       .single();
@@ -756,7 +733,7 @@ export const deleteMealPlan = async (req, res) => {
 
     // Xóa meal plan
     const { error: deleteError } = await supabase
-      .from("meal_plans")
+      .from("mealplan")
       .delete()
       .eq("id", planId);
 
@@ -920,11 +897,11 @@ export const getMealPlansByDate = async (req, res) => {
 
     // Get meal plans for specific date with full food info
     const { data: plans, error } = await supabase
-      .from("meal_plans")
+      .from("mealplan")
       .select(
         `
         *,
-        foods!meal_plans_food_id_fkey (
+        foods!mealplan_food_id_fkey (
           id,
           name,
           image_url,

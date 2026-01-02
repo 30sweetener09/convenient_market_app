@@ -11,7 +11,7 @@ import registerMiddlewares from "./middlewares/index.js";
 import setupSwagger from "./services/swagger.js";
 import userRoute from "./routes/users.js";
 import shoppingListRoute from "./routes/shoppingList.js";
-
+import mealRoute from "./routes/mealPlan.js";
 import recipeRoutes from "./routes/recipes.js";
 import adminRoute from "./routes/admin.js";
 
@@ -20,7 +20,6 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 registerMiddlewares(app);
-
 setupSwagger(app);
 
 // Gắn Supabase client vào req để dùng ở route
@@ -34,6 +33,7 @@ app.use("/api/user", userRoute);
 app.use("/api/shopping", shoppingListRoute);
 app.use("/api/recipes", recipeRoutes);
 app.use("/api/admin", adminRoute);
+app.use("/api/meal", mealRoute);
 
 app.get("/", (req, res) => res.send("Smart Schedule API running"));
 

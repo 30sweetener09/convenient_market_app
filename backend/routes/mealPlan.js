@@ -14,9 +14,9 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(supabaseAuth);
 
-router.post("/create", requirePermission("create_meal"), createMealPlan);
-router.put("/update", requirePermission("update_meal"), updateMealPlan);
-router.delete("/delete", requirePermission("delete_meal"), deleteMealPlan);
+router.post("/:groupId", createMealPlan);
+router.put("/:groupId", updateMealPlan);
+router.delete("/:groupId", deleteMealPlan);
 router.get("/get-by-date", getMealPlansByDate);
 
 export default router;
