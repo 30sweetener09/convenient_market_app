@@ -653,15 +653,17 @@ export const updateRecipe = async (req, res) => {
         });
       }
     }
-
+    console.log(newFoodName.trim() !== "");
     // 00367 - Xử lý Food Name (nếu có)
     let foodData = null;
     if (newFoodName && newFoodName.trim() !== "") {
       const { data: food, error: foodError } = await supabase
         .from("food")
         .select("*")
-        .ilike("name", newFoodName.trim())
+        .eq("name", newFoodName.trim())
         .single();
+
+      console.log(food);
 
       if (foodError || !food) {
         return res.status(404).json({
@@ -869,22 +871,22 @@ export const deleteRecipe = async (req, res) => {
 
 /**
  * @swagger
- * /api/recipes/get-by-food:
+ * /recipe/byFoodId:
  *   get:
- *     summary: Get all recipes for a specific food
- *     description: Retrieve all recipes associated with a food item by food ID
- *     tags: [Recipes]
+ *     summary: Get recipes by food ID
+ *     description: Retrieve all recipes associated with a specific food ID, including full food information.
+ *     tags:
+ *       - Recipe
  *     parameters:
  *       - in: query
  *         name: foodId
  *         required: true
  *         schema:
- *           type: string
- *         description: ID of the food item
- *         example: "123e4567-e89b-12d3-a456-426614174000"
+ *           type: integer
+ *         description: ID of the food
  *     responses:
  *       200:
- *         description: Recipes retrieved successfully
+ *         description: Get recipes successfully
  *         content:
  *           application/json:
  *             schema:
@@ -895,10 +897,10 @@ export const deleteRecipe = async (req, res) => {
  *                   properties:
  *                     en:
  *                       type: string
- *                       example: "Get recipes successfull"
+ *                       example: Get recipes successfull
  *                     vn:
  *                       type: string
- *                       example: "Lấy các công thức thành công"
+ *                       example: Lấy các công thức thành công
  *                 resultCode:
  *                   type: string
  *                   example: "00378"
@@ -908,7 +910,7 @@ export const deleteRecipe = async (req, res) => {
  *                     type: object
  *                     properties:
  *                       id:
- *                         type: string
+ *                         type: integer
  *                       name:
  *                         type: string
  *                       description:
@@ -922,31 +924,68 @@ export const deleteRecipe = async (req, res) => {
  *                         type: string
  *                         format: date-time
  *                       FoodId:
- *                         type: string
+ *                         type: integer
  *                       Food:
  *                         type: object
+ *                         nullable: true
  *                         properties:
  *                           id:
- *                             type: string
+ *                             type: integer
  *                           name:
  *                             type: string
  *                           imageUrl:
  *                             type: string
  *                           type:
  *                             type: string
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *                           updatedAt:
+ *                             type: string
+ *                             format: date-time
+ *                           FoodCategoryId:
+ *                             type: integer
+ *                           UserId:
+ *                             type: integer
+ *                           UnitOfMeasurementId:
+ *                             type: integer
  *       400:
- *         description: Missing foodId parameter
+ *         description: Recipe not found with the provided ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: recipe not found with the provided ID
+ *                     vn:
+ *                       type: string
+ *                       example: Không tìm thấy công thức với ID đã cung cấp
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00376"
  *       500:
  *         description: Internal server error
  */
+
 export const getRecipesByFoodId = async (req, res) => {
   try {
     const { foodId } = req.query;
 
-    if (!foodId) {
+    const { data: food, error: foodError } = await supabase
+      .from("food")
+      .select("*")
+      .eq("id", foodId)
+      .single();
+
+    if (!food || foodError) {
       return res.status(400).json({
         resultMessage: {
-          en: "ecipe not found with the provided ID",
+          en: "recipe not found with the provided ID",
           vn: "Không tìm thấy công thức với ID đã cung cấp",
         },
         resultCode: "00376",
@@ -955,15 +994,15 @@ export const getRecipesByFoodId = async (req, res) => {
 
     // Get recipes for specific food with full food info
     const { data: recipes, error } = await supabase
-      .from("recipes")
+      .from("recipe")
       .select(
         `
         *,
-        foods!recipes_food_id_fkey (*)
+        food:foodid (*) 
       `
       )
-      .eq("food_id", foodId)
-      .order("created_at", { ascending: false });
+      .eq("foodid", foodId)
+      .order("createdat", { ascending: false });
 
     if (error) throw error;
 
@@ -972,23 +1011,20 @@ export const getRecipesByFoodId = async (req, res) => {
       name: recipe.name,
       description: recipe.description,
       htmlContent: recipe.htmlcontent,
-      createdAt: recipe.created_at,
-      updatedAt: recipe.updated_at,
-      FoodId: recipe.food_id,
-      Food: recipe.foods
+      createdAt: recipe.createdat,
+      updatedAt: recipe.updatedat,
+      FoodId: recipe.foodid,
+      Food: recipe.food
         ? {
-            id: recipe.foods.id,
-            name: recipe.foods.name,
-            imageUrl: recipe.foods.image_url || recipe.foods.imageUrl,
-            type: recipe.foods.type,
-            createdAt: recipe.foods.created_at,
-            updatedAt: recipe.foods.updated_at,
-            FoodCategoryId:
-              recipe.foods.food_category_id || recipe.foods.FoodCategoryId,
-            UserId: recipe.foods.user_id || recipe.foods.UserId,
-            UnitOfMeasurementId:
-              recipe.foods.unit_of_measurement_id ||
-              recipe.foods.UnitOfMeasurementId,
+            id: recipe.food.id,
+            name: recipe.food.name,
+            imageUrl: recipe.food.imageurl,
+            type: recipe.food.type,
+            createdAt: recipe.food.createdat,
+            updatedAt: recipe.food.updatedat,
+            FoodCategoryId: recipe.food.foodcategoryid,
+            UserId: recipe.food.userid,
+            UnitOfMeasurementId: recipe.food.unitofmeasurementid,
           }
         : null,
     }));
@@ -1003,6 +1039,135 @@ export const getRecipesByFoodId = async (req, res) => {
     });
   } catch (err) {
     console.error("Error getting recipes by food id:", err.message);
+    res.status(500).json({
+      error: "Internal server error",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /recipes:
+ *   get:
+ *     summary: Get all recipes
+ *     description: Retrieve all recipes with full food information, ordered by creation date.
+ *     tags:
+ *       - Recipe
+ *     responses:
+ *       200:
+ *         description: Get all recipes successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: Get recipes successfull
+ *                     vn:
+ *                       type: string
+ *                       example: Lấy các công thức thành công
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00378"
+ *                 recipes:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       htmlContent:
+ *                         type: string
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                       FoodId:
+ *                         type: integer
+ *                       Food:
+ *                         type: object
+ *                         nullable: true
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                           name:
+ *                             type: string
+ *                           imageUrl:
+ *                             type: string
+ *                           type:
+ *                             type: string
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *                           updatedAt:
+ *                             type: string
+ *                             format: date-time
+ *                           FoodCategoryId:
+ *                             type: integer
+ *                           UserId:
+ *                             type: integer
+ *                           UnitOfMeasurementId:
+ *                             type: integer
+ *       500:
+ *         description: Internal server error
+ */
+export const getAllRecipes = async (req, res) => {
+  try {
+    const { data: recipes, error } = await supabase
+      .from("recipe")
+      .select(
+        `
+        *,
+        food:foodid (*)
+      `
+      )
+      .order("createdat", { ascending: false });
+
+    if (error) throw error;
+
+    const formattedRecipes = recipes.map((recipe) => ({
+      id: recipe.id,
+      name: recipe.name,
+      description: recipe.description,
+      htmlContent: recipe.htmlcontent,
+      createdAt: recipe.createdat,
+      updatedAt: recipe.updatedat,
+      FoodId: recipe.foodid,
+      Food: recipe.food
+        ? {
+            id: recipe.food.id,
+            name: recipe.food.name,
+            imageUrl: recipe.food.imageurl,
+            type: recipe.food.type,
+            createdAt: recipe.food.createdat,
+            updatedAt: recipe.food.updatedat,
+            FoodCategoryId: recipe.food.foodcategoryid,
+            UserId: recipe.food.userid,
+            UnitOfMeasurementId: recipe.food.unitofmeasurementid,
+          }
+        : null,
+    }));
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Get recipes successfull",
+        vn: "Lấy các công thức thành công",
+      },
+      resultCode: "00378",
+      recipes: formattedRecipes,
+    });
+  } catch (err) {
+    console.error("Error getting all recipes:", err.message);
     res.status(500).json({
       error: "Internal server error",
     });

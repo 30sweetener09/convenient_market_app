@@ -5,6 +5,7 @@ import {
   updateRecipe,
   deleteRecipe,
   getRecipesByFoodId,
+  getAllRecipes,
 } from "../controllers/recipeController.js";
 import { requirePermission } from "../middlewares/permission.js";
 import { supabaseAuth } from "../middlewares/supabaseAuth.js";
@@ -17,6 +18,7 @@ recipeRoutes.use(supabaseAuth);
 recipeRoutes.post("", createRecipe);
 recipeRoutes.put("", updateRecipe);
 recipeRoutes.delete("", deleteRecipe);
-recipeRoutes.get("", getRecipesByFoodId);
+recipeRoutes.get("/byFoodId", getRecipesByFoodId);
+recipeRoutes.get("", getAllRecipes);
 
 export default recipeRoutes;
