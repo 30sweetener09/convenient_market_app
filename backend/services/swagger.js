@@ -12,6 +12,15 @@ const swaggerOptions = {
       description: "API backend cho ứng dụng đa nền tảng",
     },
     servers: [{ url: "http://localhost:3000/api" }],
+     components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
+    },
   },
   apis: ["./server.js", "./routes/*.js", "./controllers/*.js"], // nơi chứa swagger comment
 };

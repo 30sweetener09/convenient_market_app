@@ -915,3 +915,114 @@ export const getRecipesByFoodId = async (req, res) => {
     });
   }
 };
+
+
+/**
+ * @swagger
+ * /recipes:
+ *   get:
+ *     summary: Get all recipes
+ *     description: Retrieve the full list of recipes with related food information
+ *     tags: [Recipes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Recipes retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Get all recipes successfully"
+ *                     vn:
+ *                       type: string
+ *                       example: "Lấy danh sách công thức thành công"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00380"
+ *                 recipes:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       htmlContent:
+ *                         type: string
+ *                       imageUrl:
+ *                         type: string
+ *                         nullable: true
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                       FoodId:
+ *                         type: string
+ *                       Food:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                           imageUrl:
+ *                             type: string
+ *                           type:
+ *                             type: string
+ *       500:
+ *         description: Internal server error
+ */
+
+export const getAllRecipes = async (req, res) => {
+  try {
+    const { data: recipes, error } = await supabase
+      .from("recipe")
+      .select(`
+        *
+      `)
+      .order("createdat", { ascending: false });
+
+    if (error) throw error;
+
+    const formattedRecipes = recipes.map((recipe) => ({
+      id: recipe.id,
+      name: recipe.name,
+      description: recipe.description,
+      htmlContent: recipe.html_content,
+      image: recipe.imageurl || recipe.imageUrl || null,
+      createdAt: recipe.createdat,
+      updatedAt: recipe.updatedat,
+    }));
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Get all recipes successfully",
+        vn: "Lấy danh sách công thức thành công",
+      },
+      resultCode: "00380",
+      recipes: formattedRecipes,
+    });
+  } catch (err) {
+    console.error("Error getting all recipes:", err.message);
+    res.status(500).json({
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+      error: err.message,
+    });
+  }
+};
