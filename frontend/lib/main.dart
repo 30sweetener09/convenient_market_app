@@ -1,4 +1,5 @@
 import 'package:di_cho_tien_loi/providers/recipe_provider.dart';
+import 'package:di_cho_tien_loi/providers/user_provider.dart';
 import 'package:flutter/material.dart';
 import '../screens/home/home_screen.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => RecipeProvider()),
+        ChangeNotifierProvider(create: (_) => UserProvider()),
       ],
       child: const MyApp()
     ),

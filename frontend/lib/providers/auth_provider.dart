@@ -24,10 +24,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load token từ local khi app khởi động
+  // Load token từ local khi app khởi động
   Future<void> _loadToken() async {
     final prefs = await SharedPreferences.getInstance();
-    token = prefs.getString('token');
+    token = prefs.getString('access_token');
 
     if (token != null) {
       // Kiểm tra token còn hạn không (tuỳ backend có endpoint check hoặc decode JWT)
@@ -77,7 +77,7 @@ class AuthProvider extends ChangeNotifier {
         token = data['session']['access_token'];
         if (token != null) {
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('token', token!);
+          await prefs.setString('access_token', token!);
           isLoggedIn = true;
         } else {
           _error = "Access Denied";
@@ -101,14 +101,7 @@ class AuthProvider extends ChangeNotifier {
     isLoggedIn = false;
     notifyListeners();
   }
-
-  Future<void> delete() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('token');
-    token = null;
-    isLoggedIn = false;
-    notifyListeners();
-  }
+  
 
   /// Gọi API có token
   Future<http.Response> authorizedGet(String endpoint) async {
