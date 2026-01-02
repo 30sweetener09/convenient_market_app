@@ -1047,7 +1047,7 @@ export const getRecipesByFoodId = async (req, res) => {
 
 /**
  * @swagger
- * /recipes:
+ * /recipe:
  *   get:
  *     summary: Get all recipes
  *     description: Retrieve all recipes with full food information, ordered by creation date.
