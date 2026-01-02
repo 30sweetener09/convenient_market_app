@@ -1,17 +1,46 @@
 // controllers/recipeController.js
 import { supabase } from "../db.js";
+import multer from "multer";
+import { v4 as uuidv4 } from "uuid";
+import path from "path";
+// kiểm tra hợp lệ text
+const nameRegex = /^[a-zA-ZÀ-ỹ0-9 ]+$/;
+
+// Cấu hình multer để xử lý upload file
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // Giới hạn 5MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(
+      path.extname(file.originalname).toLowerCase()
+    );
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error("Chỉ chấp nhận file ảnh (jpeg, jpg, png, gif, webp)"));
+    }
+  },
+});
 
 /**
  * @swagger
- * /api/recipes/create:
+ * /api/recipes:
  *   post:
- *     summary: Create a new recipe
- *     description: Create a new recipe for a specific food item
+ *     summary: Tạo công thức nấu ăn mới
+ *     description: Tạo một công thức nấu ăn mới với thông tin chi tiết và có thể upload ảnh
  *     tags: [Recipes]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required:
@@ -22,23 +51,27 @@ import { supabase } from "../db.js";
  *             properties:
  *               foodName:
  *                 type: string
- *                 description: Name of the food item
- *                 example: "Phở"
+ *                 description: Tên thực phẩm (2-50 ký tự)
+ *                 example: "Thịt bò"
  *               name:
  *                 type: string
- *                 description: Name of the recipe
- *                 example: "Phở Bò Truyền Thống"
- *               htmlContent:
- *                 type: string
- *                 description: HTML content of the recipe instructions
- *                 example: "<h2>Nguyên liệu</h2><p>500g thịt bò...</p>"
+ *                 description: Tên công thức (2-50 ký tự)
+ *                 example: "Bò xào rau củ"
  *               description:
  *                 type: string
- *                 description: Short description of the recipe
- *                 example: "Công thức phở bò truyền thống Hà Nội"
+ *                 description: Mô tả công thức
+ *                 example: "Món bò xào rau củ thơm ngon, bổ dưỡng"
+ *               htmlContent:
+ *                 type: string
+ *                 description: Nội dung HTML của công thức
+ *                 example: "<h2>Nguyên liệu</h2><ul><li>Thịt bò: 300g</li></ul>"
+ *               recipeImage:
+ *                 type: string
+ *                 format: binary
+ *                 description: Ảnh công thức (tùy chọn, tối đa 5MB, định dạng jpeg/jpg/png/gif/webp)
  *     responses:
  *       200:
- *         description: Recipe created successfully
+ *         description: Thêm công thức thành công
  *         content:
  *           application/json:
  *             schema:
@@ -49,7 +82,7 @@ import { supabase } from "../db.js";
  *                   properties:
  *                     en:
  *                       type: string
- *                       example: "Add recipe successfull"
+ *                       example: "Recipe added successfully"
  *                     vn:
  *                       type: string
  *                       example: "Thêm công thức nấu ăn thành công"
@@ -67,6 +100,9 @@ import { supabase } from "../db.js";
  *                       type: string
  *                     htmlContent:
  *                       type: string
+ *                     imageUrl:
+ *                       type: string
+ *                       description: URL ảnh công thức (nếu có)
  *                     createdAt:
  *                       type: string
  *                       format: date-time
@@ -75,25 +111,39 @@ import { supabase } from "../db.js";
  *                       format: date-time
  *                     FoodId:
  *                       type: string
- *                     Food.id:
- *                       type: string
- *                     Food.name:
- *                       type: string
- *                     Food.imageUrl:
- *                       type: string
- *                     Food.type:
- *                       type: string
+ *                     Food:
+ *                       type: object
  *       400:
- *         description: Missing required fields
+ *         description: Dữ liệu đầu vào không hợp lệ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                 resultCode:
+ *                   type: string
+ *                   enum: ["00349", "00350", "00351", "00352", "00353", "00355"]
  *       404:
- *         description: Food not found
+ *         description: Không tìm thấy thực phẩm
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00354"
  *       500:
- *         description: Internal server error
+ *         description: Lỗi máy chủ
  */
-
 export const createRecipe = async (req, res) => {
   try {
     const { foodName, name, htmlContent, description } = req.body;
+    const recipeImage = req.file; // File ảnh từ multer
 
     // 00349 - Vui lòng cung cấp tất cả các trường bắt buộc
     if (!foodName || !name || !htmlContent || !description) {
@@ -107,7 +157,11 @@ export const createRecipe = async (req, res) => {
     }
 
     // 00350 - Vui lòng cung cấp một tên thực phẩm hợp lệ
-    if (typeof foodName !== "string" || foodName.trim() === "") {
+    if (
+      !nameRegex.test(foodName) ||
+      foodName.length < 2 ||
+      foodName.length > 50
+    ) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide a valid food name",
@@ -118,7 +172,7 @@ export const createRecipe = async (req, res) => {
     }
 
     // 00351 - Vui lòng cung cấp một tên công thức hợp lệ
-    if (typeof name !== "string" || name.trim() === "") {
+    if (!nameRegex.test(name) || name.length < 2 || name.length > 50) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide a valid recipe name",
@@ -140,7 +194,14 @@ export const createRecipe = async (req, res) => {
     }
 
     // 00353 - Vui lòng cung cấp nội dung HTML công thức hợp lệ
-    if (typeof htmlContent !== "string" || htmlContent.trim() === "") {
+    const plainText = htmlContent
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .trim();
+
+    const hasImage = /<img[^>]+src="([^">]+)"/g.test(htmlContent);
+
+    if (typeof htmlContent !== "string" || (plainText === "" && !hasImage)) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide valid recipe HTML content",
@@ -152,9 +213,9 @@ export const createRecipe = async (req, res) => {
 
     // 00354 - Không tìm thấy thực phẩm với tên đã cung cấp
     const { data: food, error: foodError } = await supabase
-      .from("foods")
+      .from("food")
       .select("*")
-      .ilike("name", foodName.trim())
+      .eq("name", foodName.trim())
       .single();
 
     if (foodError || !food) {
@@ -167,17 +228,68 @@ export const createRecipe = async (req, res) => {
       });
     }
 
+    // Upload ảnh lên Supabase Storage (nếu có)
+    let imageUrl = null;
+
+    if (recipeImage) {
+      try {
+        // Tạo tên file unique
+        const fileExt = path.extname(recipeImage.originalname);
+        const fileName = `${uuidv4()}${fileExt}`;
+        const filePath = `recipes/${fileName}`;
+
+        // Upload file lên Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("recipe-images") // Tên bucket trong Supabase Storage
+          .upload(filePath, recipeImage.buffer, {
+            contentType: recipeImage.mimetype,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          // 00355 - Lỗi khi tải ảnh lên
+          return res.status(400).json({
+            resultMessage: {
+              en: "Error uploading image",
+              vn: "Lỗi khi tải ảnh lên",
+            },
+            resultCode: "00355",
+            error: uploadError.message,
+          });
+        }
+
+        // Lấy public URL của ảnh
+        const { data: publicUrlData } = supabase.storage
+          .from("recipe-images")
+          .getPublicUrl(filePath);
+
+        imageUrl = publicUrlData.publicUrl;
+      } catch (uploadErr) {
+        console.error("Upload exception:", uploadErr);
+        return res.status(400).json({
+          resultMessage: {
+            en: "Error uploading image",
+            vn: "Lỗi khi tải ảnh lên",
+          },
+          resultCode: "00355",
+          error: uploadErr.message,
+        });
+      }
+    }
+
     // Insert recipe
     const { data: recipeData, error: insertError } = await supabase
-      .from("recipes")
+      .from("recipe")
       .insert([
         {
           name: name.trim(),
           description: description.trim(),
-          html_content: htmlContent.trim(),
-          food_id: food.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          htmlcontent: htmlContent.trim(),
+          imageurl: imageUrl, // Thêm URL ảnh vào database
+          foodid: food.id,
+          createdat: new Date().toISOString(),
+          updatedat: new Date().toISOString(),
         },
       ])
       .select()
@@ -196,21 +308,21 @@ export const createRecipe = async (req, res) => {
         id: recipeData.id,
         name: recipeData.name,
         description: recipeData.description,
-        htmlContent: recipeData.html_content,
-        createdAt: recipeData.created_at,
-        updatedAt: recipeData.updated_at,
-        FoodId: recipeData.food_id,
+        htmlContent: recipeData.htmlcontent,
+        imageUrl: recipeData.imageurl, // Trả về URL ảnh
+        createdAt: recipeData.createdat,
+        updatedAt: recipeData.updatedat,
+        FoodId: recipeData.foodid,
         Food: {
           id: food.id,
           name: food.name,
-          imageUrl: food.image_url || food.imageUrl,
+          imageUrl: food.imageurl,
           type: food.type,
-          createdAt: food.created_at,
-          updatedAt: food.updated_at,
-          FoodCategoryId: food.food_category_id || food.FoodCategoryId,
-          UserId: food.user_id || food.UserId,
-          UnitOfMeasurementId:
-            food.unit_of_measurement_id || food.UnitOfMeasurementId,
+          createdAt: food.createdat,
+          updatedAt: food.updatedat,
+          FoodCategoryId: food.foodcategoryid,
+          UserId: food.userid,
+          UnitOfMeasurementId: food.unitofmeasurementid,
         },
       },
     });
@@ -226,6 +338,9 @@ export const createRecipe = async (req, res) => {
     });
   }
 };
+
+// Export middleware upload để sử dụng trong route
+export const uploadRecipeImage = upload.single("recipeImage");
 
 /**
  * @swagger

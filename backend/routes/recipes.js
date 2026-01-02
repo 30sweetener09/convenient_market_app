@@ -14,7 +14,7 @@ const recipeRoutes = express.Router();
 // Apply authentication middleware to all routes
 recipeRoutes.use(supabaseAuth);
 
-recipeRoutes.post("/create", createRecipe);
+recipeRoutes.post("", createRecipe);
 recipeRoutes.put("/update", updateRecipe);
 recipeRoutes.delete("/delete", deleteRecipe);
 recipeRoutes.get("/get-by-food", getRecipesByFoodId);

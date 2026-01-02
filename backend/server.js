@@ -31,7 +31,7 @@ app.use((req, res, next) => {
 // Routes
 app.use("/api/user", userRoute);
 app.use("/api/shopping", shoppingListRoute);
-app.use("/api/recipes", recipeRoutes);
+app.use("/api/recipe", recipeRoutes);
 app.use("/api/admin", adminRoute);
 app.use("/api/meal", mealRoute);
 
