@@ -17,6 +17,6 @@ router.use(supabaseAuth);
 router.post("/:groupId", createMealPlan);
 router.put("/:groupId", updateMealPlan);
 router.delete("/:groupId", deleteMealPlan);
-router.get("/get-by-date", getMealPlansByDate);
+router.get("/get-by-date/:groupId", getMealPlansByDate);
 
 export default router;

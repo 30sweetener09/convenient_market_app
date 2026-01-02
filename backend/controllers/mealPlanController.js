@@ -15,7 +15,7 @@ const xssPattern = /<script\b[^>]*>([\s\S]*?)<\/script>/gim;
 const validateAndFormatDate = (dateString) => {
   if (!dateString || typeof dateString !== "string") return null;
 
-  const parts = dateString.split("/");
+  const parts = dateString.split("-");
   if (parts.length !== 3) return null;
 
   const [month, day, year] = parts;
@@ -831,15 +831,16 @@ export const getMealPlansByDate = async (req, res) => {
         resultCode: "00401",
       });
     }
-
+    const groupId = req.params.groupId;
     // 00345 - Bạn chưa vào nhóm nào
     const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("id, group_id")
-      .eq("id", req.user.id)
+      .from("group_members")
+      .select("group_id, user_id")
+      .eq("user_id", req.user.id)
+      .eq("group_id", groupId)
       .single();
 
-    if (userError || !userData || !userData.group_id) {
+    if (userError || !userData) {
       return res.status(403).json({
         resultMessage: {
           en: "You have not joined any group",
@@ -860,7 +861,7 @@ export const getMealPlansByDate = async (req, res) => {
       });
     }
 
-    // Validate and format date
+    // 1. Validate và format date (hàm này phải trả về dạng YYYY-MM-DD để khớp với kiểu 'date' trong DB)
     const formattedDate = validateAndFormatDate(date);
     if (!formattedDate) {
       return res.status(400).json({
@@ -872,81 +873,95 @@ export const getMealPlansByDate = async (req, res) => {
       });
     }
 
-    // Get meal plans for specific date with full food info
+    // 2. Truy vấn Supabase dựa trên cấu trúc cột trong ảnh
     const { data: plans, error } = await supabase
       .from("mealplan")
       .select(
         `
-        *,
-        foods!mealplan_food_id_fkey (
+        id,
+        timestamp,
+        status,
+        name,
+        foodid,
+        userid,
+        createdat,
+        updatedat,
+        food (
           id,
           name,
-          image_url,
-          imageUrl,
+          imageurl,
           type,
-          created_at,
-          updated_at,
-          food_category_id,
-          FoodCategoryId,
-          user_id,
-          UserId,
-          unit_of_measurement_id,
-          UnitOfMeasurementId
+          createdat,
+          updatedat,
+          foodcategoryid,
+          userid,
+          unitofmeasurementid
         )
       `
       )
-      .eq("user_id", req.user.id)
+      .eq("userid", req.user.id)
       .eq("timestamp", formattedDate)
-      .order("created_at", { ascending: true });
+      .order("createdat", { ascending: true });
 
     if (error) throw error;
 
-    // Format response data
-    const formattedPlans = plans.map((plan) => ({
-      id: plan.id,
-      timestamp: plan.timestamp,
-      status: plan.status,
-      name: plan.name,
-      createdAt: plan.created_at,
-      updatedAt: plan.updated_at,
-      FoodId: plan.food_id,
-      UserId: plan.user_id,
-      Food: plan.foods
-        ? {
-            id: plan.foods.id,
-            name: plan.foods.name,
-            imageUrl: plan.foods.image_url || plan.foods.imageUrl,
-            type: plan.foods.type,
-            createdAt: plan.foods.created_at,
-            updatedAt: plan.foods.updated_at,
-            FoodCategoryId:
-              plan.foods.food_category_id || plan.foods.FoodCategoryId,
-            UserId: plan.foods.user_id || plan.foods.UserId,
-            UnitOfMeasurementId:
-              plan.foods.unit_of_measurement_id ||
-              plan.foods.UnitOfMeasurementId,
-          }
-        : null,
-    }));
+    if (!plans || plans.length === 0) {
+      return res.status(200).json({
+        resultCode: "00404", // Hoặc dùng 00200 tùy bạn, nhưng 404/204 thường rõ nghĩa hơn cho "không thấy"
+        resultMessage: {
+          en: "No meal plans found for this date",
+          vn: "Không tìm thấy kế hoạch bữa ăn nào cho ngày này",
+        },
+        data: [],
+      });
+    }
 
-    // 00348 - Lấy danh sách thành công
-    res.status(200).json({
+    // Map lại data trả về cho chuẩn camelCase để Frontend dễ dùng
+    const formattedPlans = plans.map((plan) => {
+      const f = plan.food;
+      return {
+        id: plan.id,
+        timestamp: plan.timestamp,
+        status: plan.status,
+        name: plan.name,
+        foodId: plan.foodid,
+        userId: plan.userid,
+        createdAt: plan.createdat,
+        updatedAt: plan.updatedat,
+        food: f
+          ? {
+              id: f.id,
+              name: f.name,
+              imageUrl: f.imageurl, // Sử dụng imageurl viết liền
+              type: f.type,
+              foodCategoryId: f.foodcategoryid,
+              unitOfMeasurementId: f.unitofmeasurementid,
+              userId: f.userid,
+              createdAt: f.createdat,
+              updatedAt: f.updatedat,
+            }
+          : null,
+      };
+    });
+
+    return res.status(200).json({
+      resultCode: "00200",
       resultMessage: {
         en: "Get plans successfully",
         vn: "Lấy danh sách thành công",
       },
       resultCode: "00348",
-      plans: formattedPlans,
+      data: formattedPlans,
     });
-  } catch (err) {
-    console.error("Error getting meal plans by date:", err.message);
-    res.status(500).json({
+  } catch (error) {
+    console.error("Error at getMealPlanByDate:", error);
+    return res.status(500).json({
+      resultCode: "00500",
       resultMessage: {
-        en: "Internal server error",
+        en: "Internal Server Error",
         vn: "Lỗi máy chủ nội bộ",
       },
-      resultCode: "00500",
-      error: err.message,
+      error: error.message,
     });
   }
 };
