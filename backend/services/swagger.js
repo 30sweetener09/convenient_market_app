@@ -1,5 +1,3 @@
-// services/swagger.js
-
 import swaggerJsDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 
@@ -12,7 +10,7 @@ const swaggerOptions = {
       description: "API backend cho ứng dụng đa nền tảng",
     },
     servers: [{ url: "https://convenient-market-app.onrender.com/api" }],
-     components: {
+    components: {
       securitySchemes: {
         bearerAuth: {
           type: "http",
@@ -21,6 +19,13 @@ const swaggerOptions = {
         },
       },
     },
+
+    // (không bắt buộc) global security
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
   },
   apis: ["./server.js", "./routes/*.js", "./controllers/*.js"], // nơi chứa swagger comment
 };
