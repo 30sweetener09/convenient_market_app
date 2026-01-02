@@ -30,7 +30,7 @@ const upload = multer({
 
 /**
  * @swagger
- * /api/recipes:
+ * /recipes:
  *   post:
  *     summary: Tạo công thức nấu ăn mới
  *     description: Tạo một công thức nấu ăn mới với thông tin chi tiết và có thể upload ảnh
