@@ -5,19 +5,21 @@ import {
   updateFridgeItem,
   deleteFridgeItem,
   getFridgeItems,
-  getFridgeItemById,
+  getSpecificFridgeItem,
 } from "../controllers/fridgeController.js";
-import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { requirePermission } from "../middlewares/permission.js";
+import { supabaseAuth } from "../middlewares/supabaseAuth.js";
 
 const router = express.Router();
 
+router.use(supabaseAuth);
 /**
  * FRIDGE ROUTES
  */
-router.post("/", authMiddleware, createFridgeItem);        // Thêm thực phẩm vào tủ
-router.put("/", authMiddleware, updateFridgeItem);         // Cập nhật thực phẩm
-router.delete("/", authMiddleware, deleteFridgeItem);      // Xóa khỏi tủ
-router.get("/", authMiddleware, getFridgeItems);           // Lấy tất cả thực phẩm trong tủ
-router.get("/:id", authMiddleware, getFridgeItemById);     // Lấy chi tiết 1 thực phẩm trong tủ
+router.post("/create", createFridgeItem);        // Thêm thực phẩm vào tủ
+router.put("/update", updateFridgeItem);         // Cập nhật thực phẩm
+router.delete("/delete", deleteFridgeItem);      // Xóa khỏi tủ
+router.get("/list", getFridgeItems);           // Lấy tất cả thực phẩm trong tủ
+router.get("/list/:foodName", getSpecificFridgeItem);     // Lấy chi tiết 1 thực phẩm trong tủ
 
 export default router;
