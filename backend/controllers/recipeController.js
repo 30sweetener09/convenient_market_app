@@ -34,7 +34,7 @@ const upload = multer({
  *   post:
  *     summary: Tạo công thức nấu ăn mới
  *     description: Tạo một công thức nấu ăn mới với thông tin chi tiết và có thể upload ảnh
- *     tags: [Recipes]
+ *     tags: [Recipe]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -236,7 +236,7 @@ export const createRecipe = async (req, res) => {
         // Tạo tên file unique
         const fileExt = path.extname(recipeImage.originalname);
         const fileName = `${uuidv4()}${fileExt}`;
-        const filePath = `recipes/${fileName}`;
+        const filePath = `recipe/${fileName}`;
 
         // Upload file lên Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -348,7 +348,7 @@ export const uploadRecipeImage = upload.single("recipeImage");
  *   put:
  *     summary: Cập nhật công thức nấu ăn
  *     description: Cập nhật thông tin công thức nấu ăn, bao gồm cả ảnh. Có thể cập nhật một hoặc nhiều trường.
- *     tags: [Recipes]
+ *     tags: [Recipe]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -601,7 +601,7 @@ export const updateRecipe = async (req, res) => {
               // Xóa file cũ
               await supabase.storage
                 .from("recipe-images")
-                .remove([`recipes/${oldFilePath}`]);
+                .remove([`recipe/${oldFilePath}`]);
             }
           } catch (deleteErr) {
             console.warn("Could not delete old image:", deleteErr.message);
@@ -612,7 +612,7 @@ export const updateRecipe = async (req, res) => {
         // Tạo tên file unique
         const fileExt = path.extname(imageFile.originalname);
         const fileName = `${uuidv4()}${fileExt}`;
-        const filePath = `recipes/${fileName}`;
+        const filePath = `recipe/${fileName}`;
 
         // Upload file mới lên Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -742,11 +742,12 @@ export const updateRecipe = async (req, res) => {
 
 /**
  * @swagger
- * /recipe/delete:
+ * /recipe:
  *   delete:
  *     summary: Delete a recipe
- *     description: Delete a recipe by its ID
- *     tags: [Recipes]
+ *     description: Delete a recipe by its ID.
+ *     tags:
+ *       - Recipe
  *     requestBody:
  *       required: true
  *       content:
@@ -757,9 +758,9 @@ export const updateRecipe = async (req, res) => {
  *               - recipeId
  *             properties:
  *               recipeId:
- *                 type: string
+ *                 type: integer
  *                 description: ID of the recipe to delete
- *                 example: "123e4567-e89b-12d3-a456-426614174000"
+ *                 example: 1
  *     responses:
  *       200:
  *         description: Recipe deleted successfully
@@ -773,20 +774,72 @@ export const updateRecipe = async (req, res) => {
  *                   properties:
  *                     en:
  *                       type: string
- *                       example: "Your recipe was deleted successfully."
+ *                       example: Your recipe was deleted successfully
  *                     vn:
  *                       type: string
- *                       example: "Công thức của bạn đã được xóa thành công"
+ *                       example: Công thức của bạn đã được xóa thành công
  *                 resultCode:
  *                   type: string
  *                   example: "00376"
  *       400:
- *         description: Missing recipeId
+ *         description: Invalid or missing recipe ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: Please provide all required fields
+ *                     vn:
+ *                       type: string
+ *                       example: Vui lòng cung cấp tất cả các trường bắt buộc
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00371"
  *       404:
  *         description: Recipe not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: Recipe not found with the provided ID
+ *                     vn:
+ *                       type: string
+ *                       example: Không tìm thấy công thức với ID đã cung cấp
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00373"
  *       500:
  *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: Internal server error
+ *                     vn:
+ *                       type: string
+ *                       example: Lỗi máy chủ nội bộ
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00500"
  */
+
 export const deleteRecipe = async (req, res) => {
   try {
     const { recipeId } = req.body;
@@ -803,17 +856,12 @@ export const deleteRecipe = async (req, res) => {
     }
 
     // 00372 - Vui lòng cung cấp một ID công thức hợp lệ
-    if (typeof recipeId !== "string" && typeof recipeId !== "number") {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide a valid recipe ID",
-          vn: "Vui lòng cung cấp một ID công thức hợp lệ",
-        },
-        resultCode: "00372",
-      });
-    }
-
-    if (typeof recipeId === "string" && recipeId.trim() === "") {
+    if (
+      (typeof recipeId !== "string" && typeof recipeId !== "number") ||
+      (typeof recipeId === "string" && recipeId.trim() === "") ||
+      recipeId === null ||
+      recipeId === undefined
+    ) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide a valid recipe ID",
@@ -825,7 +873,7 @@ export const deleteRecipe = async (req, res) => {
 
     // 00373 - Không tìm thấy công thức với ID đã cung cấp
     const { data: existingRecipe, error: fetchError } = await supabase
-      .from("recipes")
+      .from("recipe")
       .select("id")
       .eq("id", recipeId)
       .single();
@@ -842,7 +890,7 @@ export const deleteRecipe = async (req, res) => {
 
     // Xóa recipe
     const { error: deleteError } = await supabase
-      .from("recipes")
+      .from("recipe")
       .delete()
       .eq("id", recipeId);
 
@@ -1135,7 +1183,7 @@ export const getAllRecipes = async (req, res) => {
 
     if (error) throw error;
 
-    const formattedRecipes = recipes.map((recipe) => ({
+    const formattedRecipe = recipe.map((recipe) => ({
       id: recipe.id,
       name: recipe.name,
       description: recipe.description,
@@ -1164,7 +1212,7 @@ export const getAllRecipes = async (req, res) => {
         vn: "Lấy các công thức thành công",
       },
       resultCode: "00378",
-      recipes: formattedRecipes,
+      recipe: formattedRecipe,
     });
   } catch (err) {
     console.error("Error getting all recipes:", err.message);
