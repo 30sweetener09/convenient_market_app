@@ -13,6 +13,16 @@ const swaggerOptions = {
       description: "API backend cho ứng dụng đa nền tảng",
     },
     servers: [{ url: "https://convenient-market-app.vercel.app/api" }],
+     components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
+    },     
+
   },
   apis: ["./controllers/*.js", "./api/*.js"],
 };
