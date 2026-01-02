@@ -27,7 +27,7 @@ router.delete("/delete/:groupId", deleteShoppingList);
 // Tasks Routes
 router.post("/task/:groupId", createTasks);
 router.put("/task/mark", markTask);
-router.put("/task/update", updateTask);
+router.put("/task/update/:groupId", updateTask);
 router.delete("/task/delete/:groupId", deleteTask);
 
 export default router;

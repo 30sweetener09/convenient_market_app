@@ -1111,7 +1111,7 @@ export const markTask = async (req, res) => {
 export const updateTask = async (req, res) => {
   try {
     const { taskId, newFoodName, newQuantity } = req.body;
-
+    const groupId = req.params.groupId;
     // Validate taskId
     if (!taskId || (typeof taskId === "string" && !taskId.trim())) {
       return res.status(400).json({
@@ -1136,8 +1136,9 @@ export const updateTask = async (req, res) => {
 
     // Validate newFoodName
     if (
-      newFoodName !== undefined &&
-      (typeof newFoodName !== "string" || !newFoodName.trim())
+      !nameRegex.test(newFoodName) ||
+      newFoodName.length < 2 ||
+      newFoodName.length > 50
     ) {
       return res.status(400).json({
         resultMessage: {
@@ -1149,10 +1150,9 @@ export const updateTask = async (req, res) => {
     }
 
     // Validate newQuantity
-    if (
-      newQuantity !== undefined &&
-      (typeof newQuantity !== "string" || !newQuantity.trim())
-    ) {
+    const quantity = Number(newQuantity);
+
+    if (isNaN(quantity) || quantity <= 0) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide a valid newQuantity",
@@ -1173,13 +1173,14 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, role, belongstogroupadminid")
-      .eq("id", req.user.id)
+    const { data: groupAdmin, error: groupError } = await supabase
+      .from("groups")
+      .select("id, created_by")
+      .eq("id", groupId)
+      .eq("created_by", req.user.id)
       .maybeSingle();
 
-    if (adminError || !adminData || adminData.role !== "admin") {
+    if (groupError || !groupAdmin) {
       return res.status(403).json({
         resultMessage: {
           en: "User is not a group admin",
@@ -1191,16 +1192,8 @@ export const updateTask = async (req, res) => {
 
     // Check if task exists
     const { data: task, error: fetchError } = await supabase
-      .from("shopping_list_tasks")
-      .select(
-        `
-        *,
-        shopping_list:shopping_list_id (
-          id,
-          belongs_to_admin_id
-        )
-      `
-      )
+      .from("task")
+      .select("id")
       .eq("id", taskId)
       .maybeSingle();
 
@@ -1214,21 +1207,10 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    // Check if user is the owner
-    if (task.shopping_list?.belongs_to_admin_id !== req.user.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00307",
-      });
-    }
-
     // If newFoodName, validate it exists in foods table
     if (newFoodName !== undefined) {
       const { data: foodData, error: foodError } = await supabase
-        .from("foods")
+        .from("food")
         .select("name")
         .ilike("name", newFoodName.trim())
         .maybeSingle();
@@ -1245,11 +1227,10 @@ export const updateTask = async (req, res) => {
 
       // Check if food already exists in current shopping list
       const { data: existingTask, error: existingError } = await supabase
-        .from("shopping_list_tasks")
-        .select("id")
-        .eq("shopping_list_id", task.shopping_list_id)
-        .ilike("food_name", newFoodName.trim())
-        .neq("id", taskId)
+        .from("task")
+        .select("id, name")
+        .ilike("name", newFoodName.trim())
+
         .maybeSingle();
 
       if (existingTask) {
@@ -1264,10 +1245,10 @@ export const updateTask = async (req, res) => {
     }
 
     // Prepare update data
-    const updateData = { updated_at: new Date().toISOString() };
+    const updateData = { updatedat: new Date().toISOString() };
 
     if (newFoodName !== undefined) {
-      updateData.food_name = newFoodName.trim();
+      updateData.name = newFoodName.trim();
     }
 
     if (newQuantity !== undefined) {
@@ -1276,7 +1257,7 @@ export const updateTask = async (req, res) => {
 
     // Perform update
     const { data: updatedTask, error: updateError } = await supabase
-      .from("shopping_list_tasks")
+      .from("task")
       .update(updateData)
       .eq("id", taskId)
       .select()
@@ -1290,15 +1271,6 @@ export const updateTask = async (req, res) => {
         vn: "Cập nhật nhiệm vụ thành công",
       },
       resultCode: "00312",
-      updatedTask: {
-        id: updatedTask.id,
-        shoppingListId: updatedTask.shopping_list_id,
-        foodName: updatedTask.food_name,
-        quantity: updatedTask.quantity,
-        isDone: updatedTask.is_done,
-        createdAt: updatedTask.created_at,
-        updatedAt: updatedTask.updated_at,
-      },
     });
   } catch (err) {
     console.error("Error updating task:", err.message);
