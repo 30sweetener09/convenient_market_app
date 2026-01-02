@@ -656,48 +656,36 @@ export const deleteMealPlan = async (req, res) => {
     }
 
     // 00324 - Vui lòng cung cấp một ID kế hoạch hợp lệ
-    if (typeof planId !== "string" && typeof planId !== "number") {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide a valid plan ID",
-          vn: "Vui lòng cung cấp một ID kế hoạch hợp lệ",
-        },
-        resultCode: "00324",
-      });
-    }
+    const numericPlanId = Number(planId);
 
-    if (typeof planId === "string" && planId.trim() === "") {
+    if (
+      !Number.isInteger(numericPlanId) ||
+      numericPlanId <= 0 ||
+      (typeof planId === "string" && planId.trim() === "")
+    ) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide a valid plan ID",
-          vn: "Vui lòng cung cấp một ID kế hoạch hợp lệ",
+          vn: "Vui lòng cung cấp ID hợp lệ",
         },
         resultCode: "00324",
       });
     }
 
     // 00327 - Người dùng không phải là quản trị viên nhóm
-    if (!req.user || !req.user.id) {
+    const groupId = req.params.groupId;
+    const { data: groupAdmin, error: groupError } = await supabase
+      .from("groups")
+      .select("id, created_by")
+      .eq("id", groupId)
+      .eq("created_by", req.user.id)
+      .maybeSingle();
+
+    if (groupError || !groupAdmin) {
       return res.status(403).json({
         resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00327",
-      });
-    }
-
-    const { data: adminData, error: adminError } = await supabase
-      .from("users")
-      .select("id, role, group_id")
-      .eq("id", req.user.id)
-      .single();
-
-    if (adminError || !adminData || adminData.role !== "admin") {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
+          en: "Access denied. Only group admins can perform this action.",
+          vn: "Truy cập không được ủy quyền, bạn không phải admin",
         },
         resultCode: "00327",
       });
@@ -717,17 +705,6 @@ export const deleteMealPlan = async (req, res) => {
           vn: "Không tìm thấy kế hoạch với ID đã cung cấp",
         },
         resultCode: "00325",
-      });
-    }
-
-    // Kiểm tra meal plan có thuộc về user này không
-    if (existingPlan.user_id !== req.user.id) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
-        },
-        resultCode: "00327",
       });
     }
 
