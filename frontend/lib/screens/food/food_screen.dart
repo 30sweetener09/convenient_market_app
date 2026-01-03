@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../providers/recipe_provider.dart';
-import '../../widgets/recipe_card.dart';
-import 'recipe_form_screen.dart';
+import '../../providers/food_provider.dart';
+import '../../widgets/food_card.dart';
+import 'food_form_dialog.dart';
 
-class RecipeScreen extends StatefulWidget {
-  const RecipeScreen({super.key});
+class FoodScreen extends StatefulWidget {
+  const FoodScreen({super.key});
 
   @override
-  State<RecipeScreen> createState() => _RecipeScreenState();
+  State<FoodScreen> createState() => _FoodScreenState();
 }
 
-class _RecipeScreenState extends State<RecipeScreen> {
+class _FoodScreenState extends State<FoodScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
 
   @override
@@ -21,7 +21,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
 
     /// gọi API sau frame đầu
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<RecipeProvider>().fetchRecipes();
+      context.read<FoodProvider>().fetchFoods();
     });
   }
 
@@ -31,38 +31,39 @@ class _RecipeScreenState extends State<RecipeScreen> {
     super.dispose();
   }
 
+  // ================= SEARCH =================
   void _onSearch() {
     final keyword = _searchCtrl.text.trim();
 
     if (keyword.isEmpty) {
-      context.read<RecipeProvider>().fetchRecipes();
+      context.read<FoodProvider>().fetchFoods();
     } else {
-      context.read<RecipeProvider>().searchRecipes(keyword);
+      context.read<FoodProvider>().searchFoods(keyword);
     }
   }
 
   void _clearSearch() {
     _searchCtrl.clear();
-    context.read<RecipeProvider>().fetchRecipes();
+    context.read<FoodProvider>().fetchFoods();
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<RecipeProvider>();
-    final recipes = provider.recipes;
+    final provider = context.watch<FoodProvider>();
+    final foods = provider.foods;
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF386633),
         shape: const CircleBorder(),
         onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const RecipeFormScreen()),
+          final result = await showDialog(
+            context: context,
+            builder: (_) => const FoodFormDialog(),
           );
 
           if (result == true && mounted) {
-            context.read<RecipeProvider>().fetchRecipes();
+            context.read<FoodProvider>().fetchFoods();
           }
         },
         child: const Icon(Icons.add, color: Colors.white),
@@ -70,7 +71,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // 🔍 SEARCH BAR
+            // 🔍 SEARCH BAR (GIỐNG RECIPE)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
               child: Row(
@@ -81,7 +82,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
                       textInputAction: TextInputAction.search,
                       onSubmitted: (_) => _onSearch(),
                       decoration: InputDecoration(
-                        hintText: 'Nhập tên công thức...',
+                        hintText: 'Nhập tên thực phẩm...',
                         filled: true,
                         fillColor: Colors.white,
                         contentPadding:
@@ -113,7 +114,8 @@ class _RecipeScreenState extends State<RecipeScreen> {
                   /// CLEAR BUTTON
                   if (_searchCtrl.text.isNotEmpty)
                     IconButton(
-                      onPressed: provider.isLoading ? null : _clearSearch,
+                      onPressed:
+                      provider.isLoading ? null : _clearSearch,
                       icon: const Icon(Icons.clear),
                       color: Colors.grey,
                     ),
@@ -125,15 +127,15 @@ class _RecipeScreenState extends State<RecipeScreen> {
             Expanded(
               child: provider.isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : recipes.isEmpty
+                  : foods.isEmpty
                   ? const Center(
-                child: Text("Không có công thức nào"),
+                child: Text("Không có thực phẩm nào"),
               )
                   : ListView.builder(
                 padding: const EdgeInsets.only(bottom: 80),
-                itemCount: recipes.length,
+                itemCount: foods.length,
                 itemBuilder: (_, i) =>
-                    RecipeCard(recipe: recipes[i]),
+                    FoodCard(food: foods[i]),
               ),
             ),
           ],

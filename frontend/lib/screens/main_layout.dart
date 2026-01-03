@@ -1,3 +1,4 @@
+import 'package:di_cho_tien_loi/screens/food/food_screen.dart';
 import 'package:flutter/material.dart';
 import './user/user_screen.dart';
 import './group/group_screen.dart';
@@ -22,7 +23,8 @@ class _MainLayoutState extends State<MainLayout> {
     GroupScreen(),
     RecipeScreen(),
     HomeScreen(), 
-    FridgeScreen(),
+    // FridgeScreen(),
+    FoodScreen(),
     StatsScreen(),
     UserScreen(),
     NotificationScreen(),

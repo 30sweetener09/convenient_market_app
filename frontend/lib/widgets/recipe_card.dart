@@ -35,7 +35,7 @@ class RecipeCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(8),
               child: Text(
-                recipe.title,
+                recipe.name,
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
