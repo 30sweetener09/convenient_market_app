@@ -4,7 +4,7 @@ import {
   createMealPlan,
   updateMealPlan,
   deleteMealPlan,
-  getMealPlansByDate,
+  getAllMealPlans,
 } from "../controllers/mealPlanController.js";
 import { requirePermission } from "../middlewares/permission.js";
 import { supabaseAuth } from "../middlewares/supabaseAuth.js";
@@ -14,9 +14,9 @@ const router = express.Router();
 // Apply authentication middleware to all routes
 router.use(supabaseAuth);
 
-router.post("/:groupId", createMealPlan);
-router.put("/:groupId", updateMealPlan);
-router.delete("/:groupId", deleteMealPlan);
-router.get("/get-by-date/:groupId", getMealPlansByDate);
+router.post("/", createMealPlan);
+router.put("/", updateMealPlan);
+router.delete("/", deleteMealPlan);
+router.get("/", getAllMealPlans);
 
 export default router;

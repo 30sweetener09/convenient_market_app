@@ -20,6 +20,6 @@ recipeRoutes.post("/", uploadMiddleware, createRecipe);
 recipeRoutes.put("/", uploadMiddleware, updateRecipe); // Nên có ID
 recipeRoutes.delete("/", deleteRecipe); // Nên có ID
 recipeRoutes.get("/", getAllRecipes);
-recipeRoutes.get("/search", searchRecipesByName);
+recipeRoutes.post("/search", searchRecipesByName);
 
 export default recipeRoutes;

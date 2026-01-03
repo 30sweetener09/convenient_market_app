@@ -191,7 +191,6 @@ export const createRecipe = async (req, res) => {
           description: description.trim(),
           htmlcontent: htmlContent.trim(),
           imageurl: imageData?.url || null,
-
           createdat: new Date().toISOString(),
           updatedat: new Date().toISOString(),
         },
@@ -924,13 +923,13 @@ export const getRecipeById = async (req, res) => {
 /**
  * @swagger
  * /recipe/search:
- *   get:
+ *   post:
  *     summary: Search recipes by name
  *     description: Search recipes by name keyword and return matching recipes with full food information.
  *     tags:
  *       - Recipe
  *     parameters:
- *       - in: query
+ *       - in: body
  *         name: name
  *         required: true
  *         schema:
