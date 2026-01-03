@@ -9,6 +9,10 @@ import './home/home_screen.dart';
 import './notification_screen.dart';
 import '../widgets/custom_bottom_nav.dart';
 
+import 'package:provider/provider.dart';
+import '../../../providers/user_provider.dart';
+
+
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
 
@@ -32,6 +36,7 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       appBar: _buildHeader(),
       body: IndexedStack(
@@ -48,6 +53,12 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   PreferredSizeWidget _buildHeader() {
+    final userProvider = context.watch<UserProvider>();
+    final user = userProvider.user;
+    // Tạo biến helper
+  final hasAvatar = user?.photoUrl?.isNotEmpty ?? false;
+  final avatarUrl = user?.photoUrl;
+
     return AppBar(
       backgroundColor: Color(0xFF4C663C),
       toolbarHeight: 60,
@@ -59,7 +70,11 @@ class _MainLayoutState extends State<MainLayout> {
           onTap: () {setState(() {_currentIndex = 5; });},
           child: CircleAvatar(
             backgroundColor: Colors.white,
-            child: Icon(Icons.person, color: Color(0xFF4C663C), size: 24),
+            backgroundImage: hasAvatar ? NetworkImage(avatarUrl!) : null,
+            child:
+              !hasAvatar 
+              ? Icon(Icons.person, color: Color(0xFF4C663C), size: 24)
+              : null,
           ),
         ),
       ),

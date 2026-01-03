@@ -16,4 +16,22 @@ class UserDTO {
     this.photoUrl,
     this.name,
   });
+
+  factory UserDTO.fromJson(Map<String, dynamic> json) {
+    return UserDTO(
+      email: json['email'] ?? '',
+      username: json['username'] ?? '',
+      birthdate: json['birthdate'] ?? '',
+      gender: json['gender'] ?? '',
+      photoUrl: json['photourl'] ?? json['imageurl'],
+      name: json['name'],
+      password: '', // Không bao giờ lấy mật khẩu từ API
+    );
+  }
+  Map<String, dynamic> toApiMap() {
+    return {
+      'username': username,
+      'image': photoUrl, // Map photoUrl thành 'image' cho API
+    };
+  }
 }

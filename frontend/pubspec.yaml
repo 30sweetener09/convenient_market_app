@@ -16,6 +16,7 @@ dependencies:
   shared_preferences: ^2.5.3
   flutter_html: ^3.0.0
   image_picker: ^1.0.4
+  path: ^1.8.3
 
 dev_dependencies:
   flutter_test:
@@ -57,7 +58,7 @@ flutter:
 
 flutter_native_splash:
   color: "#396A30"
-  image: assets/images/logo_green.png
+  image: assets/images/logo_white.png
   android: true
   ios: true
   android_gravity: center
@@ -66,4 +67,4 @@ flutter_native_splash:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/logo_white.png"
+  image_path: "assets/images/logo_green.png"
