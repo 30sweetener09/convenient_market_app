@@ -8,23 +8,25 @@ import {
   getFoodsByGroup,
   getUnits,
   getCategories,
+  getFoodByName,
 } from "../controllers/foodController.js";
 import { requirePermission } from "../middlewares/permission.js";
-import { supabaseAuth } from "../middlewares/supabaseAuth.js";
+import { userContext } from "../middlewares/userContext.js";
 
 const router = express.Router();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-router.use(supabaseAuth);
+router.use(userContext);
 /**
  * FOOD ROUTES
  */
-router.post('/create', supabaseAuth, upload.single('image'), createFood); // Thêm thực phẩm
-router.put('/update', supabaseAuth, upload.single('image'), updateFood); // Cập nhật
-router.delete("/delete",supabaseAuth, upload.single('image'), deleteFood); // Xóa
-router.get("/list",supabaseAuth, upload.single('image'), getFoodsByGroup); // Lấy danh sách tất cả food
-router.get("/unit",supabaseAuth, upload.single('image'), getUnits);
-router.get("/category",supabaseAuth, upload.single('image'), getCategories);
+router.post('/create', upload.single('image'), createFood); 
+router.put('/update', upload.single('image'), updateFood);
+router.delete("/delete", deleteFood); // Xóa không cần gửi file
+router.get("/list", getFoodsByGroup); // Lấy list không cần file
+router.get("/unit", getUnits);
+router.get("/category", getCategories);
+router.get("/list/:foodName", getFoodByName);
 
 export default router;

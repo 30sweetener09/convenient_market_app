@@ -1,24 +1,23 @@
 // routes/recipe.js
 import express from "express";
+import { uploadMiddleware } from "../middlewares/uploadMiddleware.js";
 import {
   createRecipe,
   updateRecipe,
   deleteRecipe,
-  getRecipesByFoodId,
   getAllRecipes,
 } from "../controllers/recipeController.js";
-import { requirePermission } from "../middlewares/permission.js";
 import { supabaseAuth } from "../middlewares/supabaseAuth.js";
 
 const recipeRoutes = express.Router();
 
-// Apply authentication middleware to all routes
+// Áp dụng auth cho tất cả routes
 recipeRoutes.use(supabaseAuth);
 
-recipeRoutes.post("", createRecipe);
-recipeRoutes.put("", updateRecipe);
-recipeRoutes.delete("", deleteRecipe);
-recipeRoutes.get("/byFoodId", getRecipesByFoodId);
+// Routes
+recipeRoutes.post("", uploadMiddleware, createRecipe);
+recipeRoutes.put("/:id", uploadMiddleware, updateRecipe); // Nên có ID
+recipeRoutes.delete("/:id", deleteRecipe); // Nên có ID
 recipeRoutes.get("", getAllRecipes);
 
 export default recipeRoutes;
