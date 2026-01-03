@@ -761,6 +761,7 @@ export const getAllRecipes = async (req, res) => {
       name: recipe.name,
       description: recipe.description,
       htmlContent: recipe.htmlcontent,
+      imageurl: recipe.imageurl,
       createdAt: recipe.createdat,
       updatedAt: recipe.updatedat,
     }));
