@@ -1,198 +1,87 @@
 import { supabase } from "../db.js";
 
-// Helper: cộng thêm số ngày vào ngày hiện tại -> ISO string
+// Helper: Cộng ngày
 const addDaysISO = (days) => {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return date.toISOString();
 };
 
+/* ==========================================================================
+   PHẦN 1: QUẢN LÝ CÁI TỦ LẠNH (CONTAINER)
+   ========================================================================== */
+
+/**
+
 /**
  * @swagger
- * /fridge/create:
+ * /fridge:
  *   post:
- *     summary: Thêm mục mới vào tủ lạnh
- *     description: API này cho phép thêm một loại thực phẩm vào kho tủ lạnh chung của nhóm.
+ *     summary: Tạo tủ lạnh mới
+ *     description: Tạo một cái tủ lạnh mới gán vào một nhóm.
  *     tags: [Fridge]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/x-www-form-urlencoded:
+ *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - foodName
- *               - quantity
- *               - useWithinDays
+ *             required: [name, groupId]
  *             properties:
- *               foodName:
+ *               name:
  *                 type: string
- *                 description: Tên thực phẩm (Phải trùng khớp với tên trong danh sách Food Master Data).
- *                 example: "Thịt bò"
- *               quantity:
- *                 type: number
- *                 description: Số lượng thực phẩm cần thêm.
- *                 example: 2
- *               useWithinDays:
- *                 type: number
- *                 description: Số ngày dự kiến sử dụng
- *                 example: 7
- *               note:
+ *                 description: Tên tủ lạnh
+ *                 example: "Tủ Đông Hòa Phát"
+ *               groupId:
+ *                 type: integer
+ *                 description: ID nhóm sở hữu tủ này (User phải là member nhóm này)
+ *                 example: 1
+ *               description:
  *                 type: string
- *                 description: Ghi chú thêm.
- *                 example: "Mua ở siêu thị BigC"
+ *                 description: Mô tả thêm
+ *                 example: "Tủ chuyên đựng đồ đông lạnh"
  *     responses:
  *       200:
- *         description: Mục trong tủ lạnh được tạo thành công
+ *         description: Tạo thành công
  *         content:
  *           application/json:
- *             example:
- *               resultMessage:
- *                 en: "Fridge item added successfully"
- *                 vn: "Mục trong tủ lạnh được tạo thành công"
- *               resultCode: "00202"
- *               newItem:
- *                 id: 15
- *                 foodid: 10
- *                 userid: 5
- *                 quantity: 2
- *                 expirydate: "2024-01-20T10:00:00.000Z"
- *                 note: "Mua ở siêu thị BigC"
- *                 createdat: "2024-01-13T10:00:00.000Z"
- *                 updatedat: "2024-01-13T10:00:00.000Z"
- *       400:
- *         description: Vui cung cấp tất cả các trường cần thiết
- *         content:
- *           application/json:
- *             example:
- *               resultMessage:
- *                 en: "Please provide all required fields"
- *                 vn: "Vui cung cấp tất cả các trường cần thiết"
- *               resultCode: "00203"
- *       409:
- *         description: Mục trong tủ lạnh cho thực phẩm đã tồn tại
- *         content:
- *           application/json:
- *             example:
- *               resultMessage:
- *                 en: "This food item already exists in the refrigerator"
- *                 vn: "Mục trong tủ lạnh cho thực phẩm đã tồn tại"
- *               resultCode: "00199"
+ *             schema:
+ *               type: object
+ *               example:
+ *                 resultCode: "00200"
+ *                 resultMessage:
+ *                   vn: "Tạo tủ lạnh thành công"
+ *                 fridge:
+ *                   id: 15
+ *                   name: "Tủ Đông Hòa Phát"
+ *                   group_id: 1
  */
-export const createFridgeItem = async (req, res) => {
+export const createFridge = async (req, res) => {
     try {
-        const { foodName, quantity, useWithinDays, note } = req.body;
+        const { name, groupId, description } = req.body;
         const user = req.user;
 
-        // 1. Validate Input
-        if (!foodName || !quantity || !useWithinDays) {
-            return res.status(200).json({
-                resultMessage: { 
-                  en: "Please provide all required fields", 
-                  vn: "Vui cung cấp tất cả các trường cần thiết" },
-                resultCode: "00203"
-            });
+        if (!name || !groupId) {
+            return res.status(400).json({ 
+                resultCode: "00203", 
+                resultMessage: { vn: "Thiếu tên tủ hoặc ID nhóm" } });
         }
 
-        if (!user) {
-             return res.status(200).json({
-                resultMessage: { 
-                  en: "Please log in",
-                  vn: "Bạn chưa đăng nhập" },
-                resultCode: "00225"
-            });
+        // Check quyền: User phải thuộc Group này
+        if (!user.groupIds.includes(parseInt(groupId))) {
+            return res.status(403).json({ 
+                resultCode: "00219", 
+                resultMessage: { vn: "Bạn không phải thành viên của nhóm này" } });
         }
-
-        const qty = parseFloat(quantity);
-        const days = parseInt(useWithinDays, 10);
-        if (isNaN(qty) || qty <= 0) return res.status(200).json({ 
-            resultMessage: { 
-              en: "Please provide a valid quantity!",
-              vn: "Vui lòng cung cấp một số lượng hợp lệ!" },
-            resultCode: "00192" });
-        if (isNaN(days) || days <= 0) return res.status(200).json({ 
-            resultMessage: { 
-              en: "Please provide a valid 'use within' value!", 
-              vn: "Vui lòng cung cấp một giá trị 'sử dụng trong khoảng' hợp lệ!" },
-            resultCode: "00191" });
-
-        // --- TÌM FOOD & CHECK QUYỀN ---
-        const { data: userInfo } = await supabase
-            .from("users")
-            .select("id, belongstogroupadminid")
-            .eq("id", user.id)
-            .single();
-        
-        const allowedOwnerIds = [user.id];
-        if (userInfo && userInfo.belongstogroupadminid) {
-            allowedOwnerIds.push(userInfo.belongstogroupadminid);
-        }
-
-        // Tìm Food và lấy cả tên Unit nếu có
-        const { data: food } = await supabase
-            .from("food")
-            .select("id, userid, unitofmeasurement (unitname)")
-            .ilike("name", foodName.trim())
-            .in("userid", allowedOwnerIds)
-            .maybeSingle();
-
-        if (!food) {
-            // Check lỗi chi tiết (00198 hay 00208)
-            const { data: otherFood } = await supabase
-                .from("food")
-                .select("id")
-                .ilike("name", foodName.trim())
-                .maybeSingle();
-
-            if (otherFood) {
-                return res.status(200).json({ 
-                    resultMessage: { 
-                      en: "Food item is not managed by this group", 
-                      vn: "Thực phẩm không thuộc quyền quản trị của nhóm" },
-                    resultCode: "00198" 
-                });
-            } else {
-                return res.status(200).json({
-                    resultMessage: { 
-                      en: "Food not found", 
-                      vn: "Thực phẩm không tồn tại" },
-                    resultCode: "00208"
-                });
-            }
-        }
-
-        // 4. Check trùng lặp
-        const { data: existing } = await supabase
-            .from("fridge")
-            .select("id")
-            .eq("foodid", food.id)
-            .eq("userid", user.id)
-            .maybeSingle();
-
-        if (existing) {
-            return res.status(200).json({
-                resultMessage: { 
-                  en: "This food item already exists in the refrigerator", 
-                  vn: "Mục trong tủ lạnh cho thực phẩm đã tồn tại" },
-                resultCode: "00199"
-            });
-        }
-
-        // 5. Insert (Đã bổ sung name và unit)
-        const unitNameStr = food.unitofmeasurement?.unitname || ""; 
 
         const { data, error } = await supabase
             .from("fridge")
             .insert({
-                name: foodName.trim(),
-                quantity: qty,
-                unit: unitNameStr,
-                expirydate: addDaysISO(days),
-                userid: user.id,
-                foodid: food.id,
-                note: note || ""
+                name: name.trim(),
+                group_id: groupId,
+                description: description || ""
             })
             .select()
             .single();
@@ -200,153 +89,368 @@ export const createFridgeItem = async (req, res) => {
         if (error) throw error;
 
         return res.status(200).json({
-            resultMessage: { 
-              en: "Fridge item added successfully", 
-              vn: "Mục trong tủ lạnh được tạo thành công" },
-            resultCode: "00202",
-            newItem: data
+            resultCode: "00200",
+            resultMessage: { vn: "Tạo tủ lạnh thành công" },
+            fridge: data
         });
-
     } catch (err) {
-        console.error("Error creating fridge item:", err.message);
-        return res.status(500).json({ error: "Internal server error", resultCode: "00197" });
+        console.error("Create Fridge Error:", err);
+        return res.status(500).json({ resultCode: "00197" });
     }
 };
 
 /**
  * @swagger
- * /fridge/update:
- *   put:
- *     summary: Cập nhật thông tin mục tủ lạnh
- *     description: Cập nhật số lượng, hạn sử dụng hoặc ghi chú cho một mục đã có trong tủ.
+ * /fridge:
+ *   get:
+ *     summary: Lấy danh sách tủ lạnh
+ *     description: Lấy danh sách tủ lạnh mà user có quyền truy cập. Có thể lọc theo Group ID.
  *     tags: [Fridge]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: groupId
+ *         schema:
+ *           type: integer
+ *         description: ID của nhóm (nếu muốn lọc tủ của 1 nhóm cụ thể)
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               example:
+ *                 resultCode: "00228"
+ *                 resultMessage:
+ *                   vn: "Lấy danh sách tủ lạnh thành công"
+ *                 fridges:
+ *                   - id: 10
+ *                     name: "Tủ lạnh Samsung"
+ *                     group_id: 1
+ *                     description: "Tủ ở tầng 1"
+ */
+export const getAllFridge = async (req, res) => {
+    try {
+        const { groupId } = req.query;
+        const user = req.user; // req.user.groupIds từ middleware
+
+        let query = supabase
+            .from("fridge")
+            .select("*")
+            .order("createdat", { ascending: false });
+
+        // Nếu client gửi groupId -> Lọc theo group đó (cần check quyền)
+        if (groupId) {
+            if (!user.groupIds.includes(parseInt(groupId))) {
+                 return res.status(403).json({ 
+                    resultCode: "00219", 
+                    resultMessage: { vn: "Bạn không có quyền truy cập nhóm này" } });
+            }
+            query = query.eq("group_id", groupId);
+        } else {
+            // Nếu không gửi groupId -> Lấy tất cả tủ thuộc các nhóm mình tham gia
+            query = query.in("group_id", user.groupIds);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        return res.status(200).json({
+            resultCode: "00228",
+            resultMessage: { vn: "Lấy danh sách tủ lạnh thành công" },
+            fridges: data
+        });
+    } catch (err) {
+        console.error("Get All Fridge Error:", err);
+        return res.status(500).json({ resultCode: "00197" });
+    }
+};
+
+/**
+ * @swagger
+ * /fridge/{id}:
+ *   get:
+ *     summary: Lấy chi tiết một tủ lạnh
+ *     tags: [Fridge]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID của tủ lạnh
+ *         example: 10
+ *     responses:
+ *       200:
+ *         description: Thành công
+ */
+export const getFridgeById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user = req.user;
+
+        const { data, error } = await supabase
+            .from("fridge")
+            .select("*")
+            .eq("id", id)
+            .maybeSingle();
+
+        if (!data) return res.status(404).json({ resultCode: "00213", resultMessage: { vn: "Tủ lạnh không tồn tại" } });
+        
+        // Check quyền
+        if (!user.groupIds.includes(data.group_id)) {
+            return res.status(403).json({ resultCode: "00219", resultMessage: { vn: "Không có quyền truy cập" } });
+        }
+
+        return res.status(200).json({
+            resultCode: "00228",
+            resultMessage: { vn: "Lấy chi tiết thành công" },
+            fridge: data
+        });
+    } catch (err) {
+        return res.status(500).json({ resultCode: "00197" });
+    }
+};
+
+/* ==========================================================================
+   PHẦN 2: QUẢN LÝ THỰC PHẨM TRONG TỦ (FRIDGE ITEMS - BẢNG fridge_food)
+   ========================================================================== */
+
+
+/**
+ * @swagger
+ * /fridge/item/create:
+ *   post:
+ *     summary: Thêm thực phẩm vào tủ lạnh
+ *     description: Thêm một món ăn mới vào tủ lạnh cụ thể (Insert vào bảng fridge_food).
+ *     tags: [Fridge Item]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/x-www-form-urlencoded:
+ *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - itemId
+ *             required: [fridgeId, foodName, quantity]
+ *             properties:
+ *               fridgeId:
+ *                 type: integer
+ *                 description: ID của tủ lạnh muốn bỏ đồ vào (Bắt buộc)
+ *                 example: 10
+ *               foodName:
+ *                 type: string
+ *                 description: Tên món ăn (Hệ thống sẽ tự tìm ID món ăn tương ứng)
+ *                 example: "Thịt bò Kobe"
+ *               quantity:
+ *                 type: number
+ *                 description: Số lượng
+ *                 example: 2.5
+ *               unit:
+ *                 type: string
+ *                 description: Đơn vị tính (nếu khác mặc định)
+ *                 example: "Kg"
+ *               useWithinDays:
+ *                 type: integer
+ *                 description: Số ngày hết hạn (tính từ hôm nay)
+ *                 example: 7
+ *     responses:
+ *       200:
+ *         description: Thêm thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               example:
+ *                 resultCode: "00202"
+ *                 resultMessage:
+ *                   vn: "Thêm vào tủ thành công"
+ *                 newItem:
+ *                   id: 101
+ *                   fridge_id: 10
+ *                   food_id: 55
+ *                   quantity: 2.5
+ *                   expirydate: "2024-05-20T00:00:00Z"
+ */
+export const createFridgeItem = async (req, res) => {
+    try {
+        const { fridgeId, foodName, quantity, useWithinDays, unit } = req.body;
+        const user = req.user;
+
+        // 1. VALIDATION CƠ BẢN
+        if (!fridgeId || !foodName || !quantity) {
+            return res.status(400).json({ resultCode: "00203", resultMessage: { vn: "Thiếu thông tin (fridgeId, foodName, quantity)" } });
+        }
+
+        if (parseFloat(quantity) <= 0) {
+            return res.status(400).json({ resultCode: "00205", resultMessage: { vn: "Số lượng phải lớn hơn 0" } });
+        }
+
+        // 2. CHECK QUYỀN TỦ LẠNH
+        const { data: fridgeInfo } = await supabase.from("fridge").select("group_id").eq("id", fridgeId).maybeSingle();
+        if (!fridgeInfo) return res.status(404).json({ resultCode: "00213", resultMessage: { vn: "Tủ lạnh không tồn tại" } });
+        
+        if (!user.groupIds.includes(fridgeInfo.group_id)) {
+            return res.status(403).json({ resultCode: "00219", resultMessage: { vn: "Không có quyền thêm vào tủ này" } });
+        }
+
+        // 3. TÌM FOOD ID (Của chính user)
+        const { data: food } = await supabase
+            .from("food")
+            .select("id, unitofmeasurementid, unit:unitofmeasurementid(unitname)")
+            .eq("userid", user.id)
+            .ilike("name", foodName.trim())
+            .maybeSingle();
+
+        if (!food) {
+            return res.status(404).json({ 
+                resultCode: "00208", 
+                resultMessage: { vn: "Bạn chưa tạo món ăn này. Vui lòng tạo món ăn trước." } 
+            });
+        }
+
+        // 4. XỬ LÝ NGÀY HẾT HẠN
+        let expiryDate = null;
+        if (useWithinDays !== undefined && useWithinDays !== null && useWithinDays !== "") {
+            const days = parseInt(useWithinDays);
+            if (days < 0) return res.status(400).json({ resultCode: "00206", resultMessage: { vn: "Số ngày hết hạn không hợp lệ" } });
+            expiryDate = addDaysISO(days);
+        }
+
+        // 5. [BỔ SUNG] VALIDATE & XỬ LÝ UNIT (ĐƠN VỊ TÍNH)
+        let finalUnit = "";
+
+        if (unit && unit.trim() !== "") {
+            // Trường hợp A: User gửi unit mới -> Phải check xem DB có unit này không
+            const { data: validUnit } = await supabase
+                .from("unitofmeasurement")
+                .select("unitname")
+                .ilike("unitname", unit.trim()) // Tìm không phân biệt hoa thường
+                .maybeSingle();
+
+            if (!validUnit) {
+                 return res.status(404).json({ 
+                     resultCode: "00207", // Mã lỗi mới: Unit không tồn tại
+                     resultMessage: { vn: "Đơn vị tính không tồn tại trong hệ thống" } 
+                 });
+            }
+            finalUnit = validUnit.unitname; // Lấy tên chuẩn từ DB (VD: user nhập 'kg' -> lưu 'Kg')
+        } else {
+            // Trường hợp B: User để trống -> Lấy unit mặc định của món ăn
+            finalUnit = food.unit?.unitname || "";
+        }
+
+        // 6. INSERT
+        const { data, error } = await supabase
+            .from("fridge_food")
+            .insert({
+                fridge_id: fridgeId,
+                food_id: food.id,
+                quantity: parseFloat(quantity),
+                unit: finalUnit, 
+                expirydate: expiryDate
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return res.status(200).json({
+            resultCode: "00202",
+            resultMessage: { vn: "Thêm vào tủ thành công" },
+            newItem: data
+        });
+    } catch (err) {
+        console.error("Create Item Error:", err);
+        return res.status(500).json({ resultCode: "00197" });
+    }
+};
+
+
+/**
+ * @swagger
+ * /fridge/item/update:
+ *   put:
+ *     summary: Cập nhật thông tin món trong tủ
+ *     description: Sửa số lượng hoặc hạn sử dụng của một item cụ thể.
+ *     tags: [Fridge Item]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [itemId]
  *             properties:
  *               itemId:
  *                 type: integer
- *                 description: ID định danh của mục trong tủ lạnh
- *                 example: 15
+ *                 description: ID của dòng trong tủ lạnh (lấy từ API /item/list)
+ *                 example: 101
  *               newQuantity:
  *                 type: number
  *                 description: Số lượng mới
- *                 example: 5.0
+ *                 example: 1.5
  *               newUseWithin:
- *                 type: number
- *                 description: Số ngày sử dụng mới để tính lại ngày hết hạn
+ *                 type: integer
+ *                 description: Số ngày hết hạn mới (tính lại từ hôm nay)
  *                 example: 3
- *               newNote:
+ *               newUnit:
  *                 type: string
- *                 description: Ghi chú mới
- *                 example: "Sắp hết hạn, cần dùng ngay"
+ *                 description: Đơn vị mới
+ *                 example: "Hộp"
  *     responses:
  *       200:
  *         description: Cập nhật thành công
  *         content:
  *           application/json:
- *             example:
- *               resultMessage:
- *                 en: "Fridge item updated successfully"
- *                 vn: "Cập nhật mục tủ lạnh thành công"
- *               resultCode: "00216"
- *               updatedItem:
- *                 id: 15
- *                 quantity: 5.0
- *                 expirydate: "2024-01-16T10:00:00.000Z"
- *                 note: "Sắp hết hạn, cần dùng ngay"
- *                 updatedat: "2024-01-14T12:00:00.000Z"
- *       404:
- *         description: Không tìm thấy item hoặc không có quyền
- *         content:
- *           application/json:
- *             example:
- *               resultMessage:
- *                 en: "Item not found or denied"
- *                 vn: "Mục tủ lạnh không tồn tại hoặc không thuộc quyền quản lý"
- *               resultCode: "00213"
+ *             schema:
+ *               type: object
+ *               example:
+ *                 resultCode: "00203"
+ *                 resultMessage:
+ *                   vn: "Cập nhật thành công"
+ *                 updatedItem:
+ *                   id: 101
+ *                   quantity: 1.5
+ *                   unit: "Hộp"
+ *                   expirydate: "2024-05-16T00:00:00Z"
  */
 export const updateFridgeItem = async (req, res) => {
     try {
-        const { itemId, newQuantity, newUseWithin, newNote } = req.body;
+        const { itemId, newQuantity, newUseWithin, newUnit } = req.body;
         const user = req.user;
 
-        // Validate ID (00204)
-        if (!itemId) {
-            return res.status(200).json({ 
-                resultMessage: { 
-                  en: "Please provide the refrigerator item ID", 
-                  vn: "Vui lòng cung cấp id của item tủ lạnh" },
-                resultCode: "00204" 
-            });
-        }
+        if (!itemId) return res.status(400).json({ resultCode: "00204", resultMessage: { vn: "Thiếu Item ID" } });
 
-        // Validate update fields (00204x)
-        if (newQuantity === undefined && newUseWithin === undefined && newNote === undefined) {
-            return res.status(200).json({
-                resultMessage: { 
-                  en: "Please provide at least one of the following fields: newQuantity, newNote, newUseWithin",
-                  vn: "Vui lòng cung cấp ít nhất một trong các trường sau: newQuantity, newNote, newUseWithin" },
-                resultCode: "00204x"
-            });
-        }
-
-        // 1. Tìm Item & Kiểm tra quyền chính chủ
+        // 1. Tìm item và check quyền (Join fridge -> check group)
         const { data: item } = await supabase
-            .from("fridge")
-            .select("id")
+            .from("fridge_food")
+            .select(`id, fridge:fridge_id ( group_id )`)
             .eq("id", itemId)
-            .eq("userid", user.id)
             .maybeSingle();
 
-        if (!item) {
-            return res.status(200).json({
-                resultMessage: { 
-                  en: "Fridge item not found or you don't have permission to manage it",
-                  vn: "Mục tủ lạnh không tồn tại hoặc không thuộc quyền quản lý" },
-                resultCode: "00213"
-            });
+        if (!item) return res.status(404).json({ resultCode: "00213", resultMessage: { vn: "Mục không tồn tại" } });
+        
+        if (!user.groupIds.includes(item.fridge.group_id)) {
+            return res.status(403).json({ resultCode: "00219", resultMessage: { vn: "Không có quyền sửa mục này" } });
         }
 
-        // 2. Prepare Data
-        const updates = { updatedat: new Date().toISOString() };
+        // 2. Prepare Update
+        const updates = {};
+        if (newQuantity) updates.quantity = parseFloat(newQuantity);
+        if (newUnit) updates.unit = newUnit;
+        if (newUseWithin) updates.expirydate = addDaysISO(parseInt(newUseWithin));
 
-        if (newQuantity !== undefined) {
-            const q = parseFloat(newQuantity);
-            if (isNaN(q) || q <= 0) return res.status(200).json({ 
-              resultMessage: { 
-                  en: "Please provide a valid quantity!",
-                  vn: "Vui lòng cung cấp một lượng hợp lệ!" },
-              resultCode: "00206" });
-            updates.quantity = q;
-        }
-
-        if (newUseWithin !== undefined) {
-            const d = parseInt(newUseWithin, 10);
-            if (isNaN(d) || d <= 0) return res.status(200).json({ 
-              resultMessage: {
-                  en: "Please provide a valid 'use within' value!", 
-                  vn: "Vui lòng cung cấp một giá trị 'sử dụng trong khoảng' hợp lệ!" },
-              resultCode: "00205" });
-            
-            // Đảm bảo hàm addDaysISO đã tồn tại trong file
-            updates.expirydate = addDaysISO(d);
-        }
-
-        if (newNote !== undefined) {
-            updates.note = newNote;
-        }
-
-        // 3. Update (00216)
+        // 3. Update
         const { data, error } = await supabase
-            .from("fridge")
+            .from("fridge_food")
             .update(updates)
             .eq("id", itemId)
             .select()
@@ -355,212 +459,232 @@ export const updateFridgeItem = async (req, res) => {
         if (error) throw error;
 
         return res.status(200).json({
-            resultMessage: { 
-              en: "Fridge item updated successfully", 
-              vn: "Cập nhật mục tủ lạnh thành công" },
             resultCode: "00216",
+            resultMessage: { vn: "Cập nhật thành công" },
             updatedItem: data
         });
 
     } catch (err) {
-        // Đã sửa thông báo lỗi ở đây
-        console.error("Error updating fridge item:", err.message);
-        return res.status(500).json({ error: "Internal server error", resultCode: "00215" });
+        console.error("Update Item Error:", err);
+        return res.status(500).json({ resultCode: "00215" });
     }
 };
 
 /**
  * @swagger
- * /fridge/delete:
+ * /fridge/item/delete:
  *   delete:
- *     summary: Xóa mục tủ lạnh
- *     description: Xóa một món ăn khỏi danh sách tủ lạnh chung của nhóm.
- *     tags: [Fridge]
+ *     summary: Xóa món ăn khỏi tủ
+ *     tags: [Fridge Item]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/x-www-form-urlencoded:
+ *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - foodName
+ *             required: [itemId]
  *             properties:
+ *               itemId:
+ *                 type: integer
+ *                 description: ID của dòng cần xóa (Khuyên dùng cách này)
+ *                 example: 101
  *               foodName:
  *                 type: string
- *                 description: Tên thực phẩm muốn xóa
- *                 example: "Thịt bò"
+ *                 description: (Cách cũ) Tên món cần xóa
+ *                 example: "Thịt gà"
+ *               fridgeId:
+ *                 type: integer
+ *                 description: (Cách cũ - Bắt buộc đi kèm foodName) ID tủ
+ *                 example: 10
  *     responses:
  *       200:
  *         description: Xóa thành công
  *         content:
  *           application/json:
- *             example:
- *               resultMessage:
- *                 en: "Fridge item deleted successfully"
- *                 vn: "Xóa mục trong tủ lạnh thành công"
- *               resultCode: "00224"
- *       404:
- *         description: Không tìm thấy món ăn này trong tủ
- *         content:
- *           application/json:
- *             example:
- *               resultMessage:
- *                 vn: "Mục tủ lạnh không tồn tại"
- *               resultCode: "00213"
+ *             schema:
+ *               type: object
+ *               example:
+ *                 resultCode: "00204"
+ *                 resultMessage:
+ *                   vn: "Xóa món ăn thành công"
  */
 export const deleteFridgeItem = async (req, res) => {
     try {
-        const { foodName } = req.body;
+        const { itemId, foodName, fridgeId } = req.body;
         const user = req.user;
 
-        // 1. Validate Input (Mã 00217: Thiếu tên thực phẩm)
-        if (!foodName) {
-            return res.status(200).json({ 
-                resultMessage: { 
-                    en: "Please provide the food name",
-                    vn: "Vui lòng cung cấp tên thực phẩm" 
-                }, 
-                resultCode: "00217" 
-            });
+        let targetItemId = itemId;
+        let targetGroupId = null;
+
+        // CASE A: Xóa bằng ID (Khuyên dùng)
+        if (itemId) {
+            const { data: item } = await supabase
+                .from("fridge_food")
+                .select(`id, fridge:fridge_id ( group_id )`)
+                .eq("id", itemId)
+                .maybeSingle();
+            
+            if (item) {
+                targetGroupId = item.fridge.group_id;
+            } else {
+                return res.status(404).json({ resultCode: "00221" });
+            }
+        } 
+        // CASE B: Xóa bằng Tên + Tủ (Để tương thích route cũ, nhưng cần fridgeId)
+        else if (foodName && fridgeId) {
+            const { data: item } = await supabase
+                .from("fridge_food")
+                .select(`id, fridge:fridge_id ( group_id ), food:food_id!inner(name)`)
+                .eq("fridge_id", fridgeId)
+                .ilike("food.name", foodName.trim())
+                .maybeSingle(); // Nếu có nhiều item cùng tên, sẽ xóa cái đầu tiên tìm thấy
+
+            if (item) {
+                targetItemId = item.id;
+                targetGroupId = item.fridge.group_id;
+            } else {
+                return res.status(404).json({ resultCode: "00221", resultMessage: { vn: "Không tìm thấy món ăn này trong tủ" } });
+            }
+        } else {
+            return res.status(400).json({ resultCode: "00217", resultMessage: { vn: "Vui lòng cung cấp itemId hoặc (foodName + fridgeId)" } });
         }
 
-        // 2. Tìm item trong tủ lạnh của USER này có tên Food tương ứng
-        const { data: item } = await supabase
-            .from("fridge")
-            .select(`
-                id, 
-                food!inner(name)
-            `)
-            .eq("userid", user.id)
-            .ilike("food.name", foodName.trim()) 
-            .maybeSingle();
-
-        // 3. Check Not Found (Mã 00221: Mục tủ lạnh chưa được tạo)
-        if (!item) {
-            return res.status(200).json({ 
-                resultMessage: { 
-                  en: "Fridge item linked to this food has not been created",
-                  vn: "Mục trong tủ lạnh liên kết với thực phẩm này chưa được tạo" },
-                resultCode: "00221" 
-            });
+        // Check quyền
+        if (!user.groupIds.includes(targetGroupId)) {
+            return res.status(403).json({ resultCode: "00219" });
         }
 
-        // 4. Delete (Mã 00224: Xóa thành công)
-        const { error } = await supabase
-            .from("fridge")
-            .delete()
-            .eq("id", item.id);
-
+        // Delete
+        const { error } = await supabase.from("fridge_food").delete().eq("id", targetItemId);
         if (error) throw error;
 
         return res.status(200).json({
-            resultMessage: { 
-              en: "Fridge item deleted successfully", 
-              vn: "Xóa mục trong tủ lạnh thành công" },
-            resultCode: "00224"
+            resultCode: "00224",
+            resultMessage: { vn: "Xóa mục tủ lạnh thành công" }
         });
 
     } catch (err) {
-        console.error("Error deleting fridge item:", err.message);
-        return res.status(500).json({ error: "Internal server error", resultCode: "00222" });
+        console.error("Delete Item Error:", err);
+        return res.status(500).json({ resultCode: "00197" });
     }
 };
 
 /**
  * @swagger
- * /fridge/list:
+ * /fridge/item/list:
  *   get:
- *     summary: Lấy danh sách thực phẩm trong tủ lạnh
- *     description: Lấy về toàn bộ danh sách đồ ăn hiện có trong kho tủ lạnh chung của nhóm.
- *     tags: [Fridge]
+ *     summary: Xem đồ trong tủ lạnh
+ *     description: Lấy danh sách thực phẩm. Bắt buộc phải có fridgeId hoặc groupId.
+ *     tags: [Fridge Item]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: fridgeId
+ *         schema:
+ *           type: integer
+ *         description: Xem đồ của riêng tủ này (Ưu tiên dùng)
+ *         example: 10
+ *       - in: query
+ *         name: groupId
+ *         schema:
+ *           type: integer
+ *         description: Xem tất cả đồ của cả nhóm (Gộp nhiều tủ)
+ *         example: 1
  *     responses:
  *       200:
- *         description: Lấy danh sách thành công
+ *         description: Thành công
  *         content:
  *           application/json:
- *             example:
- *               resultMessage:
- *                 en: "Get fridge items successfully"
- *                 vn: "Lấy danh sách đồ tủ lạnh thành công"
- *               resultCode: "00228"
- *               items:
- *                 - id: 15
- *                   quantity: 2
- *                   expiryDate: "2024-01-20T10:00:00.000Z"
- *                   note: "Mua ở siêu thị BigC"
- *                   createdAt: "2024-01-13T10:00:00.000Z"
- *                   updatedAt: "2024-01-13T10:00:00.000Z"
- *                   Food:
- *                     id: 10
- *                     name: "Thịt bò"
- *                     imageUrl: "https://..."
- *                     type: "ingredient"
+ *             schema:
+ *               type: object
+ *               example:
+ *                 resultCode: "00228"
+ *                 items:
+ *                   - id: 101
+ *                     quantity: 2.5
+ *                     fridgeName: "Tủ Đông Hòa Phát"
+ *                     Food:
+ *                       name: "Thịt bò"
+ *                       imageurl: "..."
  */
 export const getFridgeItems = async (req, res) => {
     try {
+        const { fridgeId, groupId } = req.query;
         const user = req.user;
 
-        // Validate Login (00225: Bạn chưa vào nhóm nào / Chưa đăng nhập)
-        const groupId = req.query.groupId || user?.groupId;
-        
-        if (!groupId) {
-             return res.status(200).json({ 
-                resultMessage: { 
-                    en: "User not in group", 
-                    vn: "Bạn chưa vào nhóm nào" },
-                resultCode: "00225" 
-            });
-        }
-
-        // Query 
-        const { data, error } = await supabase
-            .from("fridge")
+        let query = supabase
+            .from("fridge_food")
             .select(`
-                id, quantity, expirydate, note, createdat, updatedat,
-                food:foodid ( id, name, imageurl, type )
+                id, quantity, unit, expirydate, created_at, fridge_id,
+                food:food_id ( id, name, imageurl, type ),
+                fridge:fridge_id ( id, name, group_id )
             `)
-            .eq("userid", user.id)
             .order("expirydate", { ascending: true });
 
+        // CASE 1: Lọc theo 1 tủ cụ thể (Ưu tiên)
+        if (fridgeId) {
+            // Cần check quyền tủ này trước (để đảm bảo an toàn data)
+            const { data: fridgeCheck } = await supabase.from("fridge").select("group_id").eq("id", fridgeId).maybeSingle();
+            
+            if (!fridgeCheck || !user.groupIds.includes(fridgeCheck.group_id)) {
+                 return res.status(403).json({ resultCode: "00219", resultMessage: { vn: "Không có quyền hoặc tủ không tồn tại" } });
+            }
+            query = query.eq("fridge_id", fridgeId);
+        } 
+        // CASE 2: Lọc tất cả đồ trong 1 Group (Gồm nhiều tủ)
+        else if (groupId) {
+             if (!user.groupIds.includes(parseInt(groupId))) {
+                 return res.status(403).json({ resultCode: "00219", resultMessage: { vn: "Không có quyền nhóm này" } });
+            }
+            // Join ngược để filter theo group_id của fridge
+            // Lưu ý: Supabase cú pháp filter nested hơi phức tạp, cách đơn giản là lấy list fridgeIds trước
+            const { data: fridges } = await supabase.from("fridge").select("id").eq("group_id", groupId);
+            const fridgeIds = fridges.map(f => f.id);
+            
+            if (fridgeIds.length === 0) return res.status(200).json({ resultCode: "00228", items: [] });
+            
+            query = query.in("fridge_id", fridgeIds);
+        } 
+        // CASE 3: Không gửi gì -> Lỗi hoặc trả về rỗng (để an toàn nên bắt buộc filter)
+        else {
+             return res.status(400).json({ resultCode: "00203", resultMessage: { vn: "Vui lòng cung cấp fridgeId hoặc groupId" } });
+        }
+
+        const { data, error } = await query;
         if (error) throw error;
 
-        // Format CamelCase
+        // Format
         const items = data.map(i => ({
             id: i.id,
             quantity: i.quantity,
+            unit: i.unit,
             expiryDate: i.expirydate,
-            note: i.note,
-            createdAt: i.createdat,
-            updatedAt: i.updatedat,
-            Food: i.food 
+            fridgeName: i.fridge?.name,
+            Food: i.food
         }));
 
-        // Success (00228)
         return res.status(200).json({
-            resultMessage: { 
-                en: "Get fridge items successfully", 
-                vn: "Lấy danh sách đồ tủ lạnh thành công" },
             resultCode: "00228",
+            resultMessage: { vn: "Lấy danh sách thành công" },
             items: items
         });
 
     } catch (err) {
-        // Sửa nội dung Log
-        console.error("Error getting fridge items:", err.message);
-        return res.status(500).json({ error: "Internal server error", resultCode: "00226" });
+        console.error("Get Fridge Items Error:", err);
+        return res.status(500).json({ resultCode: "00197" });
     }
 };
+
 /**
  * @swagger
- * /fridge/list/{foodName}:
+ * /fridge/item/search/{foodName}:
  *   get:
- *     summary: Lấy chi tiết mục tủ lạnh theo tên thực phẩm
- *     description: Tra cứu chi tiết một món ăn cụ thể trong tủ lạnh của nhóm.
- *     tags: [Fridge]
+ *     summary: Tìm kiếm món ăn
+ *     description: Tìm xem món ăn này đang nằm ở tủ nào, số lượng bao nhiêu.
+ *     tags: [Fridge Item]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -569,134 +693,66 @@ export const getFridgeItems = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: Tên thực phẩm cần tìm kiếm (Ví dụ Salmon).
- *         example: "Thịt bò"
+ *         description: Tên món ăn cần tìm kiếm
+ *         example: "Thịt gà"
  *     responses:
  *       200:
- *         description: Lấy item cụ thể thành công
+ *         description: Tìm thấy kết quả
  *         content:
  *           application/json:
- *             example:
- *               resultMessage:
- *                 en: "Get specific item successfull"
- *                 vn: "Lấy item cụ thể thành công"
- *               resultCode: "00237"
- *               item:
- *                 id: 15
- *                 expiredDate: "2024-01-20T10:00:00.000Z"
- *                 quantity: 2
- *                 note: "Mua ở siêu thị"
- *                 createdAt: "2024-01-13T10:00:00.000Z"
- *                 updatedAt: "2024-01-13T10:00:00.000Z"
- *                 FoodId: 10
- *                 UserId: 5
- *                 Food:
- *                   id: 10
- *                   name: "Thịt bò"
- *                   imageUrl: "https://..."
- *                   type: "ingredient"
- *                   UnitOfMeasurement:
- *                     id: 1
- *                     unitName: "kg"
- *                   FoodCategory:
- *                     id: 2
- *                     name: "Thịt"
- *       200-NotFound:
- *         description: Mục tủ lạnh không tồn tại
- *         content:
- *           application/json:
- *             example:
- *               resultMessage:
- *                 vn: "Mục tủ lạnh không tồn tại"
- *               resultCode: "00213"
+ *             schema:
+ *               type: object
+ *               example:
+ *                 resultCode: "00228"
+ *                 resultMessage:
+ *                   vn: "Tìm kiếm thành công"
+ *                 items:
+ *                   - id: 101
+ *                     fridgeName: "Tủ Đông Hòa Phát"
+ *                     quantity: 3.0
+ *                     unit: "Kg"
+ *                     expirydate: "2024-05-25T00:00:00Z"
  */
 export const getSpecificFridgeItem = async (req, res) => {
     try {
         const { foodName } = req.params;
         const user = req.user;
 
-        const groupId = user?.groupId;
-        if (!groupId) return res.status(200).json({ 
-            resultMessage: { 
-                en: "User not in group", 
-                vn: "Bạn chưa vào nhóm nào" },
-            resultCode: "00225" 
-        });
-
-        if (!user) return res.status(403).json({ resultCode: "00006", resultMessage: { vn: "Chưa đăng nhập" } });
-
-        // 1. Query
-        const { data, error } = await supabase
+        // Tìm tất cả item có tên food tương ứng VÀ thuộc các tủ của group mình tham gia
+        // Bước 1: Lấy tất cả tủ lạnh user được phép xem
+        const { data: allowedFridges } = await supabase
             .from("fridge")
+            .select("id")
+            .in("group_id", user.groupIds);
+            
+        const allowedFridgeIds = allowedFridges.map(f => f.id);
+
+        if (allowedFridgeIds.length === 0) {
+             return res.status(200).json({ resultCode: "00237", items: [] }); // Không có tủ nào
+        }
+
+        // Bước 2: Query fridge_food join food
+        const { data, error } = await supabase
+            .from("fridge_food")
             .select(`
-                id, quantity, expirydate, note, createdat, updatedat, userid,
-                food:foodid!inner (
-                    id, name, imageurl, type, createdat, updatedat,
-                    unit:unitofmeasurementid ( id, unitname, createdat, updatedat ),
-                    cat:foodcategoryid ( id, name, createdat, updatedat )
-                )
+                id, quantity, expirydate, unit,
+                food:food_id!inner( name, imageurl, type ),
+                fridge:fridge_id( id, name )
             `)
-            .eq("userid", user.id)
-            .ilike("food.name", foodName.trim()) 
-            .maybeSingle();
+            .in("fridge_id", allowedFridgeIds)
+            .ilike("food.name", foodName.trim()) // Tìm theo tên Food
+            .order("expirydate", { ascending: true });
 
         if (error) throw error;
 
-        // 2. Check Not Found (00213)
-        if (!data) {
-            return res.status(200).json({
-                resultMessage: { 
-                    en: "Fridge item not found",
-                    vn: "Mục tủ lạnh không tồn tại" },
-                resultCode: "00213"
-            });
-        }
-
-        // 3. Format chuẩn JSON mẫu
-        const formatted = {
-            id: data.id,
-            expiredDate: data.expirydate,
-            quantity: data.quantity,
-            note: data.note,
-            createdAt: data.createdat,
-            updatedAt: data.updatedat,
-            FoodId: data.food.id,
-            UserId: data.userid,
-            Food: {
-                id: data.food.id,
-                name: data.food.name,
-                imageUrl: data.food.imageurl,
-                type: data.food.type,
-                createdAt: data.food.createdat,
-                updatedAt: data.food.updatedat,
-                FoodCategoryId: data.food.cat?.id,
-                UnitOfMeasurementId: data.food.unit?.id,
-                UnitOfMeasurement: {
-                    id: data.food.unit?.id,
-                    unitName: data.food.unit?.unitname,
-                    createdAt: data.food.unit?.createdat,
-                    updatedAt: data.food.unit?.updatedat
-                },
-                FoodCategory: {
-                    id: data.food.cat?.id,
-                    name: data.food.cat?.name,
-                    createdAt: data.food.cat?.createdat,
-                    updatedAt: data.food.cat?.updatedat
-                }
-            }
-        };
-
-        // 4. Return Success (00237)
         return res.status(200).json({
-            resultMessage: { 
-                en: "Successfully retrieved specific item", 
-                vn: "Lấy item cụ thể thành công" },
             resultCode: "00237",
-            item: formatted
+            resultMessage: { vn: "Tìm kiếm thành công" },
+            items: data // Trả về mảng vì có thể có nhiều hộp thịt gà ở các tủ khác nhau
         });
 
     } catch (err) {
-        console.error("Error getting specific fridge item:", err.message);
-        return res.status(500).json({ error: "Internal server error", resultCode: "00234" });
+        console.error("Search Fridge Item Error:", err);
+        return res.status(500).json({ resultCode: "00234" });
     }
 };
