@@ -19,15 +19,15 @@ const router = express.Router();
 router.use(supabaseAuth);
 
 // Shopping List routes
-router.post("/create/:groupId", createShoppingList);
-router.get("/getAll/:groupId", getAllShoppingLists);
-router.put("/update/:groupId", updateShoppingList);
-router.delete("/delete/:groupId", deleteShoppingList);
+router.post("/", createShoppingList);
+router.get("/", getAllShoppingLists);
+router.put("/", updateShoppingList);
+router.delete("/", deleteShoppingList);
 
 // Tasks Routes
-router.post("/task/:groupId", createTasks);
+router.post("/task", createTasks);
 router.put("/task/mark", markTask);
-router.put("/task/update/:groupId", updateTask);
-router.delete("/task/delete/:groupId", deleteTask);
+router.put("/task/", updateTask);
+router.delete("/task", deleteTask);
 
 export default router;

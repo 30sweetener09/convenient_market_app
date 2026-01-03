@@ -1016,7 +1016,7 @@ export const searchRecipesByName = async (req, res) => {
         vn: "Tìm kiếm công thức thành công",
       },
       resultCode: "00380",
-      recipes: formattedRecipes,
+      recipe: formattedRecipes,
     });
   } catch (err) {
     console.error("Error searching recipes:", err.message);
