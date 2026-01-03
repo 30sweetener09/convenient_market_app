@@ -14,6 +14,8 @@ import shoppingListRoute from "./routes/shoppingList.js";
 import mealRoute from "./routes/mealPlan.js";
 import recipeRoutes from "./routes/recipes.js";
 import adminRoute from "./routes/admin.js";
+import foodRoute from "./routes/food.js"
+import fridgeRoute from "./routes/fridge.js"
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,6 +36,8 @@ app.use("/api/shopping", shoppingListRoute);
 app.use("/api/recipe", recipeRoutes);
 app.use("/api/admin", adminRoute);
 app.use("/api/meal", mealRoute);
+app.use("/api/food", foodRoute);
+app.use("/api/fridge", fridgeRoute)
 
 app.get("/", (req, res) => res.send("Smart Schedule API running"));
 
