@@ -25,7 +25,6 @@ class _EditProfileModalState extends State<EditProfileModal> {
   late TextEditingController _imageUrlController;
   bool _isLoading = false;
   File? _selectedImageFile;
-  String? _selectedImageUrl;
   
   final ImagePicker _picker = ImagePicker();
 
@@ -55,7 +54,6 @@ class _EditProfileModalState extends State<EditProfileModal> {
       if (image != null) {
         setState(() {
           _selectedImageFile = File(image.path);
-          _selectedImageUrl = null;
           _imageUrlController.clear(); // Clear URL field nếu chọn file
         });
       }
@@ -81,7 +79,6 @@ class _EditProfileModalState extends State<EditProfileModal> {
       if (photo != null) {
         setState(() {
           _selectedImageFile = File(photo.path);
-          _selectedImageUrl = null;
           _imageUrlController.clear();
         });
       }
@@ -98,7 +95,6 @@ class _EditProfileModalState extends State<EditProfileModal> {
   void _removeSelectedImage() {
     setState(() {
       _selectedImageFile = null;
-      _selectedImageUrl = null;
       _imageUrlController.clear();
     });
   }
@@ -344,34 +340,6 @@ class _EditProfileModalState extends State<EditProfileModal> {
                       
                       const SizedBox(height: 12),
                       
-                      // Hoặc nhập URL
-                      TextFormField(
-                        controller: _imageUrlController,
-                        decoration: InputDecoration(
-                          labelText: 'Hoặc nhập URL ảnh',
-                          border: const OutlineInputBorder(),
-                          hintText: 'https://example.com/avatar.jpg',
-                          suffixIcon: _imageUrlController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear, size: 18),
-                                  onPressed: _isLoading 
-                                      ? null 
-                                      : () {
-                                          _imageUrlController.clear();
-                                          setState(() {});
-                                        },
-                                )
-                              : null,
-                        ),
-                        readOnly: _isLoading,
-                        onChanged: (value) {
-                          if (value.isNotEmpty && _selectedImageFile != null) {
-                            setState(() {
-                              _selectedImageFile = null;
-                            });
-                          }
-                        },
-                      ),
                     ],
                   ),
                 ),

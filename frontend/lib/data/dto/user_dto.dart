@@ -23,7 +23,7 @@ class UserDTO {
       username: json['username'] ?? '',
       birthdate: json['birthdate'] ?? '',
       gender: json['gender'] ?? '',
-      photoUrl: json['photoUrl'],
+      photoUrl: json['photourl'] ?? json['imageurl'],
       name: json['name'],
       password: '', // Không bao giờ lấy mật khẩu từ API
     );

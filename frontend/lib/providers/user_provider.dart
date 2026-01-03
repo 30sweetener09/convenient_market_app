@@ -32,8 +32,7 @@ class UserProvider extends ChangeNotifier {
   Future<void> fetchUserInfo() async {
     isLoading = true;
     _error = null;
-    notifyListeners();
-
+    
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
@@ -63,7 +62,7 @@ class UserProvider extends ChangeNotifier {
         password: '', // Không lấy mật khẩu từ API
         birthdate: userJson['birthdate'] ?? '',
         gender: userJson['gender'] ?? '',
-        photoUrl: userJson['photourl'],
+        photoUrl: userJson['imageurl'],
       );
       debugPrint("\nĐịnh dạng dữ liệu ng dùng: ${_user?.email}");
     } else if (response.statusCode == 401) {
@@ -79,11 +78,10 @@ class UserProvider extends ChangeNotifier {
   //Chỉnh sửa thông tin user
   Future<void> updateUserInfo({
     required String username,
-    File? imageFile, // Nhận File thay vì URL string
-    String? imageUrl, // Vẫn support URL nếu cần
+    File? avatarFile, // Nhận File thay vì URL string
   }) async {
     debugPrint(
-      '🔄 updateUserInfo called with: username=$username, imageFile=${imageFile?.path}, imageUrl=$imageUrl',
+      '🔄 updateUserInfo called with: username=$username, avatarFile=${avatarFile?.path}',
     );
 
     try {
@@ -120,8 +118,8 @@ class UserProvider extends ChangeNotifier {
       request.fields['username'] = trimmedUsername;
 
       // ✅ Thêm image file nếu có
-      if (imageFile != null && await imageFile.exists()) {
-        final fileName = path.basename(imageFile.path);
+      if (avatarFile != null && await avatarFile.exists()) {
+        final fileName = path.basename(avatarFile.path);
         final fileExtension = path.extension(fileName).toLowerCase();
 
         // Xác định content type dựa trên extension
@@ -136,11 +134,11 @@ class UserProvider extends ChangeNotifier {
           contentType = MediaType('image', '*'); // Mặc định
         }
 
-        final fileStream = http.ByteStream(imageFile.openRead());
-        final fileLength = await imageFile.length();
+        final fileStream = http.ByteStream(avatarFile.openRead());
+        final fileLength = await avatarFile.length();
 
         final multipartFile = http.MultipartFile(
-          'image', // ✅ Tên field phải là 'image' theo API
+          'avatar', // ✅ Tên field phải là 'avatar' theo API
           fileStream,
           fileLength,
           filename: fileName,
@@ -148,10 +146,6 @@ class UserProvider extends ChangeNotifier {
         );
 
         request.files.add(multipartFile);
-      }
-      // ✅ Hoặc thêm image URL nếu có (tùy chọn - server có thể không support cả 2)
-      else if (imageUrl != null && imageUrl.trim().isNotEmpty) {
-        request.fields['image'] = imageUrl.trim();
       }
 
       debugPrint('📦 Sending multipart/form-data request');
@@ -192,7 +186,8 @@ class UserProvider extends ChangeNotifier {
             gender: userJson['gender']?.toString() ?? _user?.gender ?? '',
             photoUrl:
                 userJson['image']?.toString() ??
-                userJson['photoUrl']?.toString() ??
+                userJson['photourl']?.toString() ??
+                userJson['imageurl']?.toString() ??
                 userJson['avatar']?.toString(),
           );
 

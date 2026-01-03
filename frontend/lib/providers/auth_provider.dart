@@ -61,7 +61,6 @@ class AuthProvider extends ChangeNotifier {
   Future<void> login(String email, String password) async {
     isLoading = true;
     _error = null;
-    notifyListeners();
 
     try {
       final response = await http.post(
@@ -95,11 +94,35 @@ class AuthProvider extends ChangeNotifier {
 
   /// Gọi khi logout hoặc token hết hạn
   Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('token');
-    token = null;
-    isLoggedIn = false;
-    notifyListeners();
+    isLoading = true;
+    try {
+      // 1. Gọi API logout trên server
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+      
+      final url = Uri.parse('$_baseUrl/user/logout');
+      final response = await http.post(url, headers: headers);
+      
+      if (response.statusCode == 200) {
+        debugPrint('Logout thành công trên server');
+      } else {
+        debugPrint('Logout API error: ${response.statusCode}');
+        // Vẫn tiếp tục xóa token trên client dù server có lỗi
+      }
+    } catch (e) {
+      debugPrint('Error calling logout API: $e');
+      // Vẫn tiếp tục xóa token trên client nếu có lỗi kết nối
+    } finally {
+      // 2. Luôn luôn xóa token trên client
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('token');
+      isLoading = false;
+      token = null;
+      isLoggedIn = false;
+      notifyListeners();
+    }
   }
   
 
@@ -124,7 +147,6 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> register(UserDTO userdto) async {
     isLoading = true;
     _error = null;
-    notifyListeners();
 
     bool success = false;
 
