@@ -59,11 +59,12 @@ const formatDateToDisplay = (dateString) => {
 
 /**
  * @swagger
- * /api/meal-plans/create:
+ * /meal:
  *   post:
+ *     tags:
+ *       - Meal Plans
  *     summary: Create a new meal plan
- *     description: Create a meal plan for a specific date and food item
- *     tags: [Meal Plans]
+ *     description: Create a meal plan for a group. Only group admin can perform this action.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -73,22 +74,44 @@ const formatDateToDisplay = (dateString) => {
  *           schema:
  *             type: object
  *             required:
- *               - foodName
- *               - timestamp
+ *               - groupId
  *               - name
+ *               - description
+ *               - timestamp
  *             properties:
- *               foodName:
- *                 type: string
- *                 description: Name of the food item
- *                 example: "Cơm gà"
- *               timestamp:
- *                 type: string
- *                 description: Date in M/D/YYYY format
- *                 example: "11/15/2024"
+ *               groupId:
+ *                 type: integer
+ *                 description: ID of the group
+ *                 example: 1
  *               name:
  *                 type: string
- *                 description: Name of the meal plan
- *                 example: "Bữa trưa"
+ *                 enum: [breakfast, launch, dinner]
+ *                 description: "Meal name: breakfast (sáng), lunch (trưa), dinner (tối)"
+ *                 example: "breakfast"
+ *               description:
+ *                 type: string
+ *                 description: Description of the meal plan
+ *                 example: "Phở bò và bánh mì"
+ *               timestamp:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Scheduled time for the meal (must be in the future)
+ *                 example: "2024-01-10T07:00:00.000Z"
+ *           examples:
+ *             breakfast:
+ *               summary: Breakfast meal plan
+ *               value:
+ *                 groupId: 1
+ *                 name: "breakfast"
+ *                 description: "Phở bò và bánh mì"
+ *                 timestamp: "2024-01-10T07:00:00.000Z"
+ *             lunch:
+ *               summary: Lunch meal plan
+ *               value:
+ *                 groupId: 1
+ *                 name: "launch"
+ *                 description: "Cơm gà xối mỡ"
+ *                 timestamp: "2024-01-10T12:00:00.000Z"
  *     responses:
  *       200:
  *         description: Meal plan created successfully
@@ -102,7 +125,7 @@ const formatDateToDisplay = (dateString) => {
  *                   properties:
  *                     en:
  *                       type: string
- *                       example: "Add meal plan successfull"
+ *                       example: "Meal plan added successfully"
  *                     vn:
  *                       type: string
  *                       example: "Thêm kế hoạch bữa ăn thành công"
@@ -110,64 +133,71 @@ const formatDateToDisplay = (dateString) => {
  *                   type: string
  *                   example: "00322"
  *                 newPlan:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                     name:
- *                       type: string
- *                     timestamp:
- *                       type: string
- *                       example: "11/15/2024"
- *                     status:
- *                       type: string
- *                       enum: [NOT_PASS_YET, PASSED, SKIPPED]
- *                     FoodId:
- *                       type: string
- *                     UserId:
- *                       type: string
- *                     updatedAt:
- *                       type: string
- *                       format: date-time
- *                     createdAt:
- *                       type: string
- *                       format: date-time
+ *                   $ref: '#/components/schemas/MealPlan'
  *       400:
- *         description: Missing required fields or invalid date format
- *       404:
- *         description: Food not found
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                 resultCode:
+ *                   type: string
+ *             examples:
+ *               missingFields:
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Please provide all required fields"
+ *                     vn: "Vui lòng cung cấp tất cả các trường bắt buộc"
+ *                   resultCode: "00313"
+ *               invalidTimestamp:
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Please provide a valid timestamp"
+ *                     vn: "Vui lòng cung cấp một dấu thời gian hợp lệ"
+ *                   resultCode: "00315"
+ *               invalidMealName:
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Please provide a valid meal name: breakfast (sáng), lunch (trưa), dinner (tối)"
+ *                     vn: "Vui lòng cung cấp một tên hợp lệ cho bữa ăn, sáng, trưa, tối"
+ *                   resultCode: "00316"
+ *       403:
+ *         description: Forbidden - Not group admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                 resultCode:
+ *                   type: string
+ *             example:
+ *               resultMessage:
+ *                 en: "Access denied. Only group admins can perform this action."
+ *                 vn: "Truy cập không được ủy quyền, bạn không phải admin"
+ *               resultCode: "00319"
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
  *       500:
  *         description: Internal server error
  */
+
 export const createMealPlan = async (req, res) => {
   try {
-    const { foodName, timestamp, name } = req.body;
-    // foodName: Tên món ăn,
-    // name: tên mealplan
+    const { groupId, name, description, timestamp } = req.body;
 
     // 00313 - Vui lòng cung cấp tất cả các trường bắt buộc
-    if (!foodName || !timestamp || !name) {
+    if (!description || !timestamp || !name) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide all required fields",
           vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
         },
         resultCode: "00313",
-      });
-    }
-
-    // 00314 - Vui lòng cung cấp một tên thực phẩm hợp lệ
-    if (
-      !nameRegex.test(foodName) ||
-      foodName.length < 2 ||
-      foodName.length > 50
-    ) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide a valid food name",
-          vn: "Vui lòng cung cấp một tên thực phẩm hợp lệ",
-        },
-        resultCode: "00314",
       });
     }
 
@@ -201,8 +231,6 @@ export const createMealPlan = async (req, res) => {
       });
     }
 
-    // 00319 - Người dùng không phải là quản trị viên nhóm
-    const groupId = req.params.groupId;
     const { data: groupAdmin, error: groupError } = await supabase
       .from("groups")
       .select("id, created_by")
@@ -220,23 +248,6 @@ export const createMealPlan = async (req, res) => {
       });
     }
 
-    // 00317 - Không tìm thấy thực phẩm với tên đã cung cấp
-    const { data: food, error: foodError } = await supabase
-      .from("food")
-      .select("id, name")
-      .ilike("name", foodName.trim())
-      .single();
-
-    if (foodError || !food) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Food not found with the provided name",
-          vn: "Không tìm thấy thực phẩm với tên đã cung cấp",
-        },
-        resultCode: "00317",
-      });
-    }
-
     // Chuẩn hóa tên bữa ăn
     let normalizedMealName = name.trim().toLowerCase();
 
@@ -246,10 +257,10 @@ export const createMealPlan = async (req, res) => {
       .insert([
         {
           name: normalizedMealName,
+          description: description,
           timestamp: timestamp,
           status: "NOT_PASS_YET",
-          foodid: food.id,
-          userid: req.user.id,
+          groupid: groupId,
           createdat: new Date().toISOString(),
           updatedat: new Date().toISOString(),
         },
@@ -269,10 +280,9 @@ export const createMealPlan = async (req, res) => {
       newPlan: {
         id: mealPlanData.id,
         name: mealPlanData.name,
+        description: mealPlanData.description,
         timestamp: mealPlanData.timestamp,
         status: mealPlanData.status,
-        FoodId: mealPlanData.foodid,
-        UserId: mealPlanData.userid,
         updatedAt: mealPlanData.updatedat,
         createdAt: mealPlanData.createdat,
       },
@@ -292,11 +302,12 @@ export const createMealPlan = async (req, res) => {
 
 /**
  * @swagger
- * /api/meal-plans/update:
+ * /meal:
  *   put:
+ *     tags:
+ *       - Meal Plans
  *     summary: Update an existing meal plan
- *     description: Update meal plan details including food, date, name, or status
- *     tags: [Meal Plans]
+ *     description: Update meal plan details. Only group admin can perform this action. At least one field must be provided for update.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -306,29 +317,56 @@ export const createMealPlan = async (req, res) => {
  *           schema:
  *             type: object
  *             required:
+ *               - groupId
  *               - planId
  *             properties:
+ *               groupId:
+ *                 type: integer
+ *                 description: ID of the group
+ *                 example: 1
  *               planId:
- *                 type: string
+ *                 type: integer
  *                 description: ID of the meal plan to update
- *                 example: "123e4567-e89b-12d3-a456-426614174000"
+ *                 example: 5
  *               newName:
  *                 type: string
- *                 description: New name for the meal plan
- *                 example: "Bữa tối"
- *               newFoodName:
+ *                 enum: [breakfast, launch, dinner]
+ *                 description: "New meal name: breakfast (sáng), lunch (trưa), dinner (tối)"
+ *                 example: "lunch"
+ *               newDescription:
  *                 type: string
- *                 description: New food name to associate with the meal plan
- *                 example: "Phở bò"
+ *                 description: New description for the meal plan
+ *                 example: "Cơm gà xối mỡ và canh rau"
  *               newTimestamp:
  *                 type: string
- *                 description: New date in M/D/YYYY format
- *                 example: "11/16/2024"
+ *                 format: date-time
+ *                 description: New scheduled time (must be in the future)
+ *                 example: "2024-01-15T12:00:00.000Z"
  *               newStatus:
  *                 type: string
  *                 enum: [NOT_PASS_YET, PASSED, SKIPPED]
- *                 description: New status for the meal plan
+ *                 description: New status of the meal plan
  *                 example: "PASSED"
+ *           examples:
+ *             updateNameAndTime:
+ *               summary: Update name and timestamp
+ *               value:
+ *                 groupId: 1
+ *                 planId: 5
+ *                 newName: "dinner"
+ *                 newTimestamp: "2024-01-15T19:00:00.000Z"
+ *             updateDescription:
+ *               summary: Update description only
+ *               value:
+ *                 groupId: 1
+ *                 planId: 5
+ *                 newDescription: "Lẩu Thái hải sản với tôm, mực, cá"
+ *             updateStatus:
+ *               summary: Update status
+ *               value:
+ *                 groupId: 1
+ *                 planId: 5
+ *                 newStatus: "PASSED"
  *     responses:
  *       200:
  *         description: Meal plan updated successfully
@@ -348,43 +386,79 @@ export const createMealPlan = async (req, res) => {
  *                       example: "Cập nhật kế hoạch bữa ăn thành công"
  *                 resultCode:
  *                   type: string
- *                   example: "00326"
+ *                   example: "00344"
  *                 updatedPlan:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                     name:
- *                       type: string
- *                     timestamp:
- *                       type: string
- *                       example: "11/16/2024"
- *                     status:
- *                       type: string
- *                     FoodId:
- *                       type: string
- *                     UserId:
- *                       type: string
+ *                   $ref: '#/components/schemas/MealPlanDetailed'
  *       400:
- *         description: Missing planId, invalid data, or invalid status
+ *         description: Validation errors
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               missingFields:
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Please provide all required fields"
+ *                     vn: "Vui lòng cung cấp tất cả các trường bắt buộc"
+ *                   resultCode: "00331"
+ *               missingPlanId:
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Please provide a plan ID!"
+ *                     vn: "Vui lòng cung cấp một ID kế hoạch!"
+ *                   resultCode: "00332"
+ *               noFieldsToUpdate:
+ *                 value:
+ *                   resultCode: "00333"
+ *               invalidDescription:
+ *                 value:
+ *                   resultCode: "00334"
+ *               invalidTimestamp:
+ *                 value:
+ *                   resultCode: "00335"
+ *               invalidMealName:
+ *                 value:
+ *                   resultCode: "00336"
  *       403:
- *         description: Permission denied
+ *         description: Not group admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               resultCode: "00339"
  *       404:
- *         description: Meal plan or food not found
+ *         description: Plan not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               resultCode: "00337"
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
  *       500:
  *         description: Internal server error
  */
+
 export const updateMealPlan = async (req, res) => {
   try {
-    const { planId, newFoodName, newTimestamp, newName, newStatus } = req.body;
+    const {
+      groupId,
+      planId,
+      newName,
+      newDescription,
+      newTimestamp,
+      newStatus,
+    } = req.body;
 
     // 00331 - Vui lòng cung cấp tất cả các trường bắt buộc
     if (
       !planId &&
-      newFoodName === undefined &&
+      newDescription === undefined &&
       newTimestamp === undefined &&
-      newName === undefined &&
-      newStatus === undefined
+      newName === undefined
     ) {
       return res.status(400).json({
         resultMessage: {
@@ -408,7 +482,7 @@ export const updateMealPlan = async (req, res) => {
 
     // 00333 - Vui lòng cung cấp ít nhất một trong các trường sau
     if (
-      newFoodName === undefined &&
+      newDescription === undefined &&
       newTimestamp === undefined &&
       newName === undefined &&
       newStatus === undefined
@@ -423,15 +497,11 @@ export const updateMealPlan = async (req, res) => {
     }
 
     // 00334 - Vui lòng cung cấp một tên thực phẩm mới hợp lệ!
-    if (
-      !nameRegex.test(newFoodName) ||
-      newFoodName.length < 2 ||
-      newFoodName.length > 50
-    ) {
+    if (xssPattern.test(newDescription)) {
       return res.status(400).json({
         resultMessage: {
-          en: "Please provide a valid new food name!",
-          vn: "Vui lòng cung cấp một tên thực phẩm mới hợp lệ!",
+          en: "Please provide a valid new description!",
+          vn: "Vui lòng cung cấp một mô tả mới hợp lệ!",
         },
         resultCode: "00334",
       });
@@ -470,7 +540,6 @@ export const updateMealPlan = async (req, res) => {
     }
 
     // 00339 - Người dùng không phải là quản trị viên nhóm
-    const groupId = req.params.groupId;
     const { data: groupAdmin, error: groupError } = await supabase
       .from("groups")
       .select("id, created_by")
@@ -508,26 +577,9 @@ export const updateMealPlan = async (req, res) => {
     // Build update object
     const updateData = { updatedat: new Date().toISOString() };
 
-    // Xử lý newFoodName
-    if (newFoodName !== undefined) {
-      // 00341 - Tên thực phẩm mới không tồn tại
-      const { data: food, error: foodError } = await supabase
-        .from("food")
-        .select("id, name")
-        .ilike("name", newFoodName.trim())
-        .single();
-
-      if (foodError || !food) {
-        return res.status(404).json({
-          resultMessage: {
-            en: "New food name does not exist",
-            vn: "Tên thực phẩm mới không tồn tại",
-          },
-          resultCode: "00341",
-        });
-      }
-
-      updateData.foodid = food.id;
+    // Xử lý newDescription
+    if (newDescription !== undefined) {
+      updateData.description = newDescription;
     }
 
     // Xử lý newName
@@ -569,10 +621,10 @@ export const updateMealPlan = async (req, res) => {
       updatedPlan: {
         id: updatedPlanData.id,
         name: updatedPlanData.name,
+        description: updatedPlanData.description,
         timestamp: updatedPlanData.timestamp,
         status: updatedPlanData.status,
-        FoodId: updatedPlanData.foodid,
-        UserId: updatedPlanData.userid,
+        groupid: updatedPlanData.groupid,
         updatedAt: updatedPlanData.updatedat,
         createdAt: updatedPlanData.createdat,
       },
@@ -589,13 +641,22 @@ export const updateMealPlan = async (req, res) => {
     });
   }
 };
+
 /**
  * @swagger
- * /api/meal-plans/delete:
+ * /api/mealplans:
  *   delete:
+ *     tags:
+ *       - Meal Plans
  *     summary: Delete a meal plan
- *     description: Delete a meal plan by its ID (user must own the plan)
- *     tags: [Meal Plans]
+ *     description: |
+ *       Delete a meal plan and all associated data (shopping lists and tasks).
+ *       Only group admin can perform this action.
+ *
+ *       **Cascade deletion:**
+ *       1. Delete all tasks associated with shopping lists
+ *       2. Delete all shopping lists associated with the meal plan
+ *       3. Delete the meal plan itself
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -605,12 +666,23 @@ export const updateMealPlan = async (req, res) => {
  *           schema:
  *             type: object
  *             required:
+ *               - groupId
  *               - planId
  *             properties:
+ *               groupId:
+ *                 type: integer
+ *                 description: ID of the group
+ *                 example: 1
  *               planId:
- *                 type: string
+ *                 type: integer
  *                 description: ID of the meal plan to delete
- *                 example: "123e4567-e89b-12d3-a456-426614174000"
+ *                 example: 5
+ *           examples:
+ *             deleteMealPlan:
+ *               summary: Delete meal plan
+ *               value:
+ *                 groupId: 1
+ *                 planId: 5
  *     responses:
  *       200:
  *         description: Meal plan deleted successfully
@@ -624,25 +696,139 @@ export const updateMealPlan = async (req, res) => {
  *                   properties:
  *                     en:
  *                       type: string
- *                       example: "Your meal plan was deleted successfully."
+ *                       example: "Your meal plan was deleted successfully"
  *                     vn:
  *                       type: string
  *                       example: "Kế hoạch bữa ăn của bạn đã được xóa thành công"
  *                 resultCode:
  *                   type: string
  *                   example: "00330"
+ *             example:
+ *               resultMessage:
+ *                 en: "Your meal plan was deleted successfully"
+ *                 vn: "Kế hoạch bữa ăn của bạn đã được xóa thành công"
+ *               resultCode: "00330"
  *       400:
- *         description: Missing planId
+ *         description: Bad request - Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                     vn:
+ *                       type: string
+ *                 resultCode:
+ *                   type: string
+ *             examples:
+ *               missingFields:
+ *                 summary: Missing required fields
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Please provide all required fields"
+ *                     vn: "Vui lòng cung cấp tất cả các trường bắt buộc"
+ *                   resultCode: "00323"
+ *               invalidPlanId:
+ *                 summary: Invalid plan ID
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Please provide a valid plan ID"
+ *                     vn: "Vui lòng cung cấp ID hợp lệ"
+ *                   resultCode: "00324"
  *       403:
- *         description: Permission denied
+ *         description: Forbidden - Not group admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Access denied. Only group admins can perform this action."
+ *                     vn:
+ *                       type: string
+ *                       example: "Truy cập không được ủy quyền, bạn không phải admin"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00327"
+ *             example:
+ *               resultMessage:
+ *                 en: "Access denied. Only group admins can perform this action."
+ *                 vn: "Truy cập không được ủy quyền, bạn không phải admin"
+ *               resultCode: "00327"
  *       404:
- *         description: Meal plan not found
+ *         description: Plan not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Plan not found with the provided ID"
+ *                     vn:
+ *                       type: string
+ *                       example: "Không tìm thấy kế hoạch với ID đã cung cấp"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00325"
+ *             example:
+ *               resultMessage:
+ *                 en: "Plan not found with the provided ID"
+ *                 vn: "Không tìm thấy kế hoạch với ID đã cung cấp"
+ *               resultCode: "00325"
+ *       401:
+ *         description: Unauthorized - Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
  *       500:
  *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Internal server error"
+ *                     vn:
+ *                       type: string
+ *                       example: "Lỗi máy chủ nội bộ"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00500"
+ *                 error:
+ *                   type: string
+ *                   example: "Error message details"
+ *             example:
+ *               resultMessage:
+ *                 en: "Internal server error"
+ *                 vn: "Lỗi máy chủ nội bộ"
+ *               resultCode: "00500"
+ *               error: "Database connection failed"
  */
 export const deleteMealPlan = async (req, res) => {
   try {
-    const { planId } = req.body;
+    const { groupId, planId } = req.body;
 
     // 00323 - Vui lòng cung cấp tất cả các trường bắt buộc
     if (!planId) {
@@ -673,7 +859,6 @@ export const deleteMealPlan = async (req, res) => {
     }
 
     // 00327 - Người dùng không phải là quản trị viên nhóm
-    const groupId = req.params.groupId;
     const { data: groupAdmin, error: groupError } = await supabase
       .from("groups")
       .select("id, created_by")
@@ -708,7 +893,33 @@ export const deleteMealPlan = async (req, res) => {
       });
     }
 
-    // Xóa meal plan
+    const { data: shoppingLists, error: fetchError1 } = await supabase
+      .from("shoppinglist")
+      .select("id")
+      .eq("mealplan_id", planId);
+
+    if (fetchError1) throw fetchError1;
+
+    if (shoppingLists && shoppingLists.length > 0) {
+      const shoppingListIds = shoppingLists.map((list) => list.id);
+
+      // 2. Xóa tất cả TASK thuộc về các shoppinglist đó (Xóa Cháu)
+      const { error: errorTask } = await supabase
+        .from("task")
+        .delete()
+        .in("shoppinglist_id", shoppingListIds);
+
+      if (errorTask) throw errorTask;
+    }
+
+    // 3. Xóa tất cả SHOPPINGLIST thuộc về mealplan này (Xóa Cha)
+    const { error: errorShopping } = await supabase
+      .from("shoppinglist")
+      .delete()
+      .eq("mealplan_id", planId);
+
+    if (errorShopping) throw errorShopping;
+
     const { error: deleteError } = await supabase
       .from("mealplan")
       .delete()
@@ -739,87 +950,123 @@ export const deleteMealPlan = async (req, res) => {
 
 /**
  * @swagger
- * /api/meal-plans/get-by-date:
- *   get:
- *     summary: Get meal plans by date
- *     description: Retrieve all meal plans for the authenticated user on a specific date
- *     tags: [Meal Plans]
+ * /meal:
+ *   post:
+ *     summary: Get all meal plans of a group
+ *     description: |
+ *       Get all meal plans belonging to a specific group.
+ *       User must be authenticated and must be a member of the group.
+ *     tags:
+ *       - MealPlan
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: date
- *         required: true
- *         schema:
- *           type: string
- *         description: Date in M/D/YYYY format
- *         example: "11/15/2024"
+ *     requestBody:
+ *       required: true
+ *
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - groupId
+ *             properties:
+ *               groupId:
+ *                 type: string
+ *                 example: "b1f23e9a-1234-4567-890a-abcdef123456"
  *     responses:
  *       200:
- *         description: Meal plans retrieved successfully
+ *         description: Get meal plans successfully
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00348"
  *                 resultMessage:
  *                   type: object
  *                   properties:
  *                     en:
  *                       type: string
- *                       example: "Get plans successfull"
+ *                       example: "Get plans successfully"
  *                     vn:
  *                       type: string
  *                       example: "Lấy danh sách thành công"
- *                 resultCode:
- *                   type: string
- *                   example: "00348"
- *                 plans:
+ *                 data:
  *                   type: array
  *                   items:
  *                     type: object
  *                     properties:
  *                       id:
  *                         type: string
- *                       timestamp:
- *                         type: string
- *                         example: "11/15/2024"
- *                       status:
- *                         type: string
- *                         enum: [NOT_PASS_YET, PASSED, SKIPPED]
+ *                         example: "1"
  *                       name:
  *                         type: string
+ *                         example: "Weekly Meal Plan"
+ *                       description:
+ *                         type: string
+ *                         example: "Meal plan for the whole week"
+ *                       timestamp:
+ *                         type: string
+ *                         example: "2026-01-01T10:00:00Z"
+ *                       status:
+ *                         type: string
+ *                         example: "active"
+ *                       groupid:
+ *                         type: string
+ *                         example: "b1f23e9a-1234-4567-890a-abcdef123456"
  *                       createdAt:
  *                         type: string
- *                         format: date-time
+ *                         example: "2026-01-01T09:00:00Z"
  *                       updatedAt:
  *                         type: string
- *                         format: date-time
- *                       FoodId:
- *                         type: string
- *                       UserId:
- *                         type: string
- *                       Food:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: string
- *                           name:
- *                             type: string
- *                           imageUrl:
- *                             type: string
- *                           type:
- *                             type: string
- *       400:
- *         description: Missing date parameter or invalid date format
+ *                         example: "2026-01-02T09:00:00Z"
  *       401:
  *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00401"
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Unauthorized"
+ *                     vn:
+ *                       type: string
+ *                       example: "Chưa xác thực"
+ *       403:
+ *         description: User is not a member of the group
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00345"
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "You have not joined any group"
+ *                     vn:
+ *                       type: string
+ *                       example: "Bạn chưa vào nhóm nào"
  *       500:
- *         description: Internal server error
+ *         description: Internal Server Error
  */
-export const getMealPlansByDate = async (req, res) => {
+
+export const getAllMealPlans = async (req, res) => {
   try {
-    const { date } = req.query;
+    const { groupId } = req.body;
 
     // Kiểm tra authentication
     if (!req.user || !req.user.id) {
@@ -831,7 +1078,7 @@ export const getMealPlansByDate = async (req, res) => {
         resultCode: "00401",
       });
     }
-    const groupId = req.params.groupId;
+
     // 00345 - Bạn chưa vào nhóm nào
     const { data: userData, error: userError } = await supabase
       .from("group_members")
@@ -850,67 +1097,21 @@ export const getMealPlansByDate = async (req, res) => {
       });
     }
 
-    // Kiểm tra date parameter
-    if (!date) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Missing date parameter",
-          vn: "Thiếu tham số date",
-        },
-        resultCode: "00400",
-      });
-    }
-
-    // 1. Validate và format date (hàm này phải trả về dạng YYYY-MM-DD để khớp với kiểu 'date' trong DB)
-    const formattedDate = validateAndFormatDate(date);
-    if (!formattedDate) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Invalid date format. Expected MM/DD/YYYY",
-          vn: "Định dạng ngày không hợp lệ. Yêu cầu MM/DD/YYYY",
-        },
-        resultCode: "00400",
-      });
-    }
-
     // 2. Truy vấn Supabase dựa trên cấu trúc cột trong ảnh
     const { data: plans, error } = await supabase
       .from("mealplan")
-      .select(
-        `
-        id,
-        timestamp,
-        status,
-        name,
-        foodid,
-        userid,
-        createdat,
-        updatedat,
-        food (
-          id,
-          name,
-          imageurl,
-          type,
-          createdat,
-          updatedat,
-          foodcategoryid,
-          userid,
-          unitofmeasurementid
-        )
-      `
-      )
-      .eq("userid", req.user.id)
-      .eq("timestamp", formattedDate)
+      .select("*")
+      .eq("groupid", groupId)
       .order("createdat", { ascending: true });
 
     if (error) throw error;
 
     if (!plans || plans.length === 0) {
       return res.status(200).json({
-        resultCode: "00404", // Hoặc dùng 00200 tùy bạn, nhưng 404/204 thường rõ nghĩa hơn cho "không thấy"
+        resultCode: "00404",
         resultMessage: {
-          en: "No meal plans found for this date",
-          vn: "Không tìm thấy kế hoạch bữa ăn nào cho ngày này",
+          en: "No meal plans found ",
+          vn: "Không tìm thấy kế hoạch bữa ăn nào",
         },
         data: [],
       });
@@ -918,29 +1119,15 @@ export const getMealPlansByDate = async (req, res) => {
 
     // Map lại data trả về cho chuẩn camelCase để Frontend dễ dùng
     const formattedPlans = plans.map((plan) => {
-      const f = plan.food;
       return {
         id: plan.id,
+        name: plan.name,
+        description: plan.description,
         timestamp: plan.timestamp,
         status: plan.status,
-        name: plan.name,
-        foodId: plan.foodid,
-        userId: plan.userid,
+        groupid: plan.groupid,
         createdAt: plan.createdat,
         updatedAt: plan.updatedat,
-        food: f
-          ? {
-              id: f.id,
-              name: f.name,
-              imageUrl: f.imageurl, // Sử dụng imageurl viết liền
-              type: f.type,
-              foodCategoryId: f.foodcategoryid,
-              unitOfMeasurementId: f.unitofmeasurementid,
-              userId: f.userid,
-              createdAt: f.createdat,
-              updatedAt: f.updatedat,
-            }
-          : null,
       };
     });
 
@@ -954,7 +1141,7 @@ export const getMealPlansByDate = async (req, res) => {
       data: formattedPlans,
     });
   } catch (error) {
-    console.error("Error at getMealPlanByDate:", error);
+    console.error("Error at getAllMealPlan:", error);
     return res.status(500).json({
       resultCode: "00500",
       resultMessage: {
@@ -962,6 +1149,389 @@ export const getMealPlansByDate = async (req, res) => {
         vn: "Lỗi máy chủ nội bộ",
       },
       error: error.message,
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /meal/detail:
+ *   post:
+ *     summary: Get meal plan detail by ID
+ *     description: |
+ *       Get detail of a specific meal plan by planId.
+ *       User must be authenticated and must belong to the group.
+ *     tags:
+ *       - MealPlan
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - groupId
+ *               - planId
+ *             properties:
+ *               groupId:
+ *                 type: string
+ *                 example: "b1f23e9a-1234-4567-890a-abcdef123456"
+ *               planId:
+ *                 type: string
+ *                 example: "12"
+ *     responses:
+ *       200:
+ *         description: Get meal plan successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00348"
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Get plans successfully"
+ *                     vn:
+ *                       type: string
+ *                       example: "Lấy danh sách thành công"
+ *                 planById:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       example: "12"
+ *                     name:
+ *                       type: string
+ *                       example: "Daily Meal Plan"
+ *                     description:
+ *                       type: string
+ *                       example: "Meal plan for today"
+ *                     timestamp:
+ *                       type: string
+ *                       example: "2026-01-01T10:00:00Z"
+ *                     status:
+ *                       type: string
+ *                       example: "active"
+ *                     groupid:
+ *                       type: string
+ *                       example: "b1f23e9a-1234-4567-890a-abcdef123456"
+ *                     createdAt:
+ *                       type: string
+ *                       example: "2026-01-01T09:00:00Z"
+ *                     updatedAt:
+ *                       type: string
+ *                       example: "2026-01-02T09:00:00Z"
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00401"
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Unauthorized"
+ *                     vn:
+ *                       type: string
+ *                       example: "Chưa xác thực"
+ *       403:
+ *         description: User is not a member of the group
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00345"
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "You have not joined any group"
+ *                     vn:
+ *                       type: string
+ *                       example: "Bạn chưa vào nhóm nào"
+ *       404:
+ *         description: Meal plan not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00404"
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "No meal plans found"
+ *                     vn:
+ *                       type: string
+ *                       example: "Không tìm thấy kế hoạch bữa ăn nào"
+ *       500:
+ *         description: Internal Server Error
+ */
+
+export const getMealPlansById = async (req, res) => {
+  try {
+    const { groupId, planId } = req.body;
+
+    // Kiểm tra authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        resultMessage: {
+          en: "Unauthorized",
+          vn: "Chưa xác thực",
+        },
+        resultCode: "00401",
+      });
+    }
+
+    // 00345 - Bạn chưa vào nhóm nào
+    const { data: userData, error: userError } = await supabase
+      .from("group_members")
+      .select("group_id, user_id")
+      .eq("user_id", req.user.id)
+      .eq("group_id", groupId)
+      .single();
+
+    if (userError || !userData) {
+      return res.status(403).json({
+        resultMessage: {
+          en: "You have not joined any group",
+          vn: "Bạn chưa vào nhóm nào",
+        },
+        resultCode: "00345",
+      });
+    }
+
+    // 2. Truy vấn Supabase dựa trên cấu trúc cột trong ảnh
+    const { data: plans, error } = await supabase
+      .from("mealplan")
+      .select("*")
+      .eq("id", planId)
+      .single();
+
+    if (error) throw error;
+
+    if (!plans) {
+      return res.status(200).json({
+        resultCode: "00404",
+        resultMessage: {
+          en: "No meal plans found ",
+          vn: "Không tìm thấy kế hoạch bữa ăn nào",
+        },
+        data: [],
+      });
+    }
+
+    // Map lại data trả về cho chuẩn camelCase để Frontend dễ dùng
+
+    return res.status(200).json({
+      resultCode: "00200",
+      resultMessage: {
+        en: "Get plans successfully",
+        vn: "Lấy danh sách thành công",
+      },
+      resultCode: "00348",
+      planById: {
+        id: plans.id,
+        name: plans.name,
+        description: plans.description,
+        timestamp: plans.timestamp,
+        status: plans.status,
+        groupid: plans.groupid,
+        createdAt: plans.createdat,
+        updatedAt: plans.updatedat,
+      },
+    });
+  } catch (error) {
+    console.error("Error at getAllMealPlan:", error);
+    return res.status(500).json({
+      resultCode: "00500",
+      resultMessage: {
+        en: "Internal Server Error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      error: error.message,
+    });
+  }
+};
+/**
+ * @swagger
+ * /meal/search:
+ *   post:
+ *     summary: Search meal plans by name
+ *     description: |
+ *       Search meal plans by keyword in meal plan name.
+ *       The search is case-insensitive.
+ *     tags:
+ *       - MealPlan
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "breakfast"
+ *     responses:
+ *       200:
+ *         description: Search meal plans successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00380"
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Search mealplan successfully"
+ *                     vn:
+ *                       type: string
+ *                       example: "Tìm kiếm mealplan thành công"
+ *                 mealplan:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         example: "1"
+ *                       name:
+ *                         type: string
+ *                         example: "Healthy Breakfast"
+ *                       description:
+ *                         type: string
+ *                         example: "Nutritious breakfast meal plan"
+ *                       timestamp:
+ *                         type: string
+ *                         example: "2026-01-01T08:00:00Z"
+ *                       status:
+ *                         type: string
+ *                         example: "active"
+ *                       groupid:
+ *                         type: string
+ *                         example: "b1f23e9a-1234-4567-890a-abcdef123456"
+ *                       createdAt:
+ *                         type: string
+ *                         example: "2026-01-01T07:30:00Z"
+ *                       updatedAt:
+ *                         type: string
+ *                         example: "2026-01-02T07:30:00Z"
+ *       400:
+ *         description: Invalid input
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   oneOf:
+ *                     - example: "00371"
+ *                     - example: "00372"
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Please provide a valid search keyword"
+ *                     vn:
+ *                       type: string
+ *                       example: "Vui lòng cung cấp từ khóa tìm kiếm hợp lệ"
+ *       500:
+ *         description: Internal Server Error
+ */
+
+export const searchMealPlansByName = async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    // 00371 - Vui lòng cung cấp tất cả các trường bắt buộc
+    if (!name) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide all required fields",
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
+        },
+        resultCode: "00371",
+      });
+    }
+
+    // 00372 - Từ khóa tìm kiếm không hợp lệ
+    if (typeof name !== "string" || name.trim() === "") {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid search keyword",
+          vn: "Vui lòng cung cấp từ khóa tìm kiếm hợp lệ",
+        },
+        resultCode: "00372",
+      });
+    }
+
+    // Tìm recipe theo tên
+    const { data: mealplans, error } = await supabase
+      .from("mealplan")
+      .select("*")
+      .ilike("name", `%${name}%`)
+      .order("createdat", { ascending: false });
+
+    if (error) throw error;
+
+    const formattedMealPlans = mealplans.map((plan) => ({
+      id: plan.id,
+      name: plan.name,
+      description: plan.description,
+      timestamp: plan.timestamp,
+      status: plan.status,
+      groupid: plan.groupid,
+      createdAt: plan.createdat,
+      updatedAt: plan.updatedat,
+    }));
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Search mealplan successfully",
+        vn: "Tìm kiếm mealplan thành công",
+      },
+      resultCode: "00380",
+      mealplan: formattedMealPlans,
+    });
+  } catch (err) {
+    console.error("Error searching mealplans:", err.message);
+    res.status(500).json({
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
     });
   }
 };
