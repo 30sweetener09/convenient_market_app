@@ -734,12 +734,7 @@ export const getAllRecipes = async (req, res) => {
   try {
     const { data: recipes, error } = await supabase
       .from("recipe")
-      .select(
-        `
-        *,
-        food:foodid (*)
-      `
-      )
+      .select("*")
       .order("createdat", { ascending: false });
 
     if (error) throw error;
