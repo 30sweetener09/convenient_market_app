@@ -16,8 +16,8 @@ recipeRoutes.use(supabaseAuth);
 
 // Routes
 recipeRoutes.post("/", uploadMiddleware, createRecipe);
-recipeRoutes.put("/:id", uploadMiddleware, updateRecipe); // Nên có ID
-recipeRoutes.delete("/:id", deleteRecipe); // Nên có ID
+recipeRoutes.put("/", uploadMiddleware, updateRecipe); // Nên có ID
+recipeRoutes.delete("/", deleteRecipe); // Nên có ID
 recipeRoutes.get("/", getAllRecipes);
 
 export default recipeRoutes;
