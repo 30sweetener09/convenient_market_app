@@ -1,11 +1,11 @@
 // routes/food.js
 import express from "express";
-import multer from 'multer';
+import multer from "multer";
 import {
   createFood,
   updateFood,
   deleteFood,
-  getFoodsByGroup,
+  getAllFoods,
   getUnits,
   getCategories,
   getFoodByName,
@@ -18,13 +18,11 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 router.use(userContext);
-/**
- * FOOD ROUTES
- */
-router.post('/create', upload.single('image'), createFood); 
-router.put('/update', upload.single('image'), updateFood);
-router.delete("/delete", deleteFood); // Xóa không cần gửi file
-router.get("/list", getFoodsByGroup); // Lấy list không cần file
+
+router.post("/", upload.single("image"), createFood);
+router.put("/", upload.single("image"), updateFood);
+router.delete("/", deleteFood);
+router.get("/", getAllFoods);
 router.get("/unit", getUnits);
 router.get("/category", getCategories);
 router.get("/list/:foodName", getFoodByName);

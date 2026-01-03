@@ -5,10 +5,6 @@ import {
   getAllShoppingLists,
   updateShoppingList,
   deleteShoppingList,
-  createTasks,
-  markTask,
-  deleteTask,
-  updateTask,
 } from "../controllers/shoppingListController.js";
 import { requirePermission } from "../middlewares/permission.js";
 import { supabaseAuth } from "../middlewares/supabaseAuth.js";
@@ -23,11 +19,5 @@ router.post("/", createShoppingList);
 router.get("/", getAllShoppingLists);
 router.put("/", updateShoppingList);
 router.delete("/", deleteShoppingList);
-
-// Tasks Routes
-router.post("/task", createTasks);
-router.put("/task/mark", markTask);
-router.put("/task/", updateTask);
-router.delete("/task", deleteTask);
 
 export default router;

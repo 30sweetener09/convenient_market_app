@@ -962,6 +962,7 @@ export const deleteMealPlan = async (req, res) => {
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
+ *
  *       content:
  *         application/json:
  *           schema:
