@@ -37,3 +37,4 @@ export default (app) => {
 };
 
 // url swagger: http://localhost:3000/api-docs
+// url: https://convenient-market-app.onrender.com/api
