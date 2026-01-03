@@ -238,7 +238,7 @@ export const createGroup = async (req, res) => {
       group_id: group.id,
       user_id: userId,
       role_in_group: "groupAdmin",
-      role_group_id: 1,
+      group_role_id: 1,
       joined_at: new Date(),
     });
 
