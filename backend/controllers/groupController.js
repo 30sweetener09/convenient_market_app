@@ -676,3 +676,102 @@ export const getGroupsMemberByName = async (req, res) => {
 
   res.json(data);
 };
+
+/**
+ * @swagger
+ * /group/{id}:
+ *   get:
+ *     summary: Lấy chi tiết một group theo ID
+ *     description: >
+ *       Trả về thông tin chi tiết của group theo ID.
+ *       User phải là thành viên của group.
+ *     tags: [Group]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID của group
+ *         schema:
+ *           type: string
+ *           example: "f1a3b9d2-8c4a-4e9a-b123-abc456789000"
+ *     responses:
+ *       200:
+ *         description: Thông tin chi tiết group
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                 description:
+ *                   type: string
+ *                 imageurl:
+ *                   type: string
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *                 role:
+ *                   type: string
+ *                   example: member
+ *                 total_members:
+ *                   type: integer
+ *                   example: 5
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: User không thuộc group
+ *       404:
+ *         description: Group không tồn tại
+ */
+export const getGroupById = async (req, res) => {
+  try {
+    const groupId = req.params.id;
+    const userId = req.user.id;
+
+    // 1️⃣ Check user có thuộc group không + lấy role
+    const { data: membership, error: memberError } = await supabase
+      .from("group_members")
+      .select("role_in_group")
+      .eq("group_id", groupId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (memberError) {
+      return res.status(400).json({ error: memberError.message });
+    }
+
+    if (!membership) {
+      return res.status(403).json({ error: "You are not a member of this group" });
+    }
+
+    // 2️⃣ Lấy thông tin group
+    const { data: group, error: groupError } = await supabase
+      .from("groups")
+      .select("id, name, description, imageurl, created_at")
+      .eq("id", groupId)
+      .single();
+
+    if (groupError) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    // 3️⃣ Đếm số thành viên
+    const { count } = await supabase
+      .from("group_members")
+      .select("*", { count: "exact", head: true })
+      .eq("group_id", groupId);
+
+    return res.json({
+      ...group,
+      role: membership.role_in_group,
+      total_members: count || 0,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};

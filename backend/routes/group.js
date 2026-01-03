@@ -6,6 +6,7 @@ import { upload } from "../middlewares/upload.js";
 import {
   getGroups,
   getGroupsByName,
+  getGroupById,
   createGroup,
   updateGroup,
   deleteGroup,
@@ -23,7 +24,8 @@ router.use(supabaseAuth);
  * GROUP
  */
 router.get("/", getGroups);                       // danh sách group của user
-router.get("/search", getGroupsByName);           // search group theo tên
+router.get("/search", getGroupsByName);     
+router.get("/:id", getGroupById);      // lấy thông tin chi tiết group theo ID
 router.post("/", upload.single("file"), createGroup);
 router.put("/:id", upload.single("file"), updateGroup);
 router.delete("/:id", deleteGroup);
