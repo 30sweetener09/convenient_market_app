@@ -1,8 +1,4 @@
 {
-<<<<<<< HEAD
-    "cmake.ignoreCMakeListsMissing": true
-}
-=======
   "sqltools.connections": [
     {
       "ssh": "Disabled",
@@ -17,4 +13,3 @@
     }
   ]
 }
->>>>>>> 0c45b6d879a18c3c522e042f9045c448333593be
