@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'package:di_cho_tien_loi/providers/user_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path_lib;
+import 'package:provider/provider.dart';
 
 
 class EditProfileModal extends StatefulWidget {
@@ -100,6 +102,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
   }
 
   Future<void> _handleSave() async {
+    final userProvider = context.read<UserProvider>();
     final newUsername = _usernameController.text.trim();
     final newImageUrl = _imageUrlController.text.trim();
 
@@ -156,7 +159,8 @@ class _EditProfileModalState extends State<EditProfileModal> {
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        await userProvider.fetchUserInfo();
+        //setState(() {});
       }
     }
   }

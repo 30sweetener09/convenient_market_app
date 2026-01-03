@@ -1,3 +1,4 @@
+import 'package:di_cho_tien_loi/data/models/group_model.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -128,7 +129,6 @@ class GroupProvider extends ChangeNotifier {
   Future<void> getAllMemberOfGroup(String groupId) async {
     isLoading = true;
     _error = null;
-    notifyListeners();
 
     try {
       final headers = await _getHeaders();
@@ -179,8 +179,73 @@ class GroupProvider extends ChangeNotifier {
       rethrow;
     }
   }
+  /*
+  Future<GroupModel?> createGroup({
+    required String name,
+    required String description,
+    File? imageFile,
+  }) async {
+    isLoading = true;
+    _error = null;
+    notifyListeners();
 
-  Future<void> createGroup() async {}
+    try {
+      final headers = await _getHeaders();
+      
+      // Tạo multipart request
+      final url = Uri.parse('$_baseUrl/group');
+      var request = http.MultipartRequest('POST', url);
+      
+      // Thêm headers
+      request.headers.addAll({
+        'accept': 'application/json',
+        'Authorization': headers['Authorization']!,
+      });
+
+      // Thêm các field text
+      request.fields['name'] = name;
+      request.fields['description'] = description;
+
+      // Thêm file nếu có
+      if (imageFile != null) {
+        final fileStream = http.ByteStream(imageFile.openRead());
+        final fileLength = await imageFile.length();
+        
+        final multipartFile = http.MultipartFile(
+          'file',
+          fileStream,
+          fileLength,
+          filename: imageFile.path.split('/').last,
+        );
+        request.files.add(multipartFile);
+      }
+
+      // Gửi request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = json.decode(response.body);
+        final newGroup = GroupModel.fromJson(responseData);
+        
+        // Thêm group mới vào danh sách
+        _allGroups?.insert(0, newGroup); // Thêm lên đầu danh sách
+        
+        // Cập nhật UI
+        isLoading = false;
+        notifyListeners();
+        
+        return newGroup;
+      } else {
+        throw Exception('Failed to create group: ${response.statusCode}');
+      }
+    } catch (e) {
+      _error = e.toString();
+      isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
+  }*/
 
   Future<void> addMemberToGroup(String username) async {}
 

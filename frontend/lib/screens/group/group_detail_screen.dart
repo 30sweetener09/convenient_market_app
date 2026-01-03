@@ -11,6 +11,7 @@ class GroupDetailScreen extends StatefulWidget {
 }
 
 class _GroupDetailScreenState extends State<GroupDetailScreen> {
+  
   GroupDTO? _group;
   bool _isLoading = true;
 
