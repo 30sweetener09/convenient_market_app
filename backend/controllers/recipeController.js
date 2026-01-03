@@ -2,31 +2,10 @@
 import { supabase } from "../db.js";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
+import { uploadImageToSupabase } from "../services/uploadService.js";
 import path from "path";
 // kiểm tra hợp lệ text
 const nameRegex = /^[a-zA-ZÀ-ỹ0-9 ]+$/;
-
-// Cấu hình multer để xử lý upload file
-const storage = multer.memoryStorage();
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // Giới hạn 5MB
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(
-      path.extname(file.originalname).toLowerCase()
-    );
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error("Chỉ chấp nhận file ảnh (jpeg, jpg, png, gif, webp)"));
-    }
-  },
-});
 
 /**
  * @swagger
@@ -44,15 +23,11 @@ const upload = multer({
  *           schema:
  *             type: object
  *             required:
- *               - foodName
  *               - name
  *               - htmlContent
  *               - description
+ *               - imageUrl
  *             properties:
- *               foodName:
- *                 type: string
- *                 description: Tên thực phẩm (2-50 ký tự)
- *                 example: "Thịt bò"
  *               name:
  *                 type: string
  *                 description: Tên công thức (2-50 ký tự)
@@ -65,7 +40,7 @@ const upload = multer({
  *                 type: string
  *                 description: Nội dung HTML của công thức
  *                 example: "<h2>Nguyên liệu</h2><ul><li>Thịt bò: 300g</li></ul>"
- *               recipeImage:
+ *               imageUrl:
  *                 type: string
  *                 format: binary
  *                 description: Ảnh công thức (tùy chọn, tối đa 5MB, định dạng jpeg/jpg/png/gif/webp)
@@ -109,10 +84,7 @@ const upload = multer({
  *                     updatedAt:
  *                       type: string
  *                       format: date-time
- *                     FoodId:
- *                       type: string
- *                     Food:
- *                       type: object
+
  *       400:
  *         description: Dữ liệu đầu vào không hợp lệ
  *         content:
@@ -142,11 +114,11 @@ const upload = multer({
  */
 export const createRecipe = async (req, res) => {
   try {
-    const { foodName, name, htmlContent, description } = req.body;
-    const recipeImage = req.file; // File ảnh từ multer
+    const { name, htmlContent, description } = req.body;
+    const recipeImage = req.file;
 
-    // 00349 - Vui lòng cung cấp tất cả các trường bắt buộc
-    if (!foodName || !name || !htmlContent || !description) {
+    // Validation
+    if (!name || !htmlContent || !description) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide all required fields",
@@ -156,22 +128,6 @@ export const createRecipe = async (req, res) => {
       });
     }
 
-    // 00350 - Vui lòng cung cấp một tên thực phẩm hợp lệ
-    if (
-      !nameRegex.test(foodName) ||
-      foodName.length < 2 ||
-      foodName.length > 50
-    ) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Please provide a valid food name",
-          vn: "Vui lòng cung cấp một tên thực phẩm hợp lệ",
-        },
-        resultCode: "00350",
-      });
-    }
-
-    // 00351 - Vui lòng cung cấp một tên công thức hợp lệ
     if (!nameRegex.test(name) || name.length < 2 || name.length > 50) {
       return res.status(400).json({
         resultMessage: {
@@ -182,7 +138,6 @@ export const createRecipe = async (req, res) => {
       });
     }
 
-    // 00352 - Vui lòng cung cấp một mô tả công thức hợp lệ
     if (typeof description !== "string" || description.trim() === "") {
       return res.status(400).json({
         resultMessage: {
@@ -193,12 +148,10 @@ export const createRecipe = async (req, res) => {
       });
     }
 
-    // 00353 - Vui lòng cung cấp nội dung HTML công thức hợp lệ
     const plainText = htmlContent
       .replace(/<[^>]*>/g, "")
       .replace(/&nbsp;/g, " ")
       .trim();
-
     const hasImage = /<img[^>]+src="([^">]+)"/g.test(htmlContent);
 
     if (typeof htmlContent !== "string" || (plainText === "" && !hasImage)) {
@@ -211,69 +164,20 @@ export const createRecipe = async (req, res) => {
       });
     }
 
-    // 00354 - Không tìm thấy thực phẩm với tên đã cung cấp
-    const { data: food, error: foodError } = await supabase
-      .from("food")
-      .select("*")
-      .eq("name", foodName.trim())
-      .single();
-
-    if (foodError || !food) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Food not found with the provided name",
-          vn: "Không tìm thấy thực phẩm với tên đã cung cấp",
-        },
-        resultCode: "00354",
-      });
-    }
-
-    // Upload ảnh lên Supabase Storage (nếu có)
-    let imageUrl = null;
-
+    // Upload ảnh (nếu có)
+    let imageData = null;
     if (recipeImage) {
       try {
-        // Tạo tên file unique
-        const fileExt = path.extname(recipeImage.originalname);
-        const fileName = `${uuidv4()}${fileExt}`;
-        const filePath = `recipe/${fileName}`;
-
-        // Upload file lên Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("recipe-images") // Tên bucket trong Supabase Storage
-          .upload(filePath, recipeImage.buffer, {
-            contentType: recipeImage.mimetype,
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          // 00355 - Lỗi khi tải ảnh lên
-          return res.status(400).json({
-            resultMessage: {
-              en: "Error uploading image",
-              vn: "Lỗi khi tải ảnh lên",
-            },
-            resultCode: "00355",
-            error: uploadError.message,
-          });
-        }
-
-        // Lấy public URL của ảnh
-        const { data: publicUrlData } = supabase.storage
-          .from("recipe-images")
-          .getPublicUrl(filePath);
-
-        imageUrl = publicUrlData.publicUrl;
-      } catch (uploadErr) {
-        console.error("Upload exception:", uploadErr);
+        imageData = await uploadImageToSupabase(recipeImage);
+      } catch (uploadError) {
+        console.error("Upload error:", uploadError);
         return res.status(400).json({
           resultMessage: {
             en: "Error uploading image",
             vn: "Lỗi khi tải ảnh lên",
           },
           resultCode: "00355",
-          error: uploadErr.message,
+          error: uploadError.message,
         });
       }
     }
@@ -286,8 +190,8 @@ export const createRecipe = async (req, res) => {
           name: name.trim(),
           description: description.trim(),
           htmlcontent: htmlContent.trim(),
-          imageurl: imageUrl, // Thêm URL ảnh vào database
-          foodid: food.id,
+          imageurl: imageData?.url || null,
+
           createdat: new Date().toISOString(),
           updatedat: new Date().toISOString(),
         },
@@ -297,8 +201,7 @@ export const createRecipe = async (req, res) => {
 
     if (insertError) throw insertError;
 
-    // 00357 - Thêm công thức nấu ăn thành công
-    res.status(200).json({
+    return res.status(201).json({
       resultMessage: {
         en: "Recipe added successfully",
         vn: "Thêm công thức nấu ăn thành công",
@@ -309,26 +212,14 @@ export const createRecipe = async (req, res) => {
         name: recipeData.name,
         description: recipeData.description,
         htmlContent: recipeData.htmlcontent,
-        imageUrl: recipeData.imageurl, // Trả về URL ảnh
+        imageUrl: recipeData.imageurl,
         createdAt: recipeData.createdat,
         updatedAt: recipeData.updatedat,
-        FoodId: recipeData.foodid,
-        Food: {
-          id: food.id,
-          name: food.name,
-          imageUrl: food.imageurl,
-          type: food.type,
-          createdAt: food.createdat,
-          updatedAt: food.updatedat,
-          FoodCategoryId: food.foodcategoryid,
-          UserId: food.userid,
-          UnitOfMeasurementId: food.unitofmeasurementid,
-        },
       },
     });
   } catch (err) {
     console.error("Error creating recipe:", err.message);
-    res.status(500).json({
+    return res.status(500).json({
       resultMessage: {
         en: "Internal server error",
         vn: "Lỗi máy chủ nội bộ",
@@ -339,12 +230,9 @@ export const createRecipe = async (req, res) => {
   }
 };
 
-// Export middleware upload để sử dụng trong route
-export const uploadRecipeImage = upload.single("recipeImage");
-
 /**
  * @swagger
- * /recipe:
+ * /recipe/{recipeId}:
  *   put:
  *     summary: Cập nhật công thức nấu ăn
  *     description: Cập nhật thông tin công thức nấu ăn, bao gồm cả ảnh. Có thể cập nhật một hoặc nhiều trường.
@@ -373,10 +261,6 @@ export const uploadRecipeImage = upload.single("recipeImage");
  *                 type: string
  *                 description: Tên công thức mới (2-50 ký tự, tùy chọn)
  *                 example: "Bò xào rau củ nâng cao"
- *               newFoodName:
- *                 type: string
- *                 description: Tên thực phẩm mới (2-50 ký tự, tùy chọn)
- *                 example: "Thịt bò Úc"
  *               newDescription:
  *                 type: string
  *                 description: Mô tả mới (tùy chọn)
@@ -429,10 +313,6 @@ export const uploadRecipeImage = upload.single("recipeImage");
  *                     updatedAt:
  *                       type: string
  *                       format: date-time
- *                     FoodId:
- *                       type: string
- *                     Food:
- *                       type: object
  *       400:
  *         description: Dữ liệu đầu vào không hợp lệ
  *         content:
@@ -462,8 +342,7 @@ export const uploadRecipeImage = upload.single("recipeImage");
  */
 export const updateRecipe = async (req, res) => {
   try {
-    const { recipeId, newHtmlContent, newDescription, newFoodName, newName } =
-      req.body;
+    const { recipeId, newHtmlContent, newDescription, newName } = req.body;
     const imageFile = req.file; // Nhận file ảnh từ middleware (Multer)
 
     // 00359 - Kiểm tra trường bắt buộc (recipeId)
@@ -478,13 +357,7 @@ export const updateRecipe = async (req, res) => {
     }
 
     // 00360 - Kiểm tra ít nhất một trường cần cập nhật (bao gồm cả ảnh)
-    if (
-      !newFoodName &&
-      !newDescription &&
-      !newHtmlContent &&
-      !newName &&
-      !imageFile
-    ) {
+    if (!newDescription && !newHtmlContent && !newName && !imageFile) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide at least one field to update",
@@ -492,23 +365,6 @@ export const updateRecipe = async (req, res) => {
         },
         resultCode: "00360",
       });
-    }
-
-    // 00361 - Validate Food Name (nếu có)
-    if (newFoodName && newFoodName.trim() !== "") {
-      if (
-        !nameRegex.test(newFoodName) ||
-        newFoodName.length < 2 ||
-        newFoodName.length > 50
-      ) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Invalid food name",
-            vn: "Tên thực phẩm không hợp lệ",
-          },
-          resultCode: "00361",
-        });
-      }
     }
 
     // 00362 - Validate Description (nếu có)
@@ -589,93 +445,18 @@ export const updateRecipe = async (req, res) => {
     // Xử lý Upload ảnh lên Supabase Storage nếu có file mới
     if (imageFile) {
       try {
-        // Xóa ảnh cũ nếu có (tùy chọn)
-        if (existingRecipe.imageurl) {
-          try {
-            // Extract file path from old URL
-            const oldUrl = existingRecipe.imageurl;
-            const urlParts = oldUrl.split("/recipe-images/");
-            if (urlParts.length > 1) {
-              const oldFilePath = urlParts[1].split("?")[0]; // Remove query params
-
-              // Xóa file cũ
-              await supabase.storage
-                .from("recipe-images")
-                .remove([`recipe/${oldFilePath}`]);
-            }
-          } catch (deleteErr) {
-            console.warn("Could not delete old image:", deleteErr.message);
-            // Không throw error, tiếp tục upload ảnh mới
-          }
-        }
-
-        // Tạo tên file unique
-        const fileExt = path.extname(imageFile.originalname);
-        const fileName = `${uuidv4()}${fileExt}`;
-        const filePath = `recipe/${fileName}`;
-
-        // Upload file mới lên Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("recipe-images")
-          .upload(filePath, imageFile.buffer, {
-            contentType: imageFile.mimetype,
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          // 00368 - Lỗi khi tải ảnh lên
-          return res.status(400).json({
-            resultMessage: {
-              en: "Error uploading image",
-              vn: "Lỗi khi tải ảnh lên",
-            },
-            resultCode: "00368",
-            error: uploadError.message,
-          });
-        }
-
-        // Lấy public URL của ảnh mới
-        const { data: publicUrlData } = supabase.storage
-          .from("recipe-images")
-          .getPublicUrl(filePath);
-
-        updateData.imageurl = publicUrlData.publicUrl;
-      } catch (uploadErr) {
-        console.error("Upload exception:", uploadErr);
+        imageData = await uploadImageToSupabase(recipeImage);
+      } catch (uploadError) {
+        console.error("Upload error:", uploadError);
         return res.status(400).json({
           resultMessage: {
             en: "Error uploading image",
             vn: "Lỗi khi tải ảnh lên",
           },
-          resultCode: "00368",
-          error: uploadErr.message,
+          resultCode: "00355",
+          error: uploadError.message,
         });
       }
-    }
-    console.log(newFoodName.trim() !== "");
-    // 00367 - Xử lý Food Name (nếu có)
-    let foodData = null;
-    if (newFoodName && newFoodName.trim() !== "") {
-      const { data: food, error: foodError } = await supabase
-        .from("food")
-        .select("*")
-        .eq("name", newFoodName.trim())
-        .single();
-
-      console.log(food);
-
-      if (foodError || !food) {
-        return res.status(404).json({
-          resultMessage: {
-            en: "Food not found",
-            vn: "Thực phẩm không tồn tại",
-          },
-          resultCode: "00367",
-        });
-      }
-      updateData.foodid = food.id;
-      foodData = food;
     }
 
     // Thực hiện Update
@@ -687,16 +468,6 @@ export const updateRecipe = async (req, res) => {
       .single();
 
     if (updateError) throw updateError;
-
-    // Lấy thông tin Food nếu chưa có
-    if (!foodData) {
-      const { data: food } = await supabase
-        .from("food")
-        .select("*")
-        .eq("id", updatedRecipe.foodid)
-        .single();
-      foodData = food;
-    }
 
     // 00370 - Cập nhật thành công
     res.status(200).json({
@@ -710,21 +481,9 @@ export const updateRecipe = async (req, res) => {
         name: updatedRecipe.name,
         description: updatedRecipe.description,
         htmlContent: updatedRecipe.htmlcontent,
-        imageUrl: updatedRecipe.imageurl, // Trả về URL ảnh mới (nếu có)
+        imageUrl: updatedRecipe.imageData, // Trả về URL ảnh mới (nếu có)
         createdAt: updatedRecipe.createdat,
         updatedAt: updatedRecipe.updatedat,
-        FoodId: updatedRecipe.foodid,
-        Food: foodData
-          ? {
-              id: foodData.id,
-              name: foodData.name,
-              imageUrl: foodData.imageurl,
-              type: foodData.type,
-              FoodCategoryId: foodData.foodcategoryid,
-              UserId: foodData.userid,
-              UnitOfMeasurementId: foodData.unitofmeasurementid,
-            }
-          : null,
       },
     });
   } catch (err) {
@@ -742,7 +501,7 @@ export const updateRecipe = async (req, res) => {
 
 /**
  * @swagger
- * /recipe:
+ * /recipe/{recipeId}:
  *   delete:
  *     summary: Delete a recipe
  *     description: Delete a recipe by its ID.
@@ -919,182 +678,6 @@ export const deleteRecipe = async (req, res) => {
 
 /**
  * @swagger
- * /recipe/byFoodId:
- *   get:
- *     summary: Get recipes by food ID
- *     description: Retrieve all recipes associated with a specific food ID, including full food information.
- *     tags:
- *       - Recipe
- *     parameters:
- *       - in: query
- *         name: foodId
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID of the food
- *     responses:
- *       200:
- *         description: Get recipes successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 resultMessage:
- *                   type: object
- *                   properties:
- *                     en:
- *                       type: string
- *                       example: Get recipes successfull
- *                     vn:
- *                       type: string
- *                       example: Lấy các công thức thành công
- *                 resultCode:
- *                   type: string
- *                   example: "00378"
- *                 recipes:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                       name:
- *                         type: string
- *                       description:
- *                         type: string
- *                       htmlContent:
- *                         type: string
- *                       createdAt:
- *                         type: string
- *                         format: date-time
- *                       updatedAt:
- *                         type: string
- *                         format: date-time
- *                       FoodId:
- *                         type: integer
- *                       Food:
- *                         type: object
- *                         nullable: true
- *                         properties:
- *                           id:
- *                             type: integer
- *                           name:
- *                             type: string
- *                           imageUrl:
- *                             type: string
- *                           type:
- *                             type: string
- *                           createdAt:
- *                             type: string
- *                             format: date-time
- *                           updatedAt:
- *                             type: string
- *                             format: date-time
- *                           FoodCategoryId:
- *                             type: integer
- *                           UserId:
- *                             type: integer
- *                           UnitOfMeasurementId:
- *                             type: integer
- *       400:
- *         description: Recipe not found with the provided ID
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 resultMessage:
- *                   type: object
- *                   properties:
- *                     en:
- *                       type: string
- *                       example: recipe not found with the provided ID
- *                     vn:
- *                       type: string
- *                       example: Không tìm thấy công thức với ID đã cung cấp
- *                 resultCode:
- *                   type: string
- *                   example: "00376"
- *       500:
- *         description: Internal server error
- */
-
-export const getRecipesByFoodId = async (req, res) => {
-  try {
-    const { foodId } = req.query;
-
-    const { data: food, error: foodError } = await supabase
-      .from("food")
-      .select("*")
-      .eq("id", foodId)
-      .single();
-
-    if (!food || foodError) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "recipe not found with the provided ID",
-          vn: "Không tìm thấy công thức với ID đã cung cấp",
-        },
-        resultCode: "00376",
-      });
-    }
-
-    // Get recipes for specific food with full food info
-    const { data: recipes, error } = await supabase
-      .from("recipe")
-      .select(
-        `
-        *,
-        food:foodid (*) 
-      `
-      )
-      .eq("foodid", foodId)
-      .order("createdat", { ascending: false });
-
-    if (error) throw error;
-
-    const formattedRecipes = recipes.map((recipe) => ({
-      id: recipe.id,
-      name: recipe.name,
-      description: recipe.description,
-      htmlContent: recipe.htmlcontent,
-      createdAt: recipe.createdat,
-      updatedAt: recipe.updatedat,
-      FoodId: recipe.foodid,
-      Food: recipe.food
-        ? {
-            id: recipe.food.id,
-            name: recipe.food.name,
-            imageUrl: recipe.food.imageurl,
-            type: recipe.food.type,
-            createdAt: recipe.food.createdat,
-            updatedAt: recipe.food.updatedat,
-            FoodCategoryId: recipe.food.foodcategoryid,
-            UserId: recipe.food.userid,
-            UnitOfMeasurementId: recipe.food.unitofmeasurementid,
-          }
-        : null,
-    }));
-
-    res.status(200).json({
-      resultMessage: {
-        en: "Get recipes successfull",
-        vn: "Lấy các công thức thành công",
-      },
-      resultCode: "00378",
-      recipes: formattedRecipes,
-    });
-  } catch (err) {
-    console.error("Error getting recipes by food id:", err.message);
-    res.status(500).json({
-      error: "Internal server error",
-    });
-  }
-};
-
-/**
- * @swagger
  * /recipe:
  *   get:
  *     summary: Get all recipes
@@ -1120,7 +703,7 @@ export const getRecipesByFoodId = async (req, res) => {
  *                       example: Lấy các công thức thành công
  *                 resultCode:
  *                   type: string
- *                   example: "00378"
+ *                   example: "00383"
  *                 recipes:
  *                   type: array
  *                   items:
@@ -1134,38 +717,16 @@ export const getRecipesByFoodId = async (req, res) => {
  *                         type: string
  *                       htmlContent:
  *                         type: string
+ *                       imageUrl:
+ *                         type: string
+ *                         description: URL ảnh công thức
  *                       createdAt:
  *                         type: string
  *                         format: date-time
  *                       updatedAt:
  *                         type: string
  *                         format: date-time
- *                       FoodId:
- *                         type: integer
- *                       Food:
- *                         type: object
- *                         nullable: true
- *                         properties:
- *                           id:
- *                             type: integer
- *                           name:
- *                             type: string
- *                           imageUrl:
- *                             type: string
- *                           type:
- *                             type: string
- *                           createdAt:
- *                             type: string
- *                             format: date-time
- *                           updatedAt:
- *                             type: string
- *                             format: date-time
- *                           FoodCategoryId:
- *                             type: integer
- *                           UserId:
- *                             type: integer
- *                           UnitOfMeasurementId:
- *                             type: integer
+ *
  *       500:
  *         description: Internal server error
  */
@@ -1190,20 +751,6 @@ export const getAllRecipes = async (req, res) => {
       htmlContent: recipe.htmlcontent,
       createdAt: recipe.createdat,
       updatedAt: recipe.updatedat,
-      FoodId: recipe.foodid,
-      Food: recipe.food
-        ? {
-            id: recipe.food.id,
-            name: recipe.food.name,
-            imageUrl: recipe.food.imageurl,
-            type: recipe.food.type,
-            createdAt: recipe.food.createdat,
-            updatedAt: recipe.food.updatedat,
-            FoodCategoryId: recipe.food.foodcategoryid,
-            UserId: recipe.food.userid,
-            UnitOfMeasurementId: recipe.food.unitofmeasurementid,
-          }
-        : null,
     }));
 
     res.status(200).json({
@@ -1211,13 +758,271 @@ export const getAllRecipes = async (req, res) => {
         en: "Get recipes successfull",
         vn: "Lấy các công thức thành công",
       },
-      resultCode: "00378",
+      resultCode: "00379",
       recipe: formattedRecipe,
     });
   } catch (err) {
     console.error("Error getting all recipes:", err.message);
     res.status(500).json({
       error: "Internal server error",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /recipe/{recipeId}:
+ *   get:
+ *     summary: Get recipe by ID
+ *     description: Retrieve detailed information of a specific recipe by its ID, including full food information.
+ *     tags:
+ *       - Recipe
+ *     parameters:
+ *       - in: path
+ *         name: recipeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the recipe
+ *     responses:
+ *       200:
+ *         description: Get recipe detail successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: Get recipe detail successfully
+ *                     vn:
+ *                       type: string
+ *                       example: Lấy chi tiết công thức thành công
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00379"
+ *                 recipe:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     name:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     htmlContent:
+ *                       type: string
+ *                     imageUrl:
+ *                       type: string
+ *                       description: URL ảnh công thức
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *
+ *       400:
+ *         description: Invalid recipe ID
+ *       404:
+ *         description: Recipe not found
+ *       500:
+ *         description: Internal server error
+ */
+export const getRecipeById = async (req, res) => {
+  try {
+    const { recipeId } = req.params;
+
+    // 00371 - Vui lòng cung cấp tất cả các trường bắt buộc
+    if (!recipeId) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide all required fields",
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
+        },
+        resultCode: "00380",
+      });
+    }
+
+    // 00372 - Vui lòng cung cấp một ID công thức hợp lệ
+    if (
+      (typeof recipeId !== "string" && typeof recipeId !== "number") ||
+      (typeof recipeId === "string" && recipeId.trim() === "")
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid recipe ID",
+          vn: "Vui lòng cung cấp một ID công thức hợp lệ",
+        },
+        resultCode: "00381",
+      });
+    }
+
+    // Lấy recipe theo ID
+    const { data: recipe, error } = await supabase
+      .from("recipe")
+      .select(
+        `
+        *,
+        food:foodid (*)
+      `
+      )
+      .eq("id", recipeId)
+      .single();
+
+    // 00373 - Không tìm thấy công thức
+    if (error || !recipe) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Recipe not found with the provided ID",
+          vn: "Không tìm thấy công thức với ID đã cung cấp",
+        },
+        resultCode: "00382",
+      });
+    }
+
+    const formattedRecipe = {
+      id: recipe.id,
+      name: recipe.name,
+      description: recipe.description,
+      htmlContent: recipe.htmlcontent,
+      createdAt: recipe.createdat,
+      updatedAt: recipe.updatedat,
+    };
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Get recipe detail successfully",
+        vn: "Lấy chi tiết công thức thành công",
+      },
+      resultCode: "00379",
+      recipe: formattedRecipe,
+    });
+  } catch (err) {
+    console.error("Error getting recipe by id:", err.message);
+    res.status(500).json({
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /recipe/search:
+ *   get:
+ *     summary: Search recipes by name
+ *     description: Search recipes by name keyword and return matching recipes with full food information.
+ *     tags:
+ *       - Recipe
+ *     parameters:
+ *       - in: query
+ *         name: name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Keyword to search recipe name
+ *         example: chicken
+ *     responses:
+ *       200:
+ *         description: Search recipes successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: Search recipes successfully
+ *                     vn:
+ *                       type: string
+ *                       example: Tìm kiếm công thức thành công
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00380"
+ *                 recipes:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       400:
+ *         description: Missing or invalid search keyword
+ *       500:
+ *         description: Internal server error
+ */
+export const searchRecipesByName = async (req, res) => {
+  try {
+    const { name } = req.query;
+
+    // 00371 - Vui lòng cung cấp tất cả các trường bắt buộc
+    if (!name) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide all required fields",
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
+        },
+        resultCode: "00371",
+      });
+    }
+
+    // 00372 - Từ khóa tìm kiếm không hợp lệ
+    if (typeof name !== "string" || name.trim() === "") {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid search keyword",
+          vn: "Vui lòng cung cấp từ khóa tìm kiếm hợp lệ",
+        },
+        resultCode: "00372",
+      });
+    }
+
+    // Tìm recipe theo tên
+    const { data: recipes, error } = await supabase
+      .from("recipe")
+      .select(
+        `
+        *,
+        food:foodid (*)
+      `
+      )
+      .ilike("name", `%${name}%`)
+      .order("createdat", { ascending: false });
+
+    if (error) throw error;
+
+    const formattedRecipes = recipes.map((recipe) => ({
+      id: recipe.id,
+      name: recipe.name,
+      description: recipe.description,
+      htmlContent: recipe.htmlcontent,
+      createdAt: recipe.createdat,
+      updatedAt: recipe.updatedat,
+    }));
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Search recipes successfully",
+        vn: "Tìm kiếm công thức thành công",
+      },
+      resultCode: "00380",
+      recipes: formattedRecipes,
+    });
+  } catch (err) {
+    console.error("Error searching recipes:", err.message);
+    res.status(500).json({
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
     });
   }
 };
