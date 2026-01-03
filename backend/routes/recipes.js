@@ -15,9 +15,9 @@ const recipeRoutes = express.Router();
 recipeRoutes.use(supabaseAuth);
 
 // Routes
-recipeRoutes.post("", uploadMiddleware, createRecipe);
+recipeRoutes.post("/", uploadMiddleware, createRecipe);
 recipeRoutes.put("/:id", uploadMiddleware, updateRecipe); // Nên có ID
 recipeRoutes.delete("/:id", deleteRecipe); // Nên có ID
-recipeRoutes.get("", getAllRecipes);
+recipeRoutes.get("/", getAllRecipes);
 
 export default recipeRoutes;

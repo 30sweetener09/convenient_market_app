@@ -678,7 +678,7 @@ export const deleteRecipe = async (req, res) => {
 
 /**
  * @swagger
- * recipe:
+ * /recipe:
  *   get:
  *     tags:
  *       - Recipes

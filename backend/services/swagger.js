@@ -9,7 +9,7 @@ const swaggerOptions = {
       version: "1.0.0",
       description: "API backend cho ứng dụng đa nền tảng",
     },
-    servers: [{ url: "https://convenient-market-app.onrender.com/api" }],
+    servers: [{ url: " https://convenient-market-app.onrender.com/api" }],
     components: {
       securitySchemes: {
         bearerAuth: {
