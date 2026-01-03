@@ -678,15 +678,17 @@ export const deleteRecipe = async (req, res) => {
 
 /**
  * @swagger
- * /recipe:
+ * recipe:
  *   get:
- *     summary: Get all recipes
- *     description: Retrieve all recipes with full food information, ordered by creation date.
  *     tags:
- *       - Recipe
+ *       - Recipes
+ *     summary: Get all recipes
+ *     description: Retrieve all recipes sorted by creation date (newest first)
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Get all recipes successfully
+ *         description: Recipes retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -697,38 +699,53 @@ export const deleteRecipe = async (req, res) => {
  *                   properties:
  *                     en:
  *                       type: string
- *                       example: Get recipes successfull
+ *                       example: "Get recipes successfull"
  *                     vn:
  *                       type: string
- *                       example: Lấy các công thức thành công
+ *                       example: "Lấy các công thức thành công"
  *                 resultCode:
  *                   type: string
- *                   example: "00383"
- *                 recipes:
+ *                   example: "00379"
+ *                 recipe:
  *                   type: array
  *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                       name:
- *                         type: string
- *                       description:
- *                         type: string
- *                       htmlContent:
- *                         type: string
- *                       imageUrl:
- *                         type: string
- *                         description: URL ảnh công thức
- *                       createdAt:
- *                         type: string
- *                         format: date-time
- *                       updatedAt:
- *                         type: string
- *                         format: date-time
- *
+ *                     $ref: '#/components/schemas/Recipe'
+ *             examples:
+ *               success:
+ *                 summary: Successful response
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Get recipes successfull"
+ *                     vn: "Lấy các công thức thành công"
+ *                   resultCode: "00379"
+ *                   recipe:
+ *                     - id: 1
+ *                       name: "Phở Bò Hà Nội"
+ *                       description: "Món phở truyền thống của Việt Nam"
+ *                       htmlContent: "<p>Nguyên liệu...</p>"
+ *                       imageUrl: "https://example.com/image.jpg"
+ *                       createdAt: "2024-01-03T10:30:00.000Z"
+ *                       updatedAt: "2024-01-03T10:30:00.000Z"
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
  *       500:
  *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Internal server error"
  */
 export const getAllRecipes = async (req, res) => {
   try {
@@ -859,12 +876,7 @@ export const getRecipeById = async (req, res) => {
     // Lấy recipe theo ID
     const { data: recipe, error } = await supabase
       .from("recipe")
-      .select(
-        `
-        *,
-        food:foodid (*)
-      `
-      )
+      .select("*")
       .eq("id", recipeId)
       .single();
 
@@ -982,12 +994,7 @@ export const searchRecipesByName = async (req, res) => {
     // Tìm recipe theo tên
     const { data: recipes, error } = await supabase
       .from("recipe")
-      .select(
-        `
-        *,
-        food:foodid (*)
-      `
-      )
+      .select("*")
       .ilike("name", `%${name}%`)
       .order("createdat", { ascending: false });
 
