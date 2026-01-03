@@ -362,9 +362,53 @@ export const deleteGroup = async (req, res) => {
  * /group/{id}/members:
  *   get:
  *     summary: Lấy danh sách thành viên trong group
+ *     description: >
+ *       Trả về danh sách thành viên của group theo ID.
+ *       User phải là thành viên của group.
  *     tags: [Group]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID của group
+ *         schema:
+ *           type: string
+ *           example: "f1a3b9d2-8c4a-4e9a-b123-abc456789000"
+ *     responses:
+ *       200:
+ *         description: Danh sách thành viên
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   role_in_group:
+ *                     type: string
+ *                     example: member
+ *                   joined_at:
+ *                     type: string
+ *                     format: date-time
+ *                   users:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       username:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                       photourl:
+ *                         type: string
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không có quyền truy cập group
+ *       404:
+ *         description: Group không tồn tại
  */
 export const getGroupMembers = async (req, res) => {
   const groupId = req.params.id;
@@ -374,7 +418,7 @@ export const getGroupMembers = async (req, res) => {
     .select(`
       role_in_group,
       joined_at,
-      users:user_id (id, username, email, photourl)
+      users:user_id (id, username, email, imageurl)
     `)
     .eq("group_id", groupId);
 
@@ -387,49 +431,173 @@ export const getGroupMembers = async (req, res) => {
  * @swagger
  * /group/{id}/members:
  *   post:
- *     summary: Thêm thành viên vào group
+ *     summary: Thêm thành viên vào group bằng email
+ *     description: >
+ *       Thêm một user vào group thông qua email.
+ *       Backend sẽ tự tìm userId từ email.
+ *       Chỉ owner hoặc admin của group mới có quyền thực hiện.
  *     tags: [Group]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID của group
+ *         schema:
+ *           type: string
+ *           example: "f1a3b9d2-8c4a-4e9a-b123-abc456789000"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email của user cần thêm vào group
+ *                 example: "user@gmail.com"
+ *               role:
+ *                 type: string
+ *                 description: Vai trò trong group
+ *                 enum: [member, admin]
+ *                 example: member
+ *     responses:
+ *       200:
+ *         description: Thêm thành viên thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 group_id:
+ *                   type: string
+ *                 user_id:
+ *                   type: string
+ *                 role_in_group:
+ *                   type: string
+ *                 joined_at:
+ *                   type: string
+ *                   format: date-time
+ *       400:
+ *         description: Thành viên đã tồn tại hoặc dữ liệu không hợp lệ
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không có quyền thêm thành viên
+ *       404:
+ *         description: Không tìm thấy user theo email
  */
+
+
 export const addMember = async (req, res) => {
-  const groupId = req.params.id;
-  const { userId, role = "member" } = req.body;
+  try {
+    const groupId = req.params.id;
+    const { email, role = "member" } = req.body;
 
-  const { data: exists } = await supabase
-    .from("group_members")
-    .select("group_id")
-    .eq("group_id", groupId)
-    .eq("user_id", userId)
-    .maybeSingle();
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
 
-  if (exists) return res.status(400).json({ error: "Member already exists" });
+    // 1️⃣ Tìm user theo email
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id, email")
+      .eq("email", email)
+      .maybeSingle();
 
-  const { data, error } = await supabaseAdmin
-    .from("group_members")
-    .insert({
-      group_id: groupId,
-      user_id: userId,
-      role_in_group: role,
-      joined_at: new Date(),
-    })
-    .select()
-    .single();
+    if (userError) {
+      return res.status(400).json({ error: userError.message });
+    }
 
-  if (error) return res.status(400).json({ error: error.message });
+    if (!user) {
+      return res.status(404).json({ error: "User not found with this email" });
+    }
 
-  res.json(data);
+    // 2️⃣ Check user đã ở trong group chưa
+    const { data: exists } = await supabase
+      .from("group_members")
+      .select("group_id")
+      .eq("group_id", groupId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (exists) {
+      return res.status(400).json({ error: "Member already exists in group" });
+    }
+
+    // 3️⃣ Insert member
+    const { data, error } = await supabaseAdmin
+      .from("group_members")
+      .insert({
+        group_id: groupId,
+        user_id: user.id,
+        role_in_group: role,
+        joined_at: new Date(),
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    return res.json(data);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
 };
+
 
 /**
  * @swagger
  * /group/{id}/members/{userId}:
  *   delete:
  *     summary: Xóa thành viên khỏi group
+ *     description: >
+ *       Xóa một user khỏi group theo groupId và userId.
+ *       Chỉ owner hoặc admin của group mới có quyền thực hiện.
  *     tags: [Group]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID của group
+ *         schema:
+ *           type: string
+ *           example: "f1a3b9d2-8c4a-4e9a-b123-abc456789000"
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         description: ID của user cần xóa khỏi group
+ *         schema:
+ *           type: string
+ *           example: "a912bc34-1122-4455-8899-acde12345678"
+ *     responses:
+ *       200:
+ *         description: Xóa thành viên thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Member removed
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không có quyền xóa thành viên
+ *       404:
+ *         description: Thành viên không tồn tại trong group
  */
+
 export const deleteMember = async (req, res) => {
   const { id, userId } = req.params;
 
@@ -447,10 +615,53 @@ export const deleteMember = async (req, res) => {
  * /group/{id}/members/search:
  *   get:
  *     summary: Tìm thành viên theo username trong group
+ *     description: >
+ *       Tìm kiếm thành viên trong group theo username (không phân biệt hoa thường).
  *     tags: [Group]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID của group
+ *         schema:
+ *           type: string
+ *           example: "f1a3b9d2-8c4a-4e9a-b123-abc456789000"
+ *       - in: query
+ *         name: keyword
+ *         required: false
+ *         description: Username cần tìm
+ *         schema:
+ *           type: string
+ *           example: duc
+ *     responses:
+ *       200:
+ *         description: Danh sách thành viên phù hợp
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   users:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       username:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không có quyền truy cập group
+ *       404:
+ *         description: Group không tồn tại
  */
+
 export const getGroupsMemberByName = async (req, res) => {
   const groupId = req.params.id;
   const { keyword = "" } = req.query;
