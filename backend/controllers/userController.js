@@ -1,6 +1,8 @@
 // controllers/userController.js
 import { supabase, supabaseAdmin } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
+import multer from "multer";
+
 import {
   sendVerificationCodeService,
   verifyCodeService,
@@ -78,9 +80,10 @@ export const login = async (req, res) => {
   }
 };
 
+
 /**
  * @swagger
- * /user/:
+ * /user:
  *   post:
  *     summary: Đăng ký người dùng mới
  *     tags: [User]
@@ -90,22 +93,67 @@ export const login = async (req, res) => {
  *         application/x-www-form-urlencoded:
  *           schema:
  *             type: object
- *             required: [email, password, username, birthdate, gender]
+ *             required:
+ *               - email
+ *               - password
+ *               - username
+ *               - birthdate
+ *               - gender
  *             properties:
- *               email: { type: string }
- *               password: { type: string }
- *               username: { type: string }
- *               birthdate: { type: string, format: date }
- *               gender: { type: string }
- *
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: example@gmail.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: 12345678
+ *               username:
+ *                 type: string
+ *                 example: ducnguyen
+ *               birthdate:
+ *                 type: string
+ *                 format: date
+ *                 example: 2004-01-01
+ *               gender:
+ *                 type: string
+ *                 example: male
  *     responses:
  *       200:
  *         description: Đăng ký thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00035"
+ *                 message:
+ *                   type: string
+ *                   example: Bạn đã đăng ký thành công. Vui lòng kiểm tra email để xác minh.
+ *       400:
+ *         description: Dữ liệu không hợp lệ hoặc email đã tồn tại
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00025"
+ *                 message:
+ *                   type: string
+ *                   example: Vui lòng cung cấp tất cả các trường bắt buộc!
+ *       500:
+ *         description: Lỗi máy chủ
  */
+
+
 export const register = async (req, res) => {
   const { email, password, username, birthdate, gender } = req.body;
 
-  // 00025 – thiếu field
+  // ================= VALIDATE =================
   if (!email || !password || !username || !birthdate || !gender) {
     return res.status(400).json({
       resultCode: "00025",
@@ -113,7 +161,6 @@ export const register = async (req, res) => {
     });
   }
 
-  // 00026 – email không hợp lệ
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.status(400).json({
@@ -138,26 +185,18 @@ export const register = async (req, res) => {
   }
 
   try {
-    // 00032 – email đã tồn tại
-    const { data: users } = await supabaseAdmin.auth.admin.listUsers();
-    if (users.users.some((u) => u.email === email)) {
-      return res.status(400).json({
-        resultCode: "00032",
-        message: "Một tài khoản với địa chỉ email này đã tồn tại.",
-      });
-    }
-
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const deviceId = uuidv4();
 
+    // ================= SIGN UP AUTH =================
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      username,
-      birthdate,
-      gender,
       options: {
         data: {
+          username,
+          gender,
+          birthdate,
           language: "vi",
           timezone,
           deviceId,
@@ -166,6 +205,14 @@ export const register = async (req, res) => {
     });
 
     if (error) {
+      // Supabase tự check email trùng
+      if (error.message.includes("already registered")) {
+        return res.status(400).json({
+          resultCode: "00032",
+          message: "Một tài khoản với địa chỉ email này đã tồn tại.",
+        });
+      }
+
       return res.status(400).json({
         resultCode: "00008",
         message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
@@ -174,19 +221,22 @@ export const register = async (req, res) => {
 
     const userId = data.user.id;
 
-    // ===== 3) INSERT USER PROFILE =====
+    // ================= INSERT PROFILE =================
+    const { error: profileError } = await supabaseAdmin
+      .from("users")
+      .insert({
+        id: userId,
+        email,
+        username,
+        gender,
+        birthdate,
+        language: "vi",
+        imageurl: null,
+        deviceid: deviceId,
+        createdat: new Date().toISOString(),
+        updatedat: new Date().toISOString(),
+      });
 
-    const { error: profileError } = await supabaseAdmin.from("users").insert({
-      id: userId,
-      email,
-      username,
-      gender,
-      birthdate,
-      language: "vi",
-      deviceid: deviceId,
-      createdat: new Date(),
-      updatedat: new Date(),
-    });
     if (profileError) {
       console.error("Profile Insert Error:", profileError);
       return res.status(500).json({
@@ -201,6 +251,7 @@ export const register = async (req, res) => {
         "Bạn đã đăng ký thành công. Vui lòng kiểm tra email để xác minh.",
     });
   } catch (err) {
+    console.error(err);
     return res.status(500).json({
       resultCode: "00008",
       message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
@@ -545,7 +596,7 @@ export const changePassword = async (req, res) => {
 
 /**
  * @swagger
- * /user/:
+ * /user:
  *   put:
  *     summary: Chỉnh sửa thông tin người dùng (bao gồm upload ảnh)
  *     tags: [User]
@@ -560,7 +611,7 @@ export const changePassword = async (req, res) => {
  *             properties:
  *               username:
  *                 type: string
- *               image:
+ *               avatar:
  *                 type: string
  *                 format: binary
  *     responses:
@@ -570,6 +621,7 @@ export const changePassword = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log("REQ BODY:", userId, req.body, req.file);
     const { username } = req.body;
 
     const updateData = {
@@ -579,20 +631,22 @@ export const updateUser = async (req, res) => {
     if (username) updateData.username = username;
 
     if (req.file) {
-      const filePath = `${userId}/${Date.now()}-${req.file.originalname}`;
+      const ext = req.file.originalname.split(".").pop();
+      const filePath = `${userId}/avatar.${ext}`;
 
-      const { error } = await supabaseAdmin.storage
+      const { error: uploadError } = await supabaseAdmin.storage
         .from("avatars")
         .upload(filePath, req.file.buffer, {
           contentType: req.file.mimetype,
+          upsert: true,
         });
 
-      if (!error) {
+      if (!uploadError) {
         const { data } = supabaseAdmin.storage
           .from("avatars")
           .getPublicUrl(filePath);
 
-        updateData.photourl = data.publicUrl;
+        updateData.imageurl = data.publicUrl;
       }
     }
 
@@ -604,7 +658,7 @@ export const updateUser = async (req, res) => {
     if (error) {
       return res.status(400).json({
         resultCode: "00008",
-        message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+        message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại1.",
       });
     }
 
