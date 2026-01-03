@@ -968,7 +968,7 @@ export const getRecipeById = async (req, res) => {
  */
 export const searchRecipesByName = async (req, res) => {
   try {
-    const { name } = req.query;
+    const { name } = req.body;
 
     // 00371 - Vui lòng cung cấp tất cả các trường bắt buộc
     if (!name) {
@@ -1006,6 +1006,7 @@ export const searchRecipesByName = async (req, res) => {
       name: recipe.name,
       description: recipe.description,
       htmlContent: recipe.htmlcontent,
+      imageurl: recipe.imageurl,
       createdAt: recipe.createdat,
       updatedAt: recipe.updatedat,
     }));

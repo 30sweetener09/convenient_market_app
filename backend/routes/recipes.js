@@ -6,6 +6,7 @@ import {
   updateRecipe,
   deleteRecipe,
   getAllRecipes,
+  searchRecipesByName,
 } from "../controllers/recipeController.js";
 import { supabaseAuth } from "../middlewares/supabaseAuth.js";
 
@@ -19,5 +20,6 @@ recipeRoutes.post("/", uploadMiddleware, createRecipe);
 recipeRoutes.put("/", uploadMiddleware, updateRecipe); // Nên có ID
 recipeRoutes.delete("/", deleteRecipe); // Nên có ID
 recipeRoutes.get("/", getAllRecipes);
+recipeRoutes.get("/search", searchRecipesByName);
 
 export default recipeRoutes;
