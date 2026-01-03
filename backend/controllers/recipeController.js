@@ -232,7 +232,7 @@ export const createRecipe = async (req, res) => {
 
 /**
  * @swagger
- * /recipe/{recipeId}:
+ * /recipe:
  *   put:
  *     summary: Cập nhật công thức nấu ăn
  *     description: Cập nhật thông tin công thức nấu ăn, bao gồm cả ảnh. Có thể cập nhật một hoặc nhiều trường.
@@ -481,7 +481,7 @@ export const updateRecipe = async (req, res) => {
         name: updatedRecipe.name,
         description: updatedRecipe.description,
         htmlContent: updatedRecipe.htmlcontent,
-        imageUrl: updatedRecipe.imageData, // Trả về URL ảnh mới (nếu có)
+        imageurl: updatedRecipe.imageurl, // Trả về URL ảnh mới (nếu có)
         createdAt: updatedRecipe.createdat,
         updatedAt: updatedRecipe.updatedat,
       },
@@ -501,7 +501,7 @@ export const updateRecipe = async (req, res) => {
 
 /**
  * @swagger
- * /recipe/{recipeId}:
+ * /recipe:
  *   delete:
  *     summary: Delete a recipe
  *     description: Delete a recipe by its ID.
