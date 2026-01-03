@@ -767,3 +767,148 @@ export const getCategories = async (req, res) => {
         });
     }
 };
+
+/**
+ * @swagger
+ * /food/list/{foodName}:
+ *   get:
+ *     summary: Lấy chi tiết thực phẩm theo tên
+ *     description: Lấy thông tin chi tiết của một thực phẩm cụ thể (của bản thân hoặc Admin nhóm).
+ *     tags: [Food]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: foodName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tên thực phẩm cần tìm
+ *         example: "Thịt gà"
+ *     responses:
+ *       200:
+ *         description: Thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en: { type: string }
+ *                     vn: { type: string }
+ *                 resultCode: { type: string }
+ *                 food: { type: object }
+ *             example:
+ *               resultMessage:
+ *                 en: "Successfully retrieved food details"
+ *                 vn: "Lấy chi tiết thực phẩm thành công"
+ *               resultCode: "00189"
+ *               food:
+ *                 id: 2
+ *                 name: "Thịt gà"
+ *                 imageUrl: "https://url-anh..."
+ *                 type: "Ingredient"
+ *                 createdAt: "2024-01-02T00:00:00Z"
+ *                 updatedAt: "2024-01-02T00:00:00Z"
+ *                 UserId: "uuid-admin-1"
+ *                 UnitOfMeasurement:
+ *                   id: 1
+ *                   unitName: "Kg"
+ *                 FoodCategory:
+ *                   id: 1
+ *                   name: "Thịt"
+ *       404:
+ *         description: Không tìm thấy (00180)
+ */
+export const getFoodByName = async (req, res) => {
+    try {
+        const { foodName } = req.params;
+        const user = req.user;
+
+        // 1. Lấy thông tin User để xác định Admin của nhóm
+        const { data: userInfo, error: userError } = await supabase
+            .from("users")
+            .select("id, belongstogroupadminid")
+            .eq("id", user.id)
+            .single();
+
+        if (userError || !userInfo) {
+             return res.status(200).json({
+                resultMessage: { 
+                  en: "User info not found", 
+                  vn: "Không tìm thấy thông tin người dùng" },
+                resultCode: "00185",
+            });
+        }
+
+        // 2. Tạo danh sách Owner ID hợp lệ (Mình + Admin)
+        const allowedOwnerIds = [user.id];
+        if (userInfo.belongstogroupadminid) {
+            allowedOwnerIds.push(userInfo.belongstogroupadminid);
+        }
+
+        // 3. Query tìm Food theo Tên & Owner
+        const { data, error } = await supabase
+            .from("food")
+            .select(`
+                id, name, imageurl, type, createdat, updatedat, userid,
+                unitofmeasurement:unitofmeasurementid ( id, unitname ),
+                foodcategory:foodcategoryid ( id, name )
+            `)
+            .in("userid", allowedOwnerIds)
+            .ilike("name", foodName.trim())
+            .maybeSingle();
+
+        if (error) throw error;
+
+        // 4. Xử lý trường hợp không tìm thấy (Mã 00180 - Food not found)
+        if (!data) {
+            return res.status(200).json({ 
+                resultMessage: { 
+                    en: "Food not found", 
+                    vn: "Không tìm thấy thực phẩm" 
+                },
+                resultCode: "00180" 
+            });
+        }
+
+        // 5. Format dữ liệu trả về (CamelCase)
+        const formattedFood = {
+            id: data.id,
+            name: data.name,
+            imageUrl: data.imageurl,
+            type: data.type,
+            createdAt: data.createdat,
+            updatedAt: data.updatedat,
+            UserId: data.userid,
+            UnitOfMeasurement: {
+                id: data.unitofmeasurement?.id,
+                unitName: data.unitofmeasurement?.unitname
+            },
+            FoodCategory: {
+                id: data.foodcategory?.id,
+                name: data.foodcategory?.name
+            }
+        };
+
+        return res.status(200).json({
+            resultMessage: { 
+                en: "Successfully retrieved food details", 
+                vn: "Lấy chi tiết thực phẩm thành công" 
+            },
+            resultCode: "00189",
+            food: formattedFood,
+        });
+
+    } catch (err) {
+        console.error("Get Food By Name Error:", err);
+        return res.status(500).json({ 
+            resultMessage: { 
+              en: "Server error", 
+              vn: "Lỗi máy chủ nội bộ" },
+            resultCode: "00187" 
+        });
+    }
+};
