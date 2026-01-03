@@ -1,20 +1,33 @@
 // controllers/userController.js
-import { supabase } from "../db.js";
+import { supabase, supabaseAdmin } from "../db.js";
 import { v4 as uuidv4 } from "uuid";
+import multer from "multer";
 
+import {
+  sendVerificationCodeService,
+  verifyCodeService,
+} from "../services/authService.js";
+
+/**
+ * @swagger
+ * tags:
+ *   name: User
+ *   description: API liên quan đến tài khoản người dùng
+ */
 
 /**
  * @swagger
  * /user/login:
  *   post:
- *     summary: Đăng nhập
- *     tags: [Auth]
+ *     summary: Đăng nhập người dùng
+ *     tags: [User]
  *     requestBody:
  *       required: true
  *       content:
  *         application/x-www-form-urlencoded:
  *           schema:
  *             type: object
+ *             required: [email, password]
  *             properties:
  *               email:
  *                 type: string
@@ -26,71 +39,223 @@ import { v4 as uuidv4 } from "uuid";
  */
 export const login = async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+  if (!email || !password) {
+    return res.status(400).json({
+      resultCode: "00038",
+      message: "Vui lòng cung cấp tất cả các trường bắt buộc!",
+    });
+  }
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ message: "Login success", session: data.session, user: data.user });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    console.log(data.session.access_token);  // JWT
+    if (error) {
+      if (error?.message?.includes("Email not confirmed")) {
+        return res.status(403).json({
+          resultCode: "00044",
+          message: "Email của bạn chưa được xác minh, vui lòng xác minh email.",
+        });
+      }
 
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+      return res.status(400).json({
+        resultCode: "00045",
+        message: "Bạn đã nhập một email hoặc mật khẩu không hợp lệ.",
+      });
+    }
+
+    return res.status(200).json({
+      resultCode: "00047",
+      message: "Bạn đã đăng nhập thành công",
+      user: data.user,
+      session: data.session,
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
 
 
 /**
  * @swagger
- * /user/:
+ * /user:
  *   post:
- *     summary: Đăng ký tài khoản mới
- *     tags: [Auth]
+ *     summary: Đăng ký người dùng mới
+ *     tags: [User]
  *     requestBody:
  *       required: true
  *       content:
  *         application/x-www-form-urlencoded:
  *           schema:
  *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - username
+ *               - birthdate
+ *               - gender
  *             properties:
  *               email:
  *                 type: string
+ *                 format: email
+ *                 example: example@gmail.com
  *               password:
  *                 type: string
- *               name:
+ *                 format: password
+ *                 example: 12345678
+ *               username:
  *                 type: string
- *               language:
+ *                 example: ducnguyen
+ *               birthdate:
  *                 type: string
- *               timezone:
+ *                 format: date
+ *                 example: 2004-01-01
+ *               gender:
  *                 type: string
- *               deviceId:
- *                 type: string
+ *                 example: male
  *     responses:
  *       200:
  *         description: Đăng ký thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00035"
+ *                 message:
+ *                   type: string
+ *                   example: Bạn đã đăng ký thành công. Vui lòng kiểm tra email để xác minh.
+ *       400:
+ *         description: Dữ liệu không hợp lệ hoặc email đã tồn tại
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00025"
+ *                 message:
+ *                   type: string
+ *                   example: Vui lòng cung cấp tất cả các trường bắt buộc!
+ *       500:
+ *         description: Lỗi máy chủ
  */
+
+
 export const register = async (req, res) => {
-  const { email, password, name } = req.body;
-  if (!email || !password || !name) {
-    return res.status(400).json({ error: "Email, password and name are required" });
+  const { email, password, username, birthdate, gender } = req.body;
+
+  // ================= VALIDATE =================
+  if (!email || !password || !username || !birthdate || !gender) {
+    return res.status(400).json({
+      resultCode: "00025",
+      message: "Vui lòng cung cấp tất cả các trường bắt buộc!",
+    });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({
+      resultCode: "00026",
+      message: "Vui lòng cung cấp một địa chỉ email hợp lệ!",
+    });
+  }
+
+  if (password.length < 6 || password.length > 20) {
+    return res.status(400).json({
+      resultCode: "00027",
+      message:
+        "Vui lòng cung cấp mật khẩu dài hơn 6 ký tự và ngắn hơn 20 ký tự.",
+    });
+  }
+
+  if (username.length < 3 || username.length > 15) {
+    return res.status(400).json({
+      resultCode: "00081",
+      message: "Tên người dùng phải dài từ 3 đến 15 ký tự.",
+    });
   }
 
   try {
-    const language = "vi"; // mặc định
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; // lấy timezone server
-    const deviceId = uuidv4(); // tự sinh
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const deviceId = uuidv4();
 
+    // ================= SIGN UP AUTH =================
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name, language, timezone, deviceId } },
+      options: {
+        data: {
+          username,
+          gender,
+          birthdate,
+          language: "vi",
+          timezone,
+          deviceId,
+        },
+      },
     });
 
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ message: "Register success", user: data.user });
+    if (error) {
+      // Supabase tự check email trùng
+      if (error.message.includes("already registered")) {
+        return res.status(400).json({
+          resultCode: "00032",
+          message: "Một tài khoản với địa chỉ email này đã tồn tại.",
+        });
+      }
+
+      return res.status(400).json({
+        resultCode: "00008",
+        message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+      });
+    }
+
+    const userId = data.user.id;
+
+    // ================= INSERT PROFILE =================
+    const { error: profileError } = await supabaseAdmin
+      .from("users")
+      .insert({
+        id: userId,
+        email,
+        username,
+        gender,
+        birthdate,
+        language: "vi",
+        imageurl: null,
+        deviceid: deviceId,
+        createdat: new Date().toISOString(),
+        updatedat: new Date().toISOString(),
+      });
+
+    if (profileError) {
+      console.error("Profile Insert Error:", profileError);
+      return res.status(500).json({
+        resultCode: "00008",
+        message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+      });
+    }
+
+    return res.status(200).json({
+      resultCode: "00035",
+      message:
+        "Bạn đã đăng ký thành công. Vui lòng kiểm tra email để xác minh.",
+    });
   } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+    console.error(err);
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
 
@@ -98,25 +263,24 @@ export const register = async (req, res) => {
  * @swagger
  * /user/logout:
  *   post:
- *     summary: Đăng xuất
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/x-www-form-urlencoded:
+ *     summary: Đăng xuất người dùng
+ *     tags: [User]
  *     responses:
  *       200:
  *         description: Đăng xuất thành công
  */
 export const logout = async (req, res) => {
   try {
-    const { error } = await supabase.auth.signOut();
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ message: "Logged out" });
-
-    console.log("User logged out");
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+    await supabase.auth.signOut();
+    return res.status(200).json({
+      resultCode: "00050",
+      message: "Đăng xuất thành công",
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
 
@@ -125,135 +289,107 @@ export const logout = async (req, res) => {
  * /user/refresh-token:
  *   post:
  *     summary: Làm mới access token
- *     tags: [Auth]
+ *     tags: [User]
  *     requestBody:
  *       required: true
  *       content:
  *         application/x-www-form-urlencoded:
  *           schema:
  *             type: object
+ *             required: [refreshToken]
  *             properties:
  *               refreshToken: { type: string }
  *     responses:
  *       200:
- *         description: Refresh thành công
+ *         description: Token được làm mới
  */
 export const refreshToken = async (req, res) => {
   const { refreshToken } = req.body;
-  if (!refreshToken) return res.status(400).json({ error: "refreshToken required" });
+
+  if (!refreshToken) {
+    return res.status(400).json({
+      resultCode: "00059",
+      message: "Vui lòng cung cấp token làm mới.",
+    });
+  }
 
   try {
-    const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ message: "Token refreshed", session: data.session });
+    const { data, error } = await supabase.auth.refreshSession({
+      refresh_token: refreshToken,
+    });
 
-    console.log(data.session.access_token);  // JWT
+    if (error) {
+      if (!data?.session) {
+        return res.status(401).json({
+          resultCode: "00061",
+          message: "Token được cung cấp không khớp với người dùng.",
+        });
+      }
+      return res.status(401).json({
+        resultCode: "00062",
+        message: "Token đã hết hạn, vui lòng đăng nhập.",
+      });
+    }
 
+    return res.status(200).json({
+      resultCode: "00065",
+      message: "Token đã được làm mới thành công.",
+      session: data.session,
+    });
   } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
-
 
 /**
  * @swagger
  * /user/send-verification-code:
  *   post:
- *     summary: Gửi mã xác minh đến email
- *     tags: [Auth]
+ *     summary: Gửi mã xác minh email
+ *     tags: [User]
  *     requestBody:
  *       required: true
  *       content:
  *         application/x-www-form-urlencoded:
  *           schema:
  *             type: object
+ *             required: [email]
  *             properties:
  *               email: { type: string }
  *     responses:
  *       200:
- *         description: Đã gửi mã
+ *         description: Đã gửi mã xác minh
  */
 export const sendVerificationCode = async (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ error: "Email required" });
 
-  try {
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ message: "Verification code sent", data });
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+  if (!email) {
+    return res.status(400).json({
+      resultCode: "00005",
+      message: "Vui lòng cung cấp đầy đủ thông tin để gửi mã.",
+    });
   }
-};
-
-
-
-
-/**
- * @swagger
- * /user/verify-email:
- *   post:
- *     summary: Xác minh email
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/x-www-form-urlencoded:
- *           schema:
- *             type: object
- *             properties:
- *               code: { type: string }
- *               token: { type: string }
- *     responses:
- *       200:
- *         description: Xác minh thành công
- */
-export const verifyEmail = async (req, res) => {
-  const { code, token } = req.body;
-  if (!code || !token) return res.status(400).json({ error: "Code and token required" });
 
   try {
-    const { data, error } = await supabase.auth.verifyOtp({ token, type: "signup" });
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ message: "Email verified", user: data.user });
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
-
-
-/**
- * @swagger
- * /user/change-password:
- *   post:
- *     summary: Đổi mật khẩu
- *     security:
- *       - bearerAuth: []
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/x-www-form-urlencoded:
- *           schema:
- *             type: object
- *             properties:
- *               oldPassword: { type: string }
- *               newPassword: { type: string }
- *     responses:
- *       200:
- *         description: Đổi mật khẩu thành công
- */
-export const changePassword = async (req, res) => {
-  const { oldPassword, newPassword } = req.body;
-  if (!oldPassword || !newPassword) return res.status(400).json({ error: "Both old and new password required" });
-
-  try {
-    // Supabase không hỗ trợ đổi mật khẩu trực tiếp bằng oldPassword → thường sẽ dùng updateUser
-    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ message: "Password changed", user: data.user });
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+    await sendVerificationCodeService(email);
+    return res.status(200).json({
+      resultCode: "00048",
+      message: "Mã đã được gửi đến email của bạn thành công.",
+    });
+  } catch (error) {
+    if (err.message?.includes("rate")) {
+      return res.status(429).json({
+        resultCode: "00024",
+        message: "Quá nhiều yêu cầu.",
+      });
+    }
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
 
@@ -261,21 +397,47 @@ export const changePassword = async (req, res) => {
  * @swagger
  * /user/:
  *   get:
- *     summary: Lấy thông tin user
+ *     summary: Lấy thông tin người dùng hiện tại
+ *     tags: [User]
  *     security:
  *       - bearerAuth: []
- *     tags: [Auth]
  *     responses:
  *       200:
- *         description: Lấy user thành công
+ *         description: Lấy thông tin thành công
  */
 export const getUser = async (req, res) => {
   try {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ user: data.user });
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+    if (!req.user?.id) {
+      return res.status(401).json({
+        resultCode: "00007",
+        message: "ID người dùng không hợp lệ.",
+      });
+    }
+    const userId = req.user.id;
+
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({
+        resultCode: "00052",
+        message: "Không thể tìm thấy người dùng.",
+      });
+    }
+
+    return res.status(200).json({
+      resultCode: "00089",
+      message: "Thông tin người dùng đã được lấy thành công.",
+      user: data,
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
   }
 };
 
@@ -283,20 +445,271 @@ export const getUser = async (req, res) => {
  * @swagger
  * /user/:
  *   delete:
- *     summary: Xóa tài khoản
+ *     summary: Xóa tài khoản người dùng
+ *     tags: [User]
  *     security:
  *       - bearerAuth: []
- *     tags: [Auth]
  *     responses:
  *       200:
- *         description: Xóa thành công
+ *         description: Xóa tài khoản thành công
  */
 export const deleteUser = async (req, res) => {
   try {
-    const { data, error } = await supabase.auth.admin.deleteUser(req.user.id);
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ message: "User deleted", data });
+    const userId = req.user.id;
+
+    await supabaseAdmin.auth.admin.deleteUser(userId);
+    await supabaseAdmin.from("users").delete().eq("id", userId);
+
+    return res.status(200).json({
+      resultCode: "00092",
+      resultMessage: {
+        vn: "Tài khoản của bạn đã bị xóa thành công.",
+        en: "Your account has been deleted successfully.",
+      },
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /user/verify-email:
+ *   post:
+ *     summary: Xác minh email
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token: { type: string }
+ *     responses:
+ *       200:
+ *         description: Xác minh thành công
+ */
+export const verifyEmail = async (req, res) => {
+  const { token } = req.body;
+
+  if (!token) {
+    return res.status(400).json({
+      resultCode: "00053",
+      message: "Vui lòng gửi một mã xác nhận.",
+    });
+  }
+
+  try {
+    const { error } = await supabase.auth.verifyOtp({
+      token,
+      type: "signup",
+    });
+
+    if (error) {
+      return res.status(400).json({
+        resultCode: "00054",
+        message:
+          "Mã bạn nhập không khớp với mã chúng tôi đã gửi đến email của bạn. Vui lòng kiểm tra lại.",
+      });
+    }
+
+    return res.status(200).json({
+      resultCode: "00058",
+      message: "Địa chỉ email của bạn đã được xác minh thành công.",
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /user/change-password:
+ *   post:
+ *     summary: Đổi mật khẩu
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             required: [newPassword]
+ *             properties:
+ *               newPassword: { type: string }
+ *     responses:
+ *       200:
+ *         description: Đổi mật khẩu thành công
+ */
+export const changePassword = async (req, res) => {
+  const { newPassword } = req.body;
+
+  if (!newPassword) {
+    return res.status(400).json({
+      resultCode: "00025",
+      message: "Vui lòng cung cấp tất cả các trường bắt buộc!.",
+    });
+  }
+
+  if (newPassword.length < 6 || newPassword.length > 20) {
+    return res.status(400).json({
+      resultCode: "00027",
+      message:
+        "Vui lòng cung cấp mật khẩu dài hơn 6 ký tự và ngắn hơn 20 ký tự.",
+    });
+  }
+
+  try {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) {
+      return res.status(400).json({
+        resultCode: "00007",
+        message: "Không thể đổi mật khẩu.",
+      });
+    }
+
+    return res.status(200).json({
+      resultCode: "00068",
+      message: "Mật khẩu mới đã được tạo thành công.",
+      user: data.user,
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /user:
+ *   put:
+ *     summary: Chỉnh sửa thông tin người dùng (bao gồm upload ảnh)
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ */
+export const updateUser = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    console.log("REQ BODY:", userId, req.body, req.file);
+    const { username } = req.body;
+
+    const updateData = {
+      updatedat: new Date(),
+    };
+
+    if (username) updateData.username = username;
+
+    if (req.file) {
+      const ext = req.file.originalname.split(".").pop();
+      const filePath = `${userId}/avatar.${ext}`;
+
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from("avatars")
+        .upload(filePath, req.file.buffer, {
+          contentType: req.file.mimetype,
+          upsert: true,
+        });
+
+      if (!uploadError) {
+        const { data } = supabaseAdmin.storage
+          .from("avatars")
+          .getPublicUrl(filePath);
+
+        updateData.imageurl = data.publicUrl;
+      }
+    }
+
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update(updateData)
+      .eq("id", userId);
+
+    if (error) {
+      return res.status(400).json({
+        resultCode: "00008",
+        message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại1.",
+      });
+    }
+
+    return res.status(200).json({
+      resultCode: "00086",
+      message: "Thông tin hồ sơ của bạn đã được thay đổi thành công.",
+    });
+  } catch {
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+    });
+  }
+};
+
+
+export const verifyCode = async (req, res) => {
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    return res.status(400).json({
+      resultCode: "00053",
+      message: "Vui lòng cung cấp email và mã xác nhận.",
+    });
+  }
+
+  try {
+    await verifyCodeService(email, code);
+
+    return res.status(200).json({
+      resultCode: "00058",
+      message: "Mã xác thực hợp lệ.",
+    });
   } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
+    if (err.message === "INVALID_CODE") {
+      return res.status(400).json({
+        resultCode: "00054",
+        message: "Mã xác thực không đúng.",
+      });
+    }
+
+    if (err.message === "CODE_EXPIRED") {
+      return res.status(400).json({
+        resultCode: "00055",
+        message: "Mã xác thực đã hết hạn.",
+      });
+    }
+
+    return res.status(500).json({
+      resultCode: "00008",
+      message: "Đã xảy ra lỗi máy chủ nội bộ.",
+    });
   }
 };

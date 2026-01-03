@@ -1,3 +1,20 @@
 {
+<<<<<<< HEAD
     "cmake.ignoreCMakeListsMissing": true
 }
+=======
+  "sqltools.connections": [
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 5432,
+      "driver": "PostgreSQL",
+      "name": "convenient_market_local",
+      "database": "convenient_market_db",
+      "username": "postgres",
+      "password": "123456"
+    }
+  ]
+}
+>>>>>>> 0c45b6d879a18c3c522e042f9045c448333593be

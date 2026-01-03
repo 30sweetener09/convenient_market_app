@@ -1,69 +1,162 @@
+CREATE TABLE public.users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email TEXT NOT NULL UNIQUE,
+    username TEXT UNIQUE,
+    name TEXT,
+    type TEXT CHECK (type IN ('user', 'admin')) DEFAULT 'user',
+    language TEXT,
+    gender TEXT,
+    countryCode TEXT,
+    timezone TIMESTAMPTZ,
+    birthDate DATE,
+    photoUrl TEXT,
+    isActivated BOOLEAN DEFAULT FALSE,
+    isVerified BOOLEAN DEFAULT FALSE,
+    deviceId TEXT,
+    belongsToGroupAdminId UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    createdAt TIMESTAMPTZ DEFAULT NOW(),
+    updatedAt TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW."updatedAt" = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_users_updated_at
+BEFORE UPDATE ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at();
+
 CREATE TABLE roles (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(50) UNIQUE NOT NULL, -- user, group_admin, super_admin
+    name VARCHAR(50) UNIQUE NOT NULL,
     description TEXT
 );
 
 CREATE TABLE permissions (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) UNIQUE NOT NULL, -- manage_group, manage_food, delete_user...
+    name VARCHAR(100) UNIQUE NOT NULL,
     description TEXT
 );
 
-CREATE TABLE user_roles (
+CREATE TABLE user_role (
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     role_id INT REFERENCES roles(id) ON DELETE CASCADE,
     PRIMARY KEY (user_id, role_id)
 );
 
-CREATE TABLE role_permissions (
+CREATE TABLE role_permission (
     role_id INT REFERENCES roles(id) ON DELETE CASCADE,
     permission_id INT REFERENCES permissions(id) ON DELETE CASCADE,
     PRIMARY KEY (role_id, permission_id)
 );
 
-
--- Roles
-INSERT INTO roles (name, description) VALUES
-('user', 'Người dùng bình thường'),
-('group_admin', 'Quản trị nhóm'),
-('super_admin', 'Quản trị hệ thống');
-
--- Permissions
-INSERT INTO permissions (name, description) VALUES
-('manage_group', 'Quản lý nhóm'),
-('manage_food', 'Quản lý thực phẩm'),
-('manage_fridge', 'Quản lý tủ lạnh'),
-('manage_shopping_list', 'Quản lý danh sách mua sắm'),
-('manage_meal_plan', 'Quản lý kế hoạch bữa ăn'),
-('manage_recipe', 'Quản lý công thức'),
-('manage_category', 'Quản lý danh mục'),
-('manage_unit', 'Quản lý đơn vị đo lường'),
-('view_logs', 'Xem nhật ký hệ thống'),
-('delete_user', 'Xóa người dùng');
-
--- Gán quyền cho group_admin
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT 2, id FROM permissions WHERE name IN (
-  'manage_group','manage_food','manage_fridge','manage_shopping_list','manage_meal_plan','manage_recipe'
+CREATE TABLE groups (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    created_by UUID REFERENCES auth.users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Gán quyền cho super_admin
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT 3, id FROM permissions WHERE name IN (
-  'manage_category','manage_unit','view_logs','delete_user'
+CREATE TABLE group_users (
+    group_id INT REFERENCES groups(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    role_in_group VARCHAR(50),
+    joined_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (group_id, user_id)
 );
 
--- RLS Policies
+CREATE TABLE FoodCategory (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    createdAt TIMESTAMPTZ DEFAULT NOW(),
+    updatedAt TIMESTAMPTZ DEFAULT NOW()
+);
 
-alter table public.orders enable row level security;
+CREATE TABLE UnitOfMeasurement (
+    id SERIAL PRIMARY KEY,
+    unitName VARCHAR(255) NOT NULL,
+    createdAt TIMESTAMPTZ DEFAULT NOW(),
+    updatedAt TIMESTAMPTZ DEFAULT NOW()
+);
 
-create policy "Users can view their own orders"
-on public.orders
-for select
-using (auth.uid() = user_id);
+CREATE TYPE food_type_enum AS ENUM ('ingredient', 'meal');
 
-create policy "Users can insert their own orders"
-on public.orders
-for insert
-with check (auth.uid() = user_id);
+CREATE TABLE Food (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    imageUrl TEXT,
+    type food_type_enum NOT NULL,
+    FoodCategoryId INT REFERENCES FoodCategory(id),
+    UserId UUID REFERENCES auth.users(id),
+    UnitOfMeasurementId INT REFERENCES UnitOfMeasurement(id),
+    createdAt TIMESTAMPTZ DEFAULT NOW(),
+    updatedAt TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE Recipe (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    description TEXT,
+    htmlContent TEXT,
+    FoodId INT REFERENCES Food(id),
+    createdAt TIMESTAMPTZ DEFAULT NOW(),
+    updatedAt TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TYPE mealplan_status_enum AS ENUM ('NOT_PASS_YET', 'DONE');
+
+CREATE TABLE MealPlan (
+    id SERIAL PRIMARY KEY,
+    timestamp DATE,
+    status mealplan_status_enum NOT NULL,
+    name VARCHAR(255),
+    FoodId INT REFERENCES Food(id),
+    UserId UUID REFERENCES auth.users(id),
+    createdAt TIMESTAMPTZ DEFAULT NOW(),
+    updatedAt TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE Fridge (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    quantity FLOAT,
+    unit VARCHAR(50),
+    expiryDate DATE,
+    note TEXT,
+    UserId UUID REFERENCES auth.users(id),
+    FoodId INT REFERENCES Food(id),
+    startDate TIMESTAMPTZ DEFAULT NOW(),
+    createdAt TIMESTAMPTZ DEFAULT NOW(),
+    updatedAt TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE ShoppingList (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    note TEXT,
+    belongsToGroupAdminId UUID REFERENCES auth.users(id),
+    assignedToUserId UUID REFERENCES auth.users(id),
+    date TIMESTAMPTZ,
+    UserId UUID REFERENCES auth.users(id),
+    createdAt TIMESTAMPTZ DEFAULT NOW(),
+    updatedAt TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE Task (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    quantity FLOAT,
+    unit VARCHAR(50),
+    isDone BOOLEAN DEFAULT FALSE,
+    shoppingListId INT REFERENCES ShoppingList(id) ON DELETE CASCADE,
+    UserId UUID REFERENCES auth.users(id),
+    createdAt TIMESTAMPTZ DEFAULT NOW(),
+    updatedAt TIMESTAMPTZ DEFAULT NOW()
+);

@@ -3,37 +3,43 @@
 // link vercel: https://convenient-market-app.vercel.app/
 import express from "express";
 import cors from "cors";
-import { supabase } from "./db.js";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
-
+dotenv.config();
+import { supabase } from "./db.js"; // client Supabase
 import registerMiddlewares from "./middlewares/index.js";
 import setupSwagger from "./services/swagger.js";
 import userRoute from "./routes/users.js";
-
-dotenv.config();
-
-
+import shoppingListRoute from "./routes/shoppingList.js";
+import mealRoute from "./routes/mealPlan.js";
+import recipeRoutes from "./routes/recipes.js";
+import adminRoute from "./routes/admin.js";
+import foodRoute from "./routes/food.js"
+import fridgeRoute from "./routes/fridge.js"
+import groupRoute from "./routes/group.js"
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-// Cho phép mọi origin, mọi method, mọi header
-app.use(cors({
-  origin: "*",          
-  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
-  allowedHeaders: ["Content-Type","Authorization"], 
-  credentials: false     
-}));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-setupSwagger(app);
 
 // Middleware
 registerMiddlewares(app);
+setupSwagger(app);
+
+// Gắn Supabase client vào req để dùng ở route
+app.use((req, res, next) => {
+  req.supabase = supabase;
+  next();
+});
 
 // Routes
 app.use("/api/user", userRoute);
-
+app.use("/api/shopping", shoppingListRoute);
+app.use("/api/recipe", recipeRoutes);
+app.use("/api/admin", adminRoute);
+app.use("/api/meal", mealRoute);
+app.use("/api/food", foodRoute);
+app.use("/api/fridge", fridgeRoute);
+app.use("/api/group", groupRoute);
 
 app.get("/", (req, res) => res.send("Smart Schedule API running"));
 

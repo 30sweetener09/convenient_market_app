@@ -12,11 +12,19 @@ const swaggerOptions = {
       version: "1.0.0",
       description: "API backend cho ứng dụng đa nền tảng",
     },
-    servers: [
-      { url: "https://convenient-market-app.vercel.app/api" }
-    ],
+    servers: [{ url: "https://convenient-market-app.vercel.app/api" }],
+     components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
+    },     
+
   },
-  apis: ["./api/*.js"],
+  apis: ["./controllers/*.js", "./api/*.js"],
 };
 
 const swaggerSpec = swaggerJsDoc(swaggerOptions);

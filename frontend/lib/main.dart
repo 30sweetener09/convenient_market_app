@@ -2,13 +2,17 @@ import 'package:di_cho_tien_loi/providers/group_provider.dart';
 import 'package:di_cho_tien_loi/providers/recipe_provider.dart';
 import 'package:di_cho_tien_loi/providers/user_provider.dart';
 import 'package:flutter/material.dart';
+<<<<<<< HEAD
 import '../screens/home/home_screen.dart';
+=======
+>>>>>>> 0c45b6d879a18c3c522e042f9045c448333593be
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'routes/app_routes.dart';
 
 void main() {
   runApp(
+<<<<<<< HEAD
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
@@ -19,6 +23,9 @@ void main() {
       ],
       child: const MyApp()
     ),
+=======
+    ChangeNotifierProvider(create: (_) => AuthProvider(), child: const MyApp()),
+>>>>>>> 0c45b6d879a18c3c522e042f9045c448333593be
   );
 }
 
