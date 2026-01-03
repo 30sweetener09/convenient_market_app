@@ -12,10 +12,6 @@ import {
   verifyEmail,
   changePassword,
   updateUser,
-  createGroup,
-  addMember,
-  deleteMember,
-  getGroupMembers,
   verifyCode,
 } from "../controllers/userController.js";
 
@@ -37,10 +33,6 @@ router.post("/verify-code", verifyCode);
 router.post("/change-password", supabaseAuth, changePassword);
 
 router.put("/", supabaseAuth, upload.single("avatar"), updateUser);
-router.post("/group", supabaseAuth, createGroup);
-router.post("/group/add", supabaseAuth, addMember);
 
-router.delete("/group", supabaseAuth, deleteMember);
-router.get("/group", supabaseAuth, getGroupMembers);
 
 export default router;
