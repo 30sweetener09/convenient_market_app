@@ -16,7 +16,7 @@ router.use(supabaseAuth);
 
 // Shopping List routes
 router.post("/", createShoppingList);
-router.get("/", getAllShoppingLists);
+router.post("/getAll", getAllShoppingLists);
 router.put("/", updateShoppingList);
 router.delete("/", deleteShoppingList);
 

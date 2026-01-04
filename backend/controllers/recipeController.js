@@ -680,7 +680,7 @@ export const deleteRecipe = async (req, res) => {
  * /recipe:
  *   get:
  *     tags:
- *       - Recipes
+ *       - Recipe
  *     summary: Get all recipes
  *     description: Retrieve all recipes sorted by creation date (newest first)
  *     security:

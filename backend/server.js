@@ -14,9 +14,10 @@ import shoppingListRoute from "./routes/shoppingList.js";
 import mealRoute from "./routes/mealPlan.js";
 import recipeRoutes from "./routes/recipes.js";
 import adminRoute from "./routes/admin.js";
-import foodRoute from "./routes/food.js"
-import fridgeRoute from "./routes/fridge.js"
-import groupRoute from "./routes/group.js"
+import foodRoute from "./routes/food.js";
+import fridgeRoute from "./routes/fridge.js";
+import groupRoute from "./routes/group.js";
+import taskRoute from "./routes/task.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,6 +35,7 @@ app.use((req, res, next) => {
 // Routes
 app.use("/api/user", userRoute);
 app.use("/api/shopping", shoppingListRoute);
+app.use("/api/task", taskRoute);
 app.use("/api/recipe", recipeRoutes);
 app.use("/api/admin", adminRoute);
 app.use("/api/meal", mealRoute);

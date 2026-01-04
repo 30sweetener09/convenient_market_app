@@ -15,9 +15,9 @@ const router = express.Router();
 router.use(supabaseAuth);
 
 // Tasks Routes
-router.post("/task", createTasks);
-router.put("/task/mark", markTask);
-router.put("/task/", updateTask);
-router.delete("/task", deleteTask);
+router.post("/", createTasks);
+router.patch("/", markTask);
+router.put("/", updateTask);
+router.delete("/", deleteTask);
 
 export default router;

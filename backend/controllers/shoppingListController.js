@@ -134,8 +134,7 @@ const validateAndFormatDate = (dateString) => {
  *                 resultCode:
  *                   type: string
  *                   example: "00249"
- *                 createdShoppingList:
- *                   $ref: '#/components/schemas/Shopping List'
+ *
  *             example:
  *               resultMessage:
  *                 en: "Shopping list created successfully."
@@ -402,66 +401,208 @@ export const createShoppingList = async (req, res) => {
 
 /**
  * @swagger
- * /shopping:
- *   get:
- *     summary: Lấy danh sách tất cả shopping lists với tasks
- *     tags: [Shopping List]
+ * /shopping/getAll:
+ *   post:
+ *     tags:
+ *       - Shopping List
+ *     summary: Get all shopping lists for a meal plan
+ *     description: |
+ *       Retrieve all shopping lists associated with a specific meal plan.
+ *       User must be authenticated.
+ *       Lists are sorted by creation date (newest first).
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - mealplan_id
+ *             properties:
+ *               mealplan_id:
+ *                 type: integer
+ *                 description: ID of the meal plan
+ *                 example: 5
+ *           examples:
+ *             getLists:
+ *               summary: Get shopping lists for meal plan
+ *               value:
+ *                 mealplan_id: 5
  *     responses:
  *       200:
- *         description: Lấy danh sách thành công (00292)
+ *         description: Shopping lists retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Get list of shopping lists successful"
+ *                     vn:
+ *                       type: string
+ *                       example: "Lấy danh sách các shopping list thành công"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00288"
+ *                 data:
+ *                   type: array
+ *
+ *             examples:
+ *               withLists:
+ *                 summary: Success with shopping lists
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Get list of shopping lists successful"
+ *                     vn: "Lấy danh sách các shopping list thành công"
+ *                   resultCode: "00288"
+ *                   data:
+ *                     - id: 10
+ *                       name: "Danh sách mua sắm tuần 1"
+ *                       description: "Mua đồ cho bữa sáng"
+ *                       note: "Nhớ mua rau tươi"
+ *                       mealplan_id: 5
+ *                       createdat: "2024-01-05T10:30:00.000Z"
+ *                       updatedat: "2024-01-05T10:30:00.000Z"
+ *                     - id: 11
+ *                       name: "Danh sách mua sắm tuần 2"
+ *                       description: "Mua đồ cho bữa trưa"
+ *                       note: null
+ *                       mealplan_id: 5
+ *                       createdat: "2024-01-04T08:00:00.000Z"
+ *                       updatedat: "2024-01-04T08:00:00.000Z"
+ *               emptyLists:
+ *                 summary: No shopping lists found
+ *                 value:
+ *                   resultMessage:
+ *                     en: "No shopping lists found"
+ *                     vn: "Không tìm thấy danh sách mua sắm"
+ *                   data: []
+ *       400:
+ *         description: Bad request - Missing mealplan_id
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Please provide mealplan_id"
+ *                     vn:
+ *                       type: string
+ *                       example: "Vui lòng cung cấp mealplan_id"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00400"
  *       401:
- *         description: Người dùng chưa thuộc nhóm nào (00288)
+ *         description: Unauthorized - Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Unauthorized"
+ *                     vn:
+ *                       type: string
+ *                       example: "Chưa xác thực"
+ *             example:
+ *               resultMessage:
+ *                 en: "Unauthorized"
+ *                 vn: "Chưa xác thực"
  *       500:
- *         description: Lỗi máy chủ
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Internal server error"
+ *                     vn:
+ *                       type: string
+ *                       example: "Lỗi máy chủ nội bộ"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00500"
+ *                 error:
+ *                   type: string
+ *                   example: "Error message details"
  */
 export const getAllShoppingLists = async (req, res) => {
   try {
     const userId = req.user?.id;
     const { mealplan_id } = req.body;
 
+    // Check authentication
     if (!userId) {
       return res.status(401).json({
         resultMessage: {
           en: "Unauthorized",
           vn: "Chưa xác thực",
         },
+        resultCode: "00401",
       });
     }
 
-    // Chỉ lấy danh sách shopping lists, không lấy tasks
+    // Validate mealplan_id
+    if (!mealplan_id) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide mealplan_id",
+          vn: "Vui lòng cung cấp mealplan_id",
+        },
+        resultCode: "00400",
+      });
+    }
+
+    // Get shopping lists
     const { data: lists, error: listError } = await supabase
       .from("shoppinglist")
       .select("*")
-      .eq("belongstogroupadminid", userId)
+      .eq("mealplan_id", mealplan_id)
       .order("createdat", { ascending: false });
 
     if (listError) {
-      console.error(" List Error:", listError);
+      console.error("List Error:", listError);
       throw listError;
     }
 
+    // Handle empty results
     if (!lists || lists.length === 0) {
       return res.status(200).json({
         resultMessage: {
           en: "No shopping lists found",
           vn: "Không tìm thấy danh sách mua sắm",
         },
+        resultCode: "00404",
         data: [],
       });
     }
 
-    // Trả về danh sách shopping lists (không có details)
+    // Format response
     const result = lists.map((list) => ({
       id: list.id,
       name: list.name,
+      description: list.description,
       note: list.note,
-      date: list.date,
-      userid: list.userid,
-      belongstogroup: list.belongstogroup,
-      assignedtouse: list.assignedtouse,
-      group_id: list.group_id,
+      mealplan_id: list.mealplan_id,
       createdat: list.createdat,
       updatedat: list.updatedat,
     }));
@@ -527,38 +668,32 @@ export const getAllShoppingLists = async (req, res) => {
  */
 export const updateShoppingList = async (req, res) => {
   try {
-    const { currentName, newName, newAssignToUsername, newDate, newNote } =
-      req.body;
+    const { groupId, shoppingId, name, description, note } = req.body;
 
     // Validate listId
-    if (!currentName) {
+    if (!shoppingId) {
       return res.status(400).json({
         resultMessage: {
-          en: "Please provide current list name",
-          vn: "Vui lòng cung cấp tên danh sách hiện tại",
+          en: "Please provide current list id",
+          vn: "Vui lòng cung cấp id danh sách hiện tại",
         },
         resultCode: "00251",
       });
     }
 
     // Validate at least one field to update
-    if (
-      !newName?.trim() &&
-      !newAssignToUsername?.trim() &&
-      !newDate?.trim() &&
-      !newNote?.trim()
-    ) {
+    if (!name?.trim() && !description?.trim() && !note?.trim()) {
       return res.status(400).json({
         resultMessage: {
-          en: "Please provide at least one of the following fields: newName, newAssignToUsername, newNote, newDate",
-          vn: "Vui lòng cung cấp ít nhất một trong những trường sau, newName, newAssignToUsername, newNote, newDate",
+          en: "Please provide at least one of the following fields: name, description, note",
+          vn: "Vui lòng cung cấp ít nhất một trong những trường sau: name, description, note",
         },
         resultCode: "00252",
       });
     }
 
     // Validate newName
-    if (!nameRegex.test(newName) || newName.length < 2 || newName.length > 50) {
+    if (!nameRegex.test(name) || name.length < 2 || name.length > 50) {
       return res.status(400).json({
         resultCode: "00253",
         resultMessage: {
@@ -570,46 +705,18 @@ export const updateShoppingList = async (req, res) => {
 
     // Validate newAssignToUsername
     if (
-      !nameRegex.test(newAssignToUsername) ||
-      newAssignToUsername.length < 2 ||
-      newAssignToUsername.length > 50
+      !nameRegex.test(description) ||
+      description.length < 2 ||
+      description.length > 50
     ) {
       return res.status(400).json({
         resultMessage: {
-          en: "Invalid new assignee username format",
-          vn: "Định dạng tên người được giao mới không hợp lệ",
+          en: "Invalid new description format",
+          vn: "Định dạng description mới không hợp lệ",
         },
         resultCode: "00254",
       });
     }
-
-    // Validate newNote
-    if (xssPattern.test(newNote) || newNote.length > 500) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Invalid new note format",
-          vn: "Định dạng ghi chú mới không hợp lệ",
-        },
-        resultCode: "00255",
-      });
-    }
-
-    // Validate and format newDate
-    let formattedDate;
-    if (newDate !== undefined) {
-      formattedDate = validateAndFormatDate(newDate);
-      if (!formattedDate) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Invalid new date format",
-            vn: "Định dạng ngày mới không hợp lệ",
-          },
-          resultCode: "00256",
-        });
-      }
-    }
-
-    const groupId = req.params.groupId;
 
     // Check if user is admin
     const { data: groupAdmin, error: groupError } = await supabase
@@ -633,7 +740,7 @@ export const updateShoppingList = async (req, res) => {
     const { data: existingList, error: fetchError } = await supabase
       .from("shoppinglist")
       .select("*")
-      .eq("name", currentName)
+      .eq("id", shoppingId)
       .maybeSingle();
 
     if (fetchError || !existingList) {
@@ -646,86 +753,28 @@ export const updateShoppingList = async (req, res) => {
       });
     }
 
-    // Check if user is the owner
-    const { data: isAdmin, error: isAdminError } = await supabase
-      .from("shoppinglist")
-      .select("name, belongstogroupadminid, group_id")
-      .eq("group_id", groupId)
-      .eq("belongstogroupadminid", req.user.id)
-      .eq("name", currentName)
-      .maybeSingle();
-
-    if (isAdminError || !isAdmin) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "The user is not an administrator of this shopping list",
-          vn: "Người dùng không phải là quản trị viên của danh sách mua sắm này",
-        },
-        resultCode: "00261",
-      });
-    }
-
     const updateData = { updatedat: new Date().toISOString() };
 
     // Update name
-    if (newName !== undefined) {
-      updateData.name = newName.trim();
+    if (name !== undefined) {
+      updateData.name = name.trim();
     }
 
-    // Update assignusername
-    if (newAssignToUsername !== undefined) {
-      const { data: newUser, error: userError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("username", newAssignToUsername)
-        .maybeSingle();
-
-      if (userError || !newUser) {
-        return res.status(404).json({
-          resultMessage: {
-            en: "User does not exist",
-            vn: "Người dùng không tồn tại",
-          },
-          resultCode: "00262",
-        });
-      }
-      // Check permission to assign
-      const { data: groupNewMember } = await supabase
-        .from("group_members")
-        .select("user_id")
-        .eq("group_id", groupId)
-        .eq("user_id", newUser.id)
-        .maybeSingle();
-
-      if (!groupNewMember) {
-        return res.status(403).json({
-          resultMessage: {
-            en: "User does not have permission to assign this list to the username",
-            vn: "Người dùng không có quyền gán danh sách này cho tên người dùng",
-          },
-          resultCode: "00263",
-        });
-      }
-
-      updateData.assignedtousername = newAssignToUsername;
-      updateData.assignedtouserid = newUser.id;
+    // Update description
+    if (description !== undefined) {
+      updateData.description = description;
     }
 
     // Update note
-    if (newNote !== undefined) {
-      updateData.note = newNote ? newNote.trim() : null;
-    }
-
-    // Update date
-    if (newDate !== undefined) {
-      updateData.date = formattedDate;
+    if (note !== undefined) {
+      updateData.note = note ? note.trim() : null;
     }
 
     // Perform update
     const { data, error } = await supabase
       .from("shoppinglist")
       .update(updateData)
-      .eq("name", currentName)
+      .eq("id", shoppingId)
       .select()
       .maybeSingle();
 
