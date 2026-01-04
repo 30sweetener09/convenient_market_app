@@ -1,16 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:http_parser/http_parser.dart';
-
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../data/models/recipe_model.dart';
 
 class RecipeProvider extends ChangeNotifier {
@@ -23,17 +19,21 @@ class RecipeProvider extends ChangeNotifier {
   static const String _baseUrl =
       'https://convenient-market-app.onrender.com/api/recipe';
 
+  // ================= TOKEN =================
+  Future<String?> _getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('access_token');
+  }
+
   // ================= FETCH LIST =================
   Future<void> fetchRecipes() async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
-
+      final token = await _getToken();
       if (token == null) {
-        debugPrint("No token found");
+        debugPrint("❌ No access_token found");
         return;
       }
 
@@ -44,6 +44,9 @@ class RecipeProvider extends ChangeNotifier {
         },
       );
 
+      debugPrint("📥 FETCH RECIPES STATUS: ${res.statusCode}");
+      debugPrint("📥 FETCH RECIPES BODY: ${res.body}");
+
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         final List list = decoded['recipe'] ?? [];
@@ -51,12 +54,9 @@ class RecipeProvider extends ChangeNotifier {
         _recipes
           ..clear()
           ..addAll(list.map((e) => Recipe.fromJson(e)));
-      } else {
-        debugPrint("Fetch recipes failed: ${res.statusCode}");
-        debugPrint(res.body);
       }
     } catch (e) {
-      debugPrint("Fetch recipes error: $e");
+      debugPrint("❌ Fetch recipes error: $e");
     }
 
     _isLoading = false;
@@ -70,9 +70,7 @@ class RecipeProvider extends ChangeNotifier {
     required String htmlContent,
     File? image,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-
+    final token = await _getToken();
     if (token == null) return false;
 
     try {
@@ -90,29 +88,23 @@ class RecipeProvider extends ChangeNotifier {
 
       if (image != null) {
         final ext = extension(image.path).toLowerCase();
-
-        MediaType mediaType;
-        if (ext == '.png') {
-          mediaType = MediaType('image', 'png');
-        } else {
-          mediaType = MediaType('image', 'jpeg');
-        }
+        final mediaType = ext == '.png'
+            ? MediaType('image', 'png')
+            : MediaType('image', 'jpeg');
 
         request.files.add(
           await http.MultipartFile.fromPath(
             'image',
             image.path,
             filename: basename(image.path),
-            contentType: mediaType, // ✅ QUAN TRỌNG
+            contentType: mediaType,
           ),
         );
       }
 
-
       final streamedRes = await request.send();
       final res = await http.Response.fromStream(streamedRes);
 
-      // ✅ LOG CHI TIẾT
       debugPrint("📥 CREATE RECIPE STATUS: ${res.statusCode}");
       debugPrint("📥 CREATE RECIPE RESPONSE: ${res.body}");
 
@@ -129,12 +121,9 @@ class RecipeProvider extends ChangeNotifier {
     return false;
   }
 
-
   // ================= DELETE =================
   Future<bool> deleteRecipe(int recipeId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-
+    final token = await _getToken();
     if (token == null) return false;
 
     try {
@@ -151,29 +140,24 @@ class RecipeProvider extends ChangeNotifier {
       );
 
       if (res.statusCode == 200 || res.statusCode == 204) {
-        // xóa local list
         _recipes.removeWhere((r) => r.id == recipeId);
         notifyListeners();
         return true;
-      } else {
-        debugPrint("Delete recipe failed: ${res.statusCode}");
-        debugPrint(res.body);
       }
     } catch (e) {
-      debugPrint("Delete recipe error: $e");
+      debugPrint("❌ Delete recipe error: $e");
     }
 
     return false;
   }
-  // ================= SEARCH (POST + BODY) =================
+
+  // ================= SEARCH =================
   Future<void> searchRecipes(String keyword) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
-
+      final token = await _getToken();
       if (token == null) return;
 
       final res = await http.post(
@@ -198,8 +182,6 @@ class RecipeProvider extends ChangeNotifier {
         _recipes
           ..clear()
           ..addAll(list.map((e) => Recipe.fromJson(e)));
-      } else {
-        debugPrint("Search failed");
       }
     } catch (e) {
       debugPrint("❌ Search error: $e");
@@ -208,5 +190,4 @@ class RecipeProvider extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
   }
-
 }
