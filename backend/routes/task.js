@@ -1,10 +1,12 @@
-// routes/shoppingList.js
+// routes/task.js
 import express from "express";
 import {
   createTasks,
   markTask,
   deleteTask,
   updateTask,
+  getAllTasks,
+  getTaskById,
 } from "../controllers/taskController.js";
 
 import { supabaseAuth } from "../middlewares/supabaseAuth.js";
@@ -19,5 +21,7 @@ router.post("/", createTasks);
 router.patch("/", markTask);
 router.put("/", updateTask);
 router.delete("/", deleteTask);
+router.get("/", getAllTasks);
+router.post("/detail", getTaskById);
 
 export default router;

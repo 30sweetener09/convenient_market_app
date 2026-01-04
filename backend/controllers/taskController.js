@@ -1035,3 +1035,273 @@ export const deleteTask = async (req, res) => {
     });
   }
 };
+
+/**
+ * @swagger
+ * /task:
+ *   get:
+ *     summary: Get all tasks
+ *     description: Retrieve all tasks ordered by created date (descending)
+ *     tags:
+ *       - Task
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Get tasks successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: Get tasks successfull
+ *                     vn:
+ *                       type: string
+ *                       example: Lấy các task thành công
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00379"
+ *                 task:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 1
+ *                       name:
+ *                         type: string
+ *                         example: Buy milk
+ *                       description:
+ *                         type: string
+ *                         example: Buy 2 liters of milk
+ *                       assigntouser_id:
+ *                         type: integer
+ *                         example: 3
+ *                       isdone:
+ *                         type: boolean
+ *                         example: false
+ *                       shoppinglist_id:
+ *                         type: integer
+ *                         example: 10
+ *                       group_id:
+ *                         type: integer
+ *                         example: 2
+ *                       createdat:
+ *                         type: string
+ *                         format: date-time
+ *                         example: 2025-01-01T10:00:00Z
+ *                       updatedat:
+ *                         type: string
+ *                         format: date-time
+ *                         example: 2025-01-02T12:00:00Z
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *       500:
+ *         description: Internal server error
+ */
+
+export const getAllTasks = async (req, res) => {
+  try {
+    const { data: tasks, error } = await supabase
+      .from("task")
+      .select("*")
+      .order("createdat", { ascending: false });
+
+    if (error) throw error;
+
+    const formattedTask = tasks.map((task) => ({
+      id: task.id,
+      name: task.name,
+      description: task.description,
+      assigntouser_id: task.assigntouser_id,
+      isdone: task.isdone,
+      shoppinglist_id: task.shoppinglist_id,
+      group_id: task.group_id,
+      createdat: task.createdat,
+      updatedat: task.updatedat,
+    }));
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Get tasks successfull",
+        vn: "Lấy các task thành công",
+      },
+      resultCode: "00379",
+      task: formattedTask,
+    });
+  } catch (err) {
+    console.error("Error getting all task:", err.message);
+    res.status(500).json({
+      error: "Internal server error",
+    });
+  }
+};
+
+/**
+ * @swagger
+ * /task/detail:
+ *   post:
+ *     summary: Get task detail by ID
+ *     description: Retrieve task detail using taskId from request body
+ *     tags:
+ *       - Task
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - taskId
+ *             properties:
+ *               taskId:
+ *                 type: string
+ *                 example: "1"
+ *     responses:
+ *       200:
+ *         description: Get task detail successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: Get task detail successfully
+ *                     vn:
+ *                       type: string
+ *                       example: Lấy chi tiết task thành công
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00379"
+ *                 task:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 1
+ *                     name:
+ *                       type: string
+ *                       example: Buy milk
+ *                     description:
+ *                       type: string
+ *                       example: Buy 2 liters of milk
+ *                     assigntouser_id:
+ *                       type: integer
+ *                       example: 3
+ *                     isdone:
+ *                       type: boolean
+ *                       example: false
+ *                     shoppinglist_id:
+ *                       type: integer
+ *                       example: 10
+ *                     group_id:
+ *                       type: integer
+ *                       example: 2
+ *                     createdat:
+ *                       type: string
+ *                       format: date-time
+ *                       example: 2025-01-01T10:00:00Z
+ *                     updatedat:
+ *                       type: string
+ *                       format: date-time
+ *                       example: 2025-01-02T12:00:00Z
+ *       400:
+ *         description: Missing or invalid taskId
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *       404:
+ *         description: Task not found
+ *       500:
+ *         description: Internal server error
+ */
+
+export const getTaskById = async (req, res) => {
+  try {
+    const { taskId } = req.body;
+
+    // 00371 - Vui lòng cung cấp tất cả các trường bắt buộc
+    if (!taskId) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide all required fields",
+          vn: "Vui lòng cung cấp tất cả các trường bắt buộc",
+        },
+        resultCode: "00380",
+      });
+    }
+
+    // 00372 - Vui lòng cung cấp một ID công thức hợp lệ
+    if (
+      (typeof taskId !== "string" && typeof taskId !== "number") ||
+      (typeof taskId === "string" && taskId.trim() === "")
+    ) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide a valid task ID",
+          vn: "Vui lòng cung cấp một ID task hợp lệ",
+        },
+        resultCode: "00381",
+      });
+    }
+
+    // Lấy task theo ID
+    const { data: task, error } = await supabase
+      .from("task")
+      .select("*")
+      .eq("id", taskId)
+      .single();
+
+    // 00373 - Không tìm thấy công thức
+    if (error || !task) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Task not found with the provided ID",
+          vn: "Không tìm thấy task với ID đã cung cấp",
+        },
+        resultCode: "00382",
+      });
+    }
+
+    const formattedTask = {
+      id: task.id,
+      name: task.name,
+      description: task.description,
+      assigntouser_id: task.assigntouser_id,
+      isdone: task.isdone,
+      shoppinglist_id: task.shoppinglist_id,
+      group_id: task.group_id,
+      createdat: task.createdat,
+      updatedat: task.updatedat,
+    };
+
+    res.status(200).json({
+      resultMessage: {
+        en: "Get task detail successfully",
+        vn: "Lấy chi tiết task thành công",
+      },
+      resultCode: "00379",
+      task: formattedTask,
+    });
+  } catch (err) {
+    console.error("Error getting task by id:", err.message);
+    res.status(500).json({
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Lỗi máy chủ nội bộ",
+      },
+      resultCode: "00500",
+    });
+  }
+};
