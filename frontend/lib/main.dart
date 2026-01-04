@@ -1,5 +1,6 @@
 import 'package:di_cho_tien_loi/providers/food_provider.dart';
 import 'package:di_cho_tien_loi/providers/group_provider.dart';
+import 'package:di_cho_tien_loi/providers/meal_plan_provider.dart';
 import 'package:di_cho_tien_loi/providers/recipe_provider.dart';
 import 'package:di_cho_tien_loi/providers/user_provider.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +18,8 @@ void main() {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => GroupProvider()),
 
-        ChangeNotifierProvider(create: (_) => FoodProvider())
+        ChangeNotifierProvider(create: (_) => FoodProvider()),
+        ChangeNotifierProvider(create: (_) => MealPlanProvider()),
       ],
       child: const MyApp()
     ),

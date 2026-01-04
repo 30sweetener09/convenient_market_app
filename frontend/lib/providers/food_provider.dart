@@ -287,6 +287,6 @@ class FoodProvider extends ChangeNotifier {
   // ================= TOKEN =================
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
+    return prefs.getString('access_token');
   }
 }
