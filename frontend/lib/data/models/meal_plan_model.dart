@@ -2,7 +2,7 @@ class MealPlan {
   final int id;
   final String name;
   final String description;
-  final DateTime timestamp;
+  final String timestamp;
   final String status;
   final int groupId;
 
@@ -22,7 +22,7 @@ class MealPlan {
       description: json['description'],
       timestamp: json['timestamp'],
       status: json['status'],
-      groupId: json['groupId'],
+      groupId: json['groupid'],
     );
   }
 }

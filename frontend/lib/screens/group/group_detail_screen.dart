@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../widgets/custom_header.dart';
 import '../../widgets/meal_plan_card.dart';
 import 'package:di_cho_tien_loi/data/dto/group_dto.dart';
 import 'package:di_cho_tien_loi/providers/group_provider.dart';
@@ -67,42 +68,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text(_group?.name ?? 'Chi tiết nhóm'),
-        elevation: 0,
-        actions: [
-          if (_group?.role == 'groupAdmin' || _group?.role == 'owner')
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert),
-              tooltip: 'Tùy chọn',
-              //onSelected: _handleMenuSelection,
-              itemBuilder: (BuildContext context) {
-                return [
-                  PopupMenuItem<String>(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, color: Theme.of(context).primaryColor),
-                        const SizedBox(width: 12),
-                        const Text('Sửa nhóm'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuDivider(),
-                  PopupMenuItem<String>(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, color: Colors.red.shade600),
-                        const SizedBox(width: 12),
-                        Text('Xóa nhóm', style: TextStyle(color: Colors.red.shade600)),
-                      ],
-                    ),
-                  ),
-                ];
-              }
-            )
-        ],
+      appBar: CustomHeader(
+        showBack: true,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -299,7 +266,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => MealPlanDetailScreen(mealPlanId: plan.id as String),
+                    builder: (_) => MealPlanDetailScreen(mealPlanId: plan.id),
                   ),
                 );
               },

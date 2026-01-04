@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class MealPlanCard extends StatelessWidget {
   final String name;
-  final DateTime date;
+  final String date;
   final String description;
   final bool isStarred;
   // final String userEmail;
