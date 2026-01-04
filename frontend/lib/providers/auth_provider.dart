@@ -29,14 +29,25 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     token = prefs.getString('access_token');
 
-    if (token != null) {
-      // Kiểm tra token còn hạn không (tuỳ backend có endpoint check hoặc decode JWT)
-      final expired = _isTokenExpired(token!);
-      if (!expired) {
-        isLoggedIn = true;
-      } else {
-        await logout();
+    if (token != null && token!.isNotEmpty) {
+      try {
+        final expired = _isTokenExpired(token!);
+        if (!expired) {
+          isLoggedIn = true;
+        } else {
+          // Token hết hạn, xóa và set false
+          await prefs.remove('access_token');
+          token = null;
+          isLoggedIn = false;
+        }
+      } catch (e) {
+        // Nếu có lỗi decode token, xóa luôn
+        await prefs.remove('access_token');
+        token = null;
+        isLoggedIn = false;
       }
+    } else {
+      isLoggedIn = false;
     }
     notifyListeners();
   }
@@ -101,10 +112,10 @@ class AuthProvider extends ChangeNotifier {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       };
-      
+
       final url = Uri.parse('$_baseUrl/user/logout');
       final response = await http.post(url, headers: headers);
-      
+
       if (response.statusCode == 200) {
         debugPrint('Logout thành công trên server');
       } else {
@@ -117,30 +128,38 @@ class AuthProvider extends ChangeNotifier {
     } finally {
       // 2. Luôn luôn xóa token trên client
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('token');
+      await prefs.remove('access_token');
       isLoading = false;
       token = null;
       isLoggedIn = false;
       notifyListeners();
     }
   }
-  
 
   /// Gọi API có token
-  Future<http.Response> authorizedGet(String endpoint) async {
-    final url = Uri.parse("$_baseUrl$endpoint");
-    final headers = {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer $token",
-    };
-    final res = await http.get(url, headers: headers);
+  Future<http.Response?> authorizedGet(String endpoint) async {
+    if (token == null) return null;
 
-    if (res.statusCode == 401) {
-      // Token hết hạn → tự logout
-      await logout();
+    try {
+      final url = Uri.parse("$_baseUrl$endpoint");
+      final headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token",
+      };
+
+      final res = await http.get(url, headers: headers);
+
+      if (res.statusCode == 401) {
+        // Token expired → logout
+        await logout();
+        return null;
+      }
+
+      return res;
+    } catch (e) {
+      debugPrint('Authorized GET error: $e');
+      return null;
     }
-
-    return res;
   }
 
   /// Gọi API đăng ký
@@ -197,7 +216,7 @@ class AuthProvider extends ChangeNotifier {
 
           if (token != null) {
             final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('token', token!);
+            await prefs.setString('access_token', token!);
             isLoggedIn = true;
           }
           success = true;
@@ -274,6 +293,7 @@ class AuthProvider extends ChangeNotifier {
     }
     return success;
   }
+
   Future<bool> verifyCode(String email, String code) async {
     isLoading = true;
     _error = null;
@@ -307,7 +327,7 @@ class AuthProvider extends ChangeNotifier {
     return success;
   }
 
-  Future<bool> verifyEmail (String verifyToken) async {
+  Future<bool> verifyEmail(String verifyToken) async {
     isLoading = true;
     _error = null;
     notifyListeners();
@@ -317,12 +337,10 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await http.post(
         Uri.parse("$_baseUrl/user/verify-email"),
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: {"Content-Type": "application/json"},
         body: jsonEncode({
-        "token": verifyToken, // ✅ QUAN TRỌNG
-      }),
+          "token": verifyToken, // ✅ QUAN TRỌNG
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -341,7 +359,7 @@ class AuthProvider extends ChangeNotifier {
     return success;
   }
 
-  Future<bool> changePassword (String newPassword) async {
+  Future<bool> changePassword(String newPassword) async {
     isLoading = true;
     _error = null;
     notifyListeners();
@@ -350,13 +368,14 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await http.post(
-      Uri.parse("$_baseUrl/user/change-password"),
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $token", // Nếu API yêu cầu token từ bước Verify OTP
-      },
-      body: jsonEncode({"newPassword": newPassword}),
-    );
+        Uri.parse("$_baseUrl/user/change-password"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization":
+              "Bearer $token", // Nếu API yêu cầu token từ bước Verify OTP
+        },
+        body: jsonEncode({"newPassword": newPassword}),
+      );
 
       if (response.statusCode == 200) {
         success = true;
