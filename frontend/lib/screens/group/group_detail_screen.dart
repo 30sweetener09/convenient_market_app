@@ -70,6 +70,39 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       appBar: AppBar(
         title: Text(_group?.name ?? 'Chi tiết nhóm'),
         elevation: 0,
+        actions: [
+          if (_group?.role == 'groupAdmin' || _group?.role == 'owner')
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'Tùy chọn',
+              //onSelected: _handleMenuSelection,
+              itemBuilder: (BuildContext context) {
+                return [
+                  PopupMenuItem<String>(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, color: Theme.of(context).primaryColor),
+                        const SizedBox(width: 12),
+                        const Text('Sửa nhóm'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, color: Colors.red.shade600),
+                        const SizedBox(width: 12),
+                        Text('Xóa nhóm', style: TextStyle(color: Colors.red.shade600)),
+                      ],
+                    ),
+                  ),
+                ];
+              }
+            )
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -277,6 +310,4 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       },
     );
   }
-
-
 }
