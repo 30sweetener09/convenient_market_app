@@ -67,7 +67,22 @@ class MyApp extends StatelessWidget {
             );
           },
           theme: ThemeData(
-            fontFamily: 'Nunito'
+            fontFamily: 'Nunito',
+            //primaryColor: Color(0xFF396A30),
+            //brightness: Brightness.light,
+            colorScheme: ColorScheme(
+              brightness: Brightness.light, // Nền sáng
+              primary: const Color(0xFF396A30), // Màu chính
+              onPrimary: Colors.white, // Màu chữ trên nền primary
+              secondary: const Color(0xFF4CAF50), // Màu phụ (có thể điều chỉnh)
+              onSecondary: Colors.white,
+              error: Colors.red,
+              onError: Colors.white,
+              surface: const Color.fromARGB(255, 236, 236, 236), // Bề mặt components
+              onSurface: Colors.black, // Chữ trên bề mặt
+              outline: const Color(0xFFE0E0E0), // Đường viền
+            ),
+
           ),
         );
       },

@@ -27,7 +27,7 @@ class GroupDTO {
   }
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      'id': id.toString(),
       'name': name,
       'imageurl': imageurl,
       'created_at': createdAt.toIso8601String(),

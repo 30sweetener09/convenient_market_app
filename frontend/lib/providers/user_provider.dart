@@ -112,6 +112,7 @@ class UserProvider extends ChangeNotifier {
       var request = http.MultipartRequest('PUT', url);
 
       // ✅ Thêm headers
+      request.headers['accept'] = '*/*';
       request.headers['Authorization'] = 'Bearer $token';
 
       // ✅ Thêm username field

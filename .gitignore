@@ -1,0 +1,15 @@
+.vscode
+.idea
+
+frontend/.dart_tool
+frontend/.packages
+frontend/android
+frontend/build
+frontend/ios
+frontend/.flutter-plugins-dependencies
+frontend/.pub-cache
+frontend/linux
+frontend/macos
+frontend/web
+frontend/windows
+  

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/group_provider.dart';
 import './group_detail_screen.dart';
+import 'create_group_modal.dart';
 
 class GroupScreen extends StatefulWidget {
   const GroupScreen({super.key});
@@ -37,6 +38,24 @@ class _GroupScreenState extends State<GroupScreen> {
     _searchFocusNode.dispose();
     _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  void _showCreateGroupModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // QUAN TRỌNG: để modal có thể cuộn
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return const CreateGroupModal();
+      },
+    ).then((value) {
+      // Khi modal đóng, refresh lại danh sách groups nếu cần
+      if (value == true) {
+        _loadGroups();
+      }
+    });
   }
 
   Future<void> _loadGroups() async {
@@ -201,14 +220,29 @@ class _GroupScreenState extends State<GroupScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showCreateGroupModal,
+        backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(48),
+        ),
+        child: const Icon(Icons.add),
+        heroTag: 'create-group-fab',
+      ),
+      // Tùy chọn: điều chỉnh vị trí của FAB
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
   Widget _buildGroupsList(GroupDTO group) {
+    debugPrint('Building group list item with ID: ${group.id}');
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ListTile(
-        leading: CircleAvatar(
+        leading: Hero(
+          tag: 'group-avatar-${group.id}',
+          child: CircleAvatar(
           radius: 24,
           backgroundColor: Colors.grey[300],
           backgroundImage: group.imageurl != null && group.imageurl!.isNotEmpty
@@ -217,7 +251,7 @@ class _GroupScreenState extends State<GroupScreen> {
           child: group.imageurl == null || group.imageurl!.isEmpty
               ? const Icon(Icons.groups, color: Colors.white, size: 32)
               : null,
-        ),
+        ),),
         title: Text(
           group.name,
           style: const TextStyle(

@@ -208,6 +208,20 @@ class _EditProfileModalState extends State<EditProfileModal> {
               ),
               const SizedBox(height: 20),
               
+              /*
+              ImagePickerWidget(
+                title: 'Ảnh đại diện',
+                currentImageUrl: widget.currentPhotoUrl,
+                onImageChanged: (File? selectedFile) {
+                  setState(() {
+                    _selectedImageFile = selectedFile;
+                    if (selectedFile != null) {
+                      _imageUrlController.clear();
+                    }
+                  });
+                },
+              ),
+               */
               // Ảnh đại diện section
               const Text(
                 'Ảnh đại diện',
