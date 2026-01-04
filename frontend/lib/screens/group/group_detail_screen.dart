@@ -1,3 +1,5 @@
+import 'package:di_cho_tien_loi/screens/group/group_screen.dart';
+import 'package:di_cho_tien_loi/screens/group/update_group_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../widgets/custom_header.dart';
@@ -34,12 +36,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       _loadGroupDetail();
 
       // 🔥 default tab = meal plan
-      context
-          .read<MealPlanProvider>()
-          .fetchMealPlansByGroup(widget.groupId);
+      context.read<MealPlanProvider>().fetchMealPlansByGroup(widget.groupId);
     });
   }
-
 
   @override
   void dispose() {
@@ -70,6 +69,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       backgroundColor: Colors.white,
       appBar: CustomHeader(
         showBack: true,
+        onEdit: _group != null ? _handleEdit : null,
+        onDelete: _group != null ? _handleDelete : null,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -84,6 +85,97 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               ],
             ),
     );
+  }
+
+  void _handleEdit() {
+    if (_group == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => UpdateGroupModal(
+        groupId: widget.groupId,
+        currentName: _group!.name,
+        currentDescription: _group!.description ?? '',
+        currentImageUrl: _group!.imageurl,
+      ),
+    ).then((updatedGroup) {
+      if (updatedGroup != null) {
+        setState(() {
+          _group = updatedGroup;
+        });
+
+        final groupProvider = context.read<GroupProvider>();
+          if (groupProvider.allGroups != null) {
+          final index = groupProvider.allGroups!.indexWhere((g) => g.id == widget.groupId);
+          if (index != -1) {
+            groupProvider.allGroups![index] = updatedGroup;
+          }
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cập nhật nhóm thành công!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context, updatedGroup);
+      }
+    });
+  }
+
+  void _handleDelete() async {
+    if (_group == null) return;
+
+    bool? confirmed = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xóa nhóm'),
+        content: Text('Bạn có chắc chắn muốn xóa nhóm "${_group?.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Xóa', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final groupProvider = context.read<GroupProvider>();
+        final success = await groupProvider.deleteGroup(id: widget.groupId);
+
+        if (mounted && success) {
+          await Future.delayed(const Duration(milliseconds: 300));
+
+          // Quay về màn hình danh sách nhóm
+          Navigator.pop(context); 
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Đã xóa nhóm "${_group?.name}"'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   // ================= HEADER (GỌN – KÉO SÁT TRÊN) =================
@@ -156,13 +248,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               });
 
               if (index == 0) {
-                context
-                    .read<MealPlanProvider>()
-                    .fetchMealPlansByGroup(widget.groupId);
+                context.read<MealPlanProvider>().fetchMealPlansByGroup(
+                  widget.groupId,
+                );
               } else if (index == 1) {
-                context
-                    .read<GroupProvider>()
-                    .getAllMemberOfGroup(widget.groupId);
+                context.read<GroupProvider>().getAllMemberOfGroup(
+                  widget.groupId,
+                );
               } else if (index == 2) {
                 // context
                 //     .read<FridgeProvider>()
@@ -273,7 +365,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
             );
           },
         );
-
       },
     );
   }

@@ -284,7 +284,7 @@ class GroupProvider extends ChangeNotifier {
           debugPrint('🎉 Group created successfully!');
           debugPrint('   Group ID: ${data['id']}');
           debugPrint('   Group name: ${data['name']}');
-          debugPrint('   Group name: ${data['imageurl']}');
+          debugPrint('   Group name: ${data['imageurl']} ');
 
           debugPrint('🎉 Group created successfully!');
 
@@ -293,7 +293,7 @@ class GroupProvider extends ChangeNotifier {
             name: data['name'] as String,
             description: data['description'] as String,
             createdAt: DateTime.parse(data['created_at'] as String),
-            imageurl: data['imageurl'] as String,
+            imageurl: data['imageurl'],
             role: "groupAdmin",
           );
 
@@ -468,16 +468,23 @@ class GroupProvider extends ChangeNotifier {
           debugPrint('   Group name: ${data['name']}');
           debugPrint('   Group name: ${data['imageurl']}');
 
-          _groupById = GroupDTO(
+          final updatedGroup = GroupDTO(
             id: data['id'].toString(),
             name: data['name'] as String,
             description: data['description'] as String,
             createdAt: DateTime.parse(data['created_at'] as String),
-            imageurl: data['imageurl'] as String,
+            imageurl: data['imageurl'],
             role: "groupAdmin",
           );
 
           debugPrint('Đã tạo được newGroup');
+          if (_allGroups != null) {
+            final index = _allGroups!.indexWhere((g) => g.id == id);
+            if (index != -1) {
+              _allGroups![index] = updatedGroup;
+            }
+          }
+          _groupById = updatedGroup;
 
           isLoading = false;
           notifyListeners();

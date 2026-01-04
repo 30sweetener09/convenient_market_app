@@ -28,7 +28,7 @@ class CustomHeader extends StatelessWidget
       ),
       title: const Text(
         "ĐiChợTiệnLợi",
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Unbounded', fontSize: 24),
       ),
       centerTitle: true,
       actions: [
