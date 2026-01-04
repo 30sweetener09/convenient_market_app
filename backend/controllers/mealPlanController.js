@@ -950,19 +950,19 @@ export const deleteMealPlan = async (req, res) => {
 
 /**
  * @swagger
- * /meal:
+ * /meal/getAll:
  *   post:
+ *     tags:
+ *       - Meal Plans
  *     summary: Get all meal plans of a group
  *     description: |
- *       Get all meal plans belonging to a specific group.
+ *       Retrieve all meal plans belonging to a specific group.
  *       User must be authenticated and must be a member of the group.
- *     tags:
- *       - MealPlan
+ *       Plans are sorted by creation date (oldest first).
  *     security:
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
- *
  *       content:
  *         application/json:
  *           schema:
@@ -971,19 +971,22 @@ export const deleteMealPlan = async (req, res) => {
  *               - groupId
  *             properties:
  *               groupId:
- *                 type: string
- *                 example: "b1f23e9a-1234-4567-890a-abcdef123456"
+ *                 type: integer
+ *                 description: ID of the group
+ *                 example: 1
+ *           examples:
+ *             getPlans:
+ *               summary: Get meal plans for group
+ *               value:
+ *                 groupId: 1
  *     responses:
  *       200:
- *         description: Get meal plans successfully
+ *         description: Meal plans retrieved successfully
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 resultCode:
- *                   type: string
- *                   example: "00348"
  *                 resultMessage:
  *                   type: object
  *                   properties:
@@ -993,45 +996,53 @@ export const deleteMealPlan = async (req, res) => {
  *                     vn:
  *                       type: string
  *                       example: "Lấy danh sách thành công"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00348"
  *                 data:
  *                   type: array
  *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: string
- *                         example: "1"
- *                       name:
- *                         type: string
- *                         example: "Weekly Meal Plan"
- *                       description:
- *                         type: string
- *                         example: "Meal plan for the whole week"
- *                       timestamp:
- *                         type: string
- *                         example: "2026-01-01T10:00:00Z"
- *                       status:
- *                         type: string
- *                         example: "active"
- *                       groupid:
- *                         type: string
- *                         example: "b1f23e9a-1234-4567-890a-abcdef123456"
- *                       createdAt:
- *                         type: string
- *                         example: "2026-01-01T09:00:00Z"
- *                       updatedAt:
- *                         type: string
- *                         example: "2026-01-02T09:00:00Z"
+ *                     $ref: '#/components/schemas/MealPlanDetailed'
+ *             examples:
+ *               withPlans:
+ *                 summary: Success with meal plans
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Get plans successfully"
+ *                     vn: "Lấy danh sách thành công"
+ *                   resultCode: "00348"
+ *                   data:
+ *                     - id: 1
+ *                       name: "breakfast"
+ *                       description: "Phở bò và bánh mì"
+ *                       timestamp: "2024-01-10T07:00:00.000Z"
+ *                       status: "NOT_PASS_YET"
+ *                       groupid: 1
+ *                       createdAt: "2024-01-03T10:30:00.000Z"
+ *                       updatedAt: "2024-01-03T10:30:00.000Z"
+ *                     - id: 2
+ *                       name: "lunch"
+ *                       description: "Cơm gà xối mỡ"
+ *                       timestamp: "2024-01-10T12:00:00.000Z"
+ *                       status: "NOT_PASS_YET"
+ *                       groupid: 1
+ *                       createdAt: "2024-01-04T08:00:00.000Z"
+ *                       updatedAt: "2024-01-04T08:00:00.000Z"
+ *               emptyPlans:
+ *                 summary: Success but no plans found
+ *                 value:
+ *                   resultMessage:
+ *                     en: "No meal plans found"
+ *                     vn: "Không tìm thấy kế hoạch bữa ăn nào"
+ *                   resultCode: "00404"
+ *                   data: []
  *       401:
- *         description: Unauthorized
+ *         description: Unauthorized - Authentication required
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 resultCode:
- *                   type: string
- *                   example: "00401"
  *                 resultMessage:
  *                   type: object
  *                   properties:
@@ -1041,16 +1052,21 @@ export const deleteMealPlan = async (req, res) => {
  *                     vn:
  *                       type: string
  *                       example: "Chưa xác thực"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00401"
+ *             example:
+ *               resultMessage:
+ *                 en: "Unauthorized"
+ *                 vn: "Chưa xác thực"
+ *               resultCode: "00401"
  *       403:
- *         description: User is not a member of the group
+ *         description: Forbidden - User is not a member of the group
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 resultCode:
- *                   type: string
- *                   example: "00345"
  *                 resultMessage:
  *                   type: object
  *                   properties:
@@ -1060,10 +1076,43 @@ export const deleteMealPlan = async (req, res) => {
  *                     vn:
  *                       type: string
  *                       example: "Bạn chưa vào nhóm nào"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00345"
+ *             example:
+ *               resultMessage:
+ *                 en: "You have not joined any group"
+ *                 vn: "Bạn chưa vào nhóm nào"
+ *               resultCode: "00345"
  *       500:
- *         description: Internal Server Error
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Internal Server Error"
+ *                     vn:
+ *                       type: string
+ *                       example: "Lỗi máy chủ nội bộ"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00500"
+ *                 error:
+ *                   type: string
+ *                   example: "Error message details"
+ *             example:
+ *               resultMessage:
+ *                 en: "Internal Server Error"
+ *                 vn: "Lỗi máy chủ nội bộ"
+ *               resultCode: "00500"
+ *               error: "Database connection failed"
  */
-
 export const getAllMealPlans = async (req, res) => {
   try {
     const { groupId } = req.body;

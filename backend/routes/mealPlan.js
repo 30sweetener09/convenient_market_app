@@ -19,7 +19,7 @@ router.use(supabaseAuth);
 router.post("/", createMealPlan);
 router.put("/", updateMealPlan);
 router.delete("/", deleteMealPlan);
-router.get("/", getAllMealPlans);
+router.post("/getAll", getAllMealPlans);
 router.post("/detail", getMealPlansById);
 router.post("/search", searchMealPlansByName);
 
