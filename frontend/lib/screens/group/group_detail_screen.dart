@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../widgets/custom_header.dart';
 import '../../widgets/meal_plan_card.dart';
 import 'package:di_cho_tien_loi/data/dto/group_dto.dart';
 import 'package:di_cho_tien_loi/providers/group_provider.dart';
@@ -67,9 +68,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text(_group?.name ?? 'Chi tiết nhóm'),
-        elevation: 0,
+      appBar: CustomHeader(
+        showBack: true,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -266,7 +266,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => MealPlanDetailScreen(mealPlanId: plan.id as String),
+                    builder: (_) => MealPlanDetailScreen(mealPlanId: plan.id),
                   ),
                 );
               },

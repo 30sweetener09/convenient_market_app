@@ -21,8 +21,8 @@ class MealPlanProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('access_token');
   }
-
-  Future<void> fetchMealPlansByGroup(String planId) async {
+  // ================= GET ALL ===============
+  Future<void> fetchMealPlansByGroup(String groupId) async {
     isLoading = true;
     notifyListeners();
 
@@ -38,7 +38,7 @@ class MealPlanProvider extends ChangeNotifier {
           "Content-Type": "application/x-www-form-urlencoded",
         },
         body: {
-          "planId": planId,
+          "groupId": groupId,
         }
       );
 
@@ -46,7 +46,8 @@ class MealPlanProvider extends ChangeNotifier {
       debugPrint('🍽 MEAL PLAN BODY: ${res.body}');
 
       if (res.statusCode == 200) {
-        final List data = jsonDecode(res.body);
+        final body = jsonDecode(res.body);
+        final List data = body['data'] ?? [];
         _mealPlans =
             data.map((e) => MealPlan.fromJson(e)).toList();
       }
@@ -57,7 +58,9 @@ class MealPlanProvider extends ChangeNotifier {
     isLoading = false;
     notifyListeners();
   }
-  Future<MealPlan?> getDetail(String groupId) async {
+
+  // ===================DETAIL===================
+  Future<MealPlan?> getDetail(int planId) async {
     isLoading = true;
     notifyListeners();
 
@@ -68,17 +71,18 @@ class MealPlanProvider extends ChangeNotifier {
         notifyListeners();
         return null;
       }
+      debugPrint('🍽 MEAL PLAN DETAIL: START CALLING API');
 
       final res = await http.post(
         Uri.parse('$_baseUrl/detail'),
         headers: {
           "Authorization": "Bearer $token",
-          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Type": "application/json",
           "accept": "application/json",
         },
-        body: {
-          "groupId": groupId,
-        },
+        body: jsonEncode({
+          "planId": planId,
+        }),
       );
 
       debugPrint('🍽 MEAL PLAN STATUS: ${res.statusCode}');
