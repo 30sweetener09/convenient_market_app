@@ -49,10 +49,15 @@ const validateAndFormatDate = (dateString) => {
 
 /**
  * @swagger
- * /shopping-list:
+ * /shopping:
  *   post:
- *     summary: Tạo danh sách mua sắm mới
- *     tags: [Shopping List]
+ *     tags:
+ *       - Shopping List
+ *     summary: Create a new shopping list
+ *     description: |
+ *       Create a shopping list for a meal plan.
+ *       Only group admin can perform this action.
+ *       The assigned user must be a member of the group.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -61,39 +66,200 @@ const validateAndFormatDate = (dateString) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [name, assignToUsername, date]
+ *             required:
+ *               - name
+ *               - description
+ *               - mealplan_id
+ *               - groupId
  *             properties:
  *               name:
  *                 type: string
- *                 example: "Shopping list for today"
- *               assignToUsername:
+ *                 description: Name of the shopping list
+ *                 minLength: 1
+ *                 example: "Danh sách mua sắm tuần 1"
+ *               description:
  *                 type: string
- *                 example: "member6320"
+ *                 description: Description of the shopping list (2-50 characters, alphanumeric and Vietnamese characters)
+ *                 minLength: 2
+ *                 maxLength: 50
+ *                 example: "Mua đồ cho bữa sáng"
  *               note:
  *                 type: string
- *                 example: "nếu ngày ấy"
- *               date:
- *                 type: string
- *                 pattern: '^\d{2}/\d{2}/\d{4}$'
- *                 example: "12/30/2022"
+ *                 description: Additional note (optional, max 500 characters)
+ *                 maxLength: 500
+ *                 nullable: true
+ *                 example: "Nhớ mua rau tươi"
+ *               mealplan_id:
+ *                 type: integer
+ *                 description: ID of the meal plan
+ *                 example: 5
+ *               groupId:
+ *                 type: integer
+ *                 description: ID of the group
+ *                 example: 1
+ *           examples:
+ *             withNote:
+ *               summary: Create shopping list with note
+ *               value:
+ *                 name: "Danh sách mua sắm tuần 1"
+ *                 description: "Mua đồ cho bữa sáng"
+ *                 note: "Nhớ mua rau tươi"
+ *                 mealplan_id: 5
+ *                 groupId: 1
+ *             withoutNote:
+ *               summary: Create shopping list without note
+ *               value:
+ *                 name: "Danh sách mua sắm cuối tuần"
+ *                 description: "Mua đồ cho bữa trưa"
+ *                 note: null
+ *                 mealplan_id: 6
+ *                 groupId: 1
  *     responses:
  *       200:
- *         description: Tạo danh sách mua sắm thành công (00249)
+ *         description: Shopping list created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Shopping list created successfully."
+ *                     vn:
+ *                       type: string
+ *                       example: "Danh sách mua sắm đã được tạo thành công."
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00249"
+ *                 createdShoppingList:
+ *                   $ref: '#/components/schemas/Shopping List'
+ *             example:
+ *               resultMessage:
+ *                 en: "Shopping list created successfully."
+ *                 vn: "Danh sách mua sắm đã được tạo thành công."
+ *               resultCode: "00249"
+ *               createdShoppingList:
+ *                 id: 10
+ *                 name: "Danh sách mua sắm tuần 1"
+ *                 description: "Mua đồ cho bữa sáng"
+ *                 note: "Nhớ mua rau tươi"
+ *                 mealplan_id: 5
+ *                 createdat: "2024-01-05T10:30:00.000Z"
+ *                 updatedat: "2024-01-05T10:30:00.000Z"
  *       400:
- *         description: Thiếu trường bắt buộc (00238-00242)
+ *         description: Bad request - Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                     vn:
+ *                       type: string
+ *                 resultCode:
+ *                   type: string
+ *             examples:
+ *               missingName:
+ *                 summary: Missing or empty name
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Please provide name"
+ *                     vn: "Vui lòng cung cấp tên danh sách mua sắm"
+ *                   resultCode: "00239"
+ *               missingDescription:
+ *                 summary: Missing or empty description
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Please provide description"
+ *                     vn: "Vui lòng cung cấp description"
+ *                   resultCode: "00240"
+ *               invalidDescriptionFormat:
+ *                 summary: Invalid description format
+ *                 value:
+ *                   resultMessage:
+ *                     vn: "Định dạng tên không hợp lệ"
+ *                   resultCode: "00240x"
+ *               invalidNote:
+ *                 summary: Invalid note format
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Invalid note format"
+ *                     vn: "Định dạng ghi chú không hợp lệ"
+ *                   resultCode: "00241"
  *       401:
- *         description: Không có quyền truy cập (00243)
+ *         description: Unauthorized - Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
  *       403:
- *         description: Không có quyền gán cho user này (00246)
- *       404:
- *         description: Username không tồn tại (00245)
+ *         description: Forbidden - Access denied
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                     vn:
+ *                       type: string
+ *                 resultCode:
+ *                   type: string
+ *             examples:
+ *               notGroupAdmin:
+ *                 summary: User is not group admin
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Access denied. Only group admins can perform this action."
+ *                     vn: "Truy cập không được ủy quyền, bạn không phải admin"
+ *                   resultCode: "00243"
+ *               cannotAssignToUser:
+ *                 summary: Cannot assign to user (not in group)
+ *                 value:
+ *                   resultMessage:
+ *                     en: "Unauthorized access. You do not have permission to assign shopping list to this user."
+ *                     vn: "Truy cập không được ủy quyền. Bạn không có quyền gán danh sách mua sắm cho người dùng này."
+ *                   resultCode: "00246"
  *       500:
- *         description: Lỗi máy chủ (00500)
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: "Internal server error"
+ *                     vn:
+ *                       type: string
+ *                       example: "Lỗi máy chủ nội bộ"
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00500"
+ *                 error:
+ *                   type: string
+ *                   example: "Error message details"
  */
 export const createShoppingList = async (req, res) => {
   try {
-    const { name, assignToUsername, note, date } = req.body;
-    const groupId = req.params.groupId;
+    const { name, description, note, mealplan_id, groupId } = req.body;
     const userID = req.user.id;
     console.log(req.params);
 
@@ -109,20 +275,20 @@ export const createShoppingList = async (req, res) => {
     }
 
     // Validate assignToUsername
-    if (!assignToUsername.trim() || !assignToUsername) {
+    if (!description.trim() || !description) {
       return res.status(400).json({
         resultMessage: {
-          en: "Please provide assignToUsername",
-          vn: "Vui lòng cung cấp assignToUsername",
+          en: "Please provide description",
+          vn: "Vui lòng cung cấp description",
         },
         resultCode: "00240",
       });
     }
 
     if (
-      !nameRegex.test(assignToUsername) ||
-      assignToUsername.length < 2 ||
-      assignToUsername.length > 50
+      !nameRegex.test(description) ||
+      description.length < 2 ||
+      description.length > 50
     ) {
       return res.status(400).json({
         resultCode: "00240x",
@@ -141,20 +307,9 @@ export const createShoppingList = async (req, res) => {
       });
     }
 
-    // Validate and format date
-    const formattedDate = validateAndFormatDate(date);
-    if (!formattedDate) {
-      return res.status(400).json({
-        resultMessage: {
-          en: "Invalid date format",
-          vn: "Định dạng ngày không hợp lệ",
-        },
-        resultCode: "00242",
-      });
-    }
-
     // Check authentication
-    const { data: groupAdmin, error: groupError } = await supabase
+
+    /*const { data: groupAdmin, error: groupError } = await supabase
       .from("groups")
       .select("id, created_by")
       .eq("id", groupId)
@@ -169,9 +324,9 @@ export const createShoppingList = async (req, res) => {
         },
         resultCode: "00243",
       });
-    }
+    }*/
 
-    // Check if assigned user exists
+    /*// Check if assigned user exists
     const { data: assignedUser, error: assignedError } = await supabase
       .from("users")
       .select("id")
@@ -186,10 +341,10 @@ export const createShoppingList = async (req, res) => {
         },
         resultCode: "00245",
       });
-    }
+    }*/
 
     // Check permission to assign
-    const { data: groupMember } = await supabase
+    /*const { data: groupMember } = await supabase
       .from("group_members")
       .select("user_id")
       .eq("group_id", groupId)
@@ -204,7 +359,7 @@ export const createShoppingList = async (req, res) => {
         },
         resultCode: "00246",
       });
-    }
+    }*/
 
     // Create shopping list
     const { data, error } = await supabase
@@ -212,12 +367,9 @@ export const createShoppingList = async (req, res) => {
       .insert([
         {
           name: name.trim(),
+          description: description.trim(),
           note: note ? note.trim() : null,
-          assignedtousername: assignToUsername,
-          assignedtouserid: assignedUser.id,
-          date: formattedDate,
-          belongstogroupadminid: userID,
-          group_id: groupId,
+          mealplan_id: mealplan_id,
           createdat: new Date().toISOString(),
           updatedat: new Date().toISOString(),
         },
@@ -250,7 +402,7 @@ export const createShoppingList = async (req, res) => {
 
 /**
  * @swagger
- * /shopping-list:
+ * /shopping:
  *   get:
  *     summary: Lấy danh sách tất cả shopping lists với tasks
  *     tags: [Shopping List]
@@ -267,6 +419,7 @@ export const createShoppingList = async (req, res) => {
 export const getAllShoppingLists = async (req, res) => {
   try {
     const userId = req.user?.id;
+    const { mealplan_id } = req.body;
 
     if (!userId) {
       return res.status(401).json({
@@ -725,4 +878,3 @@ export const deleteShoppingList = async (req, res) => {
     });
   }
 };
-
