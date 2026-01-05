@@ -21,7 +21,7 @@ router.post("/", createTasks);
 router.patch("/", markTask);
 router.put("/", updateTask);
 router.delete("/", deleteTask);
-router.get("/", getAllTasks);
+router.post("/getAll", getAllTasks);
 router.post("/detail", getTaskById);
 
 export default router;

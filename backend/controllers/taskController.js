@@ -50,7 +50,7 @@ const validateAndFormatDate = (dateString) => {
  * @swagger
  * /task:
  *   post:
- *     summary: Tạo tasks cho shopping list
+ *     summary: Tạo tasks cho mealplan
  *     tags: [Task]
  *     security:
  *       - bearerAuth: []
@@ -62,17 +62,17 @@ const validateAndFormatDate = (dateString) => {
  *             type: object
  *             required:
  *               - groupId
- *               - shoppinglist_id
+ *               - mealplan_id
  *               - name
  *               - description
  *               - assignToUsername
  *             properties:
  *               groupId:
  *                 type: string
- *                 example: "group_123"
- *               shoppinglist_id:
+ *                 example: "16"
+ *               mealplan_id:
  *                 type: string
- *                 example: "shopping_456"
+ *                 example: "3"
  *               name:
  *                 type: string
  *                 example: "Buy milk"
@@ -81,7 +81,7 @@ const validateAndFormatDate = (dateString) => {
  *                 example: "Buy 2 liters of milk"
  *               assignToUsername:
  *                 type: string
- *                 example: "john_doe"
+ *                 example: "Mai Văn Quân"
  *     responses:
  *       200:
  *         description: Task created successfully
@@ -120,12 +120,12 @@ const validateAndFormatDate = (dateString) => {
  *                     assigntouser_id:
  *                       type: string
  *                       example: "user_123"
- *                     shoppinglist_id:
+ *                     mealplan_id:
  *                       type: string
- *                       example: "shopping_456"
+ *                       example: "3"
  *                     group_id:
  *                       type: string
- *                       example: "group_123"
+ *                       example: "16"
  *                     createdat:
  *                       type: string
  *                       format: date-time
@@ -143,13 +143,13 @@ const validateAndFormatDate = (dateString) => {
  */
 export const createTasks = async (req, res) => {
   try {
-    const { groupId, shoppinglist_id, name, description, assignToUsername } =
+    const { groupId, mealplan_id, name, description, assignToUsername } =
       req.body;
 
     // Validate required fields
     if (
       !groupId ||
-      !shoppinglist_id ||
+      !mealplan_id ||
       !name ||
       !description ||
       !assignToUsername
@@ -203,18 +203,18 @@ export const createTasks = async (req, res) => {
       });
     }
 
-    // Check if shopping list exists
+    // Check if mealplan  exists
     const { data: existingList } = await supabase
-      .from("shoppinglist")
+      .from("mealplan")
       .select("id")
-      .eq("id", shoppinglist_id)
+      .eq("id", mealplan_id)
       .maybeSingle();
 
     if (!existingList) {
       return res.status(404).json({
         resultMessage: {
-          en: "Shopping list not found",
-          vn: "Không tìm thấy danh sách mua sắm",
+          en: "mealplan not found",
+          vn: "Không tìm thấy mealplan",
         },
         resultCode: "00283",
       });
@@ -260,7 +260,7 @@ export const createTasks = async (req, res) => {
       description: description.trim(),
       isdone: false,
       assigntouser_id: groupMember.user_id,
-      shoppinglist_id,
+      mealplan_id,
       group_id: groupId,
       createdat: new Date().toISOString(),
       updatedat: new Date().toISOString(),
@@ -316,10 +316,10 @@ export const createTasks = async (req, res) => {
  *             properties:
  *               groupId:
  *                 type: string
- *                 example: "group_123"
+ *                 example: "16"
  *               taskId:
  *                 type: string
- *                 example: "task_456"
+ *                 example: "13"
  *     responses:
  *       200:
  *         description: Task marked successfully
@@ -527,7 +527,7 @@ export const markTask = async (req, res) => {
  *                 example: "Buy fresh vegetables for dinner"
  *               assigntouserName:
  *                 type: string
- *                 example: "john_doe"
+ *                 example: "Mai Văn Quân"
  *     responses:
  *       200:
  *         description: Task updated successfully
@@ -824,10 +824,10 @@ export const updateTask = async (req, res) => {
  *             properties:
  *               groupId:
  *                 type: string
- *                 example: "group_123"
+ *                 example: "16"
  *               taskId:
  *                 type: string
- *                 example: "task_456"
+ *                 example: "13"
  *     responses:
  *       200:
  *         description: Task deleted successfully
@@ -1038,14 +1038,26 @@ export const deleteTask = async (req, res) => {
 
 /**
  * @swagger
- * /task:
- *   get:
- *     summary: Get all tasks
- *     description: Retrieve all tasks ordered by created date (descending)
+ * /task/getAll:
+ *   post:
+ *     summary: Get all tasks by meal plan
+ *     description: Lấy danh sách task theo mealplan_id, sắp xếp theo thời gian tạo giảm dần
  *     tags:
  *       - Task
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - mealplan_id
+ *             properties:
+ *               mealplan_id:
+ *                 type: string
+ *                 example: "mealplan_123"
  *     responses:
  *       200:
  *         description: Get tasks successfully
@@ -1059,10 +1071,10 @@ export const deleteTask = async (req, res) => {
  *                   properties:
  *                     en:
  *                       type: string
- *                       example: Get tasks successfull
+ *                       example: "Get tasks successfull"
  *                     vn:
  *                       type: string
- *                       example: Lấy các task thành công
+ *                       example: "Lấy các task thành công"
  *                 resultCode:
  *                   type: string
  *                   example: "00379"
@@ -1076,41 +1088,41 @@ export const deleteTask = async (req, res) => {
  *                         example: 1
  *                       name:
  *                         type: string
- *                         example: Buy milk
+ *                         example: "Buy vegetables"
  *                       description:
  *                         type: string
- *                         example: Buy 2 liters of milk
+ *                         example: "Buy carrots and tomatoes"
  *                       assigntouser_id:
- *                         type: integer
- *                         example: 3
+ *                         type: string
+ *                         example: "user_001"
  *                       isdone:
  *                         type: boolean
  *                         example: false
- *                       shoppinglist_id:
- *                         type: integer
- *                         example: 10
+ *                       mealplan_id:
+ *                         type: string
+ *                         example: "mealplan_123"
  *                       group_id:
- *                         type: integer
- *                         example: 2
+ *                         type: string
+ *                         example: "group_01"
  *                       createdat:
  *                         type: string
  *                         format: date-time
- *                         example: 2025-01-01T10:00:00Z
+ *                         example: "2025-01-05T10:30:00Z"
  *                       updatedat:
  *                         type: string
  *                         format: date-time
- *                         example: 2025-01-02T12:00:00Z
- *       401:
- *         description: Unauthorized - Invalid or missing token
+ *                         example: "2025-01-05T11:00:00Z"
  *       500:
  *         description: Internal server error
  */
 
 export const getAllTasks = async (req, res) => {
   try {
+    const { mealplan_id } = req.body;
     const { data: tasks, error } = await supabase
       .from("task")
       .select("*")
+      .eq("mealplan_id", mealplan_id)
       .order("createdat", { ascending: false });
 
     if (error) throw error;
@@ -1121,7 +1133,7 @@ export const getAllTasks = async (req, res) => {
       description: task.description,
       assigntouser_id: task.assigntouser_id,
       isdone: task.isdone,
-      shoppinglist_id: task.shoppinglist_id,
+      mealplan_id: task.mealplan_id,
       group_id: task.group_id,
       createdat: task.createdat,
       updatedat: task.updatedat,
@@ -1203,7 +1215,7 @@ export const getAllTasks = async (req, res) => {
  *                     isdone:
  *                       type: boolean
  *                       example: false
- *                     shoppinglist_id:
+ *                     mealplan_id:
  *                       type: integer
  *                       example: 10
  *                     group_id:
@@ -1280,7 +1292,7 @@ export const getTaskById = async (req, res) => {
       description: task.description,
       assigntouser_id: task.assigntouser_id,
       isdone: task.isdone,
-      shoppinglist_id: task.shoppinglist_id,
+      mealplan_id: task.mealplan_id,
       group_id: task.group_id,
       createdat: task.createdat,
       updatedat: task.updatedat,
