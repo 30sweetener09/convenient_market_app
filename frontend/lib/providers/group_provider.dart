@@ -9,8 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as path;
 import 'package:http_parser/http_parser.dart';
 
-
-
 class GroupProvider extends ChangeNotifier {
   bool isLoading = false;
   String? _error;
@@ -239,20 +237,17 @@ class GroupProvider extends ChangeNotifier {
         final fileStream = http.ByteStream(imageFile.openRead());
         final fileLength = await imageFile.length();
         if (fileLength > 5 * 1024 * 1024) {
-            // 10MB limit
-            throw Exception(
-              'File ảnh quá lớn (>5MB). Vui lòng chọn ảnh nhỏ hơn',
-            );
-          }
+          // 10MB limit
+          throw Exception('File ảnh quá lớn (>5MB). Vui lòng chọn ảnh nhỏ hơn');
+        }
         final multipartFile = http.MultipartFile(
-            'file',
-            fileStream,
-            fileLength,
-            filename: fileName,
-            contentType: contentType,
-          );
+          'file',
+          fileStream,
+          fileLength,
+          filename: fileName,
+          contentType: contentType,
+        );
         request.files.add(multipartFile);
-
       } else {
         debugPrint('📭 No image file provided - creating group without image');
       }
@@ -289,7 +284,7 @@ class GroupProvider extends ChangeNotifier {
           debugPrint('🎉 Group created successfully!');
           debugPrint('   Group ID: ${data['id']}');
           debugPrint('   Group name: ${data['name']}');
-          debugPrint('   Group name: ${data['imageurl']}');
+          debugPrint('   Group name: ${data['imageurl']} ');
 
           debugPrint('🎉 Group created successfully!');
 
@@ -297,9 +292,9 @@ class GroupProvider extends ChangeNotifier {
             id: data['id'].toString(),
             name: data['name'] as String,
             description: data['description'] as String,
-            createdAt: DateTime.parse(data['created_at'] as String) ,
-            imageurl: data['imageurl'] as String,
-            role: "groupAdmin"
+            createdAt: DateTime.parse(data['created_at'] as String),
+            imageurl: data['imageurl'],
+            role: "groupAdmin",
           );
 
           debugPrint('Đã tạo được newGroup');
@@ -370,32 +365,246 @@ class GroupProvider extends ChangeNotifier {
     }
   }
 
-  // Helper function để tạo filename
-  String _getFileName(File file) {
-    final originalName = file.path.split('/').last;
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final extension = _getFileExtension(file);
-
-    // Giữ tên gốc nhưng thêm timestamp để tránh trùng
-    final nameWithoutExt = originalName.replaceAll(RegExp(r'\.[^\.]+$'), '');
-    return '${nameWithoutExt}_$timestamp$extension';
-  }
-
-  String _getFileExtension(File file) {
-    final path = file.path.toLowerCase();
-    if (path.endsWith('.jpg')) return '.jpg';
-    if (path.endsWith('.jpeg')) return '.jpeg';
-    if (path.endsWith('.png')) return '.png';
-    if (path.endsWith('.gif')) return '.gif';
-    if (path.endsWith('.webp')) return '.webp';
-    return '.jpg'; // default
-  }
-
-  Future<void> updateGroup({
+  Future<GroupDTO?> updateGroup({
+    required String id,
     required String name,
     required String description,
     File? imageFile,
-  }) async {}
+  }) async {
+    try {
+      isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final headers = await _getHeaders();
+
+      if (!headers.containsKey('Authorization') ||
+          headers['Authorization']!.isEmpty) {
+        throw Exception('Chưa đăng nhập. Vui lòng đăng nhập lại.');
+      }
+
+      final url = Uri.parse('$_baseUrl/group/${int.parse(id)}');
+      var request = http.MultipartRequest('PUT', url);
+
+      //Thêm headers
+      request.headers.addAll({
+        'accept': '*/*',
+        'Authorization': headers['Authorization']!,
+        'Content-Type': 'multipart/form-data',
+      });
+
+      // Thêm fields
+      debugPrint('📝 Text fields:');
+      debugPrint('   - name: "$name"');
+      debugPrint('   - description: "$description"');
+
+      request.fields['name'] = name;
+      request.fields['description'] = description;
+
+      // Thêm imageFile nếu có
+      if (imageFile != null && await imageFile.exists()) {
+        final fileName = path.basename(imageFile.path);
+        final fileExtension = path.extension(fileName).toLowerCase();
+        debugPrint('🖼️ Processing image file...');
+        debugPrint('   Path: ${imageFile.path}');
+        debugPrint('   Exists: ${imageFile.existsSync()}');
+
+        MediaType? contentType;
+        if (fileExtension == '.jpg' || fileExtension == '.jpeg') {
+          contentType = MediaType('image', 'jpeg');
+        } else if (fileExtension == '.png') {
+          contentType = MediaType('image', 'png');
+        } else if (fileExtension == '.gif') {
+          contentType = MediaType('image', 'gif');
+        } else {
+          contentType = MediaType('image', '*'); // Mặc định
+        }
+
+        final fileStream = http.ByteStream(imageFile.openRead());
+        final fileLength = await imageFile.length();
+        if (fileLength > 5 * 1024 * 1024) {
+          // 10MB limit
+          throw Exception('File ảnh quá lớn (>5MB). Vui lòng chọn ảnh nhỏ hơn');
+        }
+        final multipartFile = http.MultipartFile(
+          'file',
+          fileStream,
+          fileLength,
+          filename: fileName,
+          contentType: contentType,
+        );
+        request.files.add(multipartFile);
+      } else {
+        debugPrint('📭 No image file provided - creating group without image');
+      }
+
+      // 6. LOG REQUEST
+      debugPrint('📦 Request summary:');
+      debugPrint('   URL: $url');
+      debugPrint('   Fields count: ${request.fields}');
+      debugPrint('   Files count: ${request.files.length}');
+
+      // 7. GỬI REQUEST
+      debugPrint('🚀 Sending request...');
+      final streamedResponse = await request.send().timeout(
+        Duration(seconds: imageFile != null ? 45 : 25),
+        onTimeout: () {
+          throw Exception('Request timeout. Server took too long to respond.');
+        },
+      );
+
+      final response = await http.Response.fromStream(streamedResponse);
+
+      debugPrint('📥 Response received:');
+      debugPrint('   Status: ${response.statusCode}');
+      debugPrint('   Body length: ${response.body.length} chars');
+
+      // 8. XỬ LÝ RESPONSE
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        try {
+          final data = json.decode(response.body);
+          debugPrint('🎉 Lấy data thành công successfully!');
+          debugPrint('   Group ID: ${data['id']}');
+          debugPrint('   Group name: ${data['name']}');
+          debugPrint('   Group name: ${data['imageurl']}');
+
+          final updatedGroup = GroupDTO(
+            id: data['id'].toString(),
+            name: data['name'] as String,
+            description: data['description'] as String,
+            createdAt: DateTime.parse(data['created_at'] as String),
+            imageurl: data['imageurl'],
+            role: "groupAdmin",
+          );
+
+          debugPrint('Đã tạo được newGroup');
+          if (_allGroups != null) {
+            final index = _allGroups!.indexWhere((g) => g.id == id);
+            if (index != -1) {
+              _allGroups![index] = updatedGroup;
+            }
+          }
+          _groupById = updatedGroup;
+
+          isLoading = false;
+          notifyListeners();
+
+          return _groupById;
+        } catch (e) {
+          debugPrint('❌ Error parsing response: $e');
+          debugPrint('Raw response: ${response.body}');
+          throw Exception('Lỗi xử lý dữ liệu từ server. Vui lòng thử lại.');
+        }
+      } else {
+        // Xử lý các lỗi HTTP khác
+        debugPrint('❌ HTTP Error ${response.statusCode}');
+        debugPrint('Error body: ${response.body}');
+
+        String errorMessage = 'Lỗi tạo nhóm (${response.statusCode})';
+
+        try {
+          final errorData = json.decode(response.body);
+          if (errorData['message'] != null) {
+            errorMessage = errorData['message'];
+          } else if (errorData['error'] != null) {
+            errorMessage = errorData['error'];
+          }
+        } catch (_) {
+          // Không parse được JSON error
+        }
+
+        // Phân tích lỗi cụ thể
+        if (response.statusCode == 400) {
+          if (errorMessage.contains('file') || errorMessage.contains('image')) {
+            errorMessage = 'Lỗi upload ảnh: $errorMessage';
+          } else if (errorMessage.contains('name')) {
+            errorMessage = 'Tên nhóm không hợp lệ: $errorMessage';
+          } else if (errorMessage.contains('description')) {
+            errorMessage = 'Mô tả không hợp lệ: $errorMessage';
+          }
+        } else if (response.statusCode == 401) {
+          errorMessage = 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.';
+        } else if (response.statusCode == 413) {
+          errorMessage = 'File ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 10MB.';
+        } else if (response.statusCode == 415) {
+          errorMessage =
+              'Định dạng file không được hỗ trợ. Vui lòng chọn ảnh JPG, PNG, GIF.';
+        } else if (response.statusCode >= 500) {
+          errorMessage = 'Lỗi máy chủ. Vui lòng thử lại sau.';
+        }
+
+        throw Exception(errorMessage);
+      }
+    } catch (e, stackTrace) {
+      debugPrint('💥 UPDATE GROUP EXCEPTION:');
+      debugPrint('   Error: $e');
+      debugPrint('   Stack trace: $stackTrace');
+
+      _error = e.toString();
+      isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<bool> deleteGroup({required String id}) async {
+    try {
+      isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final headers = await _getHeaders();
+
+      if (!headers.containsKey('Authorization') ||
+          headers['Authorization']!.isEmpty) {
+        throw Exception('Chưa đăng nhập. Vui lòng đăng nhập lại.');
+      }
+      final groupId = int.parse(id);
+      final url = Uri.parse('$_baseUrl/group/$groupId');
+      var request = http.MultipartRequest('DELETE', url);
+
+      //Thêm headers
+      request.headers.addAll({
+        'accept': '*/*',
+        'Authorization': headers['Authorization']!,
+      });
+
+      debugPrint('🚀 Sending request...');
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        //xử lí phần xoá group
+        _allGroups!.removeWhere((group) => group.id == id);
+        debugPrint('✅ Group deleted successfully: $id');
+        isLoading = false;
+        notifyListeners();
+        return true;
+      } else if (response.statusCode == 400 || response.statusCode == 401) {
+        _error = 'Yêu cầu không hợp lệ';
+      } else if (response.statusCode == 401) {
+        _error = 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.';
+      } else if (response.statusCode == 404) {
+        _error = 'Không tìm thấy nhóm';
+      } else if (response.statusCode == 409) {
+        _error = 'Không thể xóa nhóm đang có thành viên hoặc dữ liệu liên quan';
+      } else if (response.statusCode >= 500) {
+        _error = 'Lỗi máy chủ. Vui lòng thử lại sau.';
+      }
+      return false;
+    } catch (e, stackTrace) {
+      debugPrint('💥 UPDATE GROUP EXCEPTION:');
+      debugPrint('   Error: $e');
+      debugPrint('   Stack trace: $stackTrace');
+      _error = e.toString();
+      isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
 
   Future<void> addMemberToGroup(String username) async {}
 
