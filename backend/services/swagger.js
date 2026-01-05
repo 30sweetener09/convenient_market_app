@@ -9,7 +9,7 @@ const swaggerOptions = {
       version: "1.0.0",
       description: "API backend cho ứng dụng đa nền tảng",
     },
-    servers: [{ url: "https://convenient-market-app.onrender.com/api" }],
+    servers: [{ url: "http://localhost:3000/api" }],
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -36,5 +36,5 @@ export default (app) => {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 };
 
-// url swagger: http://localhost:3000/api-docs
+// url swagger: http://localhost:3000/api
 // url: https://convenient-market-app.onrender.com/api

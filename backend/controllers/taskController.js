@@ -215,45 +215,46 @@ export const createTasks = async (req, res) => {
     }
 
     // Check if assigned user exists
-    const { data: assignedUser } = await supabase
-      .from("users")
-      .select("id")
-      .ilike("id", assignToUserId)
-      .maybeSingle();
+    if (assignToUserId) {
+      const { data: assignedUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", assignToUserId)
+        .maybeSingle();
 
-    if (!assignedUser) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Assigned username does not exist",
-          vn: "Người dùng được gán không tồn tại",
-        },
-        resultCode: "00245",
-      });
-    }
+      if (!assignedUser) {
+        return res.status(404).json({
+          resultMessage: {
+            en: "Assigned username does not exist",
+            vn: "Người dùng được gán không tồn tại",
+          },
+          resultCode: "00245",
+        });
+      }
+      // Check group membership
+      const { data: groupMember } = await supabaseAdmin
+        .from("group_members")
+        .select("user_id")
+        .eq("group_id", groupId)
+        .eq("user_id", assignedUser.id)
+        .maybeSingle();
 
-    // Check group membership
-    const { data: groupMember } = await supabaseAdmin
-      .from("group_members")
-      .select("user_id")
-      .eq("group_id", groupId)
-      .eq("user_id", assignedUser.id)
-      .maybeSingle();
-
-    if (!groupMember) {
-      return res.status(403).json({
-        resultMessage: {
-          en: "Unauthorized access",
-          vn: "Không có quyền gán task cho người dùng này",
-        },
-        resultCode: "00246",
-      });
+      if (!groupMember) {
+        return res.status(403).json({
+          resultMessage: {
+            en: "Unauthorized access",
+            vn: "Không có quyền gán task cho người dùng này",
+          },
+          resultCode: "00246",
+        });
+      }
     }
 
     const taskData = {
       name: name.trim(),
       description: description.trim(),
       isdone: false,
-      assigntouser_id: groupMember.user_id,
+      assigntouser_id: assignToUserId,
       mealplan_id,
       group_id: groupId,
       createdat: new Date().toISOString(),
