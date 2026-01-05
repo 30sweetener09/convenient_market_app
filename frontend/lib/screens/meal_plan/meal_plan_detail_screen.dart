@@ -1,8 +1,12 @@
+import 'package:di_cho_tien_loi/data/dto/group_member_dto.dart';
 import 'package:di_cho_tien_loi/data/models/meal_plan_model.dart';
 import 'package:di_cho_tien_loi/providers/meal_plan_provider.dart';
+import 'package:di_cho_tien_loi/screens/meal_plan/widgets/task_card.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../providers/group_provider.dart';
+import '../../providers/meal_task_provider.dart';
 import '../../widgets/custom_header.dart';
 
 class MealPlanDetailScreen extends StatefulWidget {
@@ -19,20 +23,24 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
   bool _isEditing = false;
   String? _assignedUser;
 
-  final List<String> _fakeUsers = ['Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C'];
-
   @override
   void initState() {
     super.initState();
     _descCtrl = TextEditingController();
 
-    /// gọi API sau frame đầu
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final provider = context.read<MealPlanProvider>();
-      final plan = await provider.getDetail(widget.mealPlanId);
+      final mealPlanProvider = context.read<MealPlanProvider>();
+      final taskProvider = context.read<MealTaskProvider>();
+      final groupProvider = context.read<GroupProvider>();
 
-      if (plan != null && mounted) {
-        _descCtrl.text = plan.description;
+      await mealPlanProvider.getDetail(widget.mealPlanId);
+
+      /// 🔥 GỌI API TASK
+      await taskProvider.fetchTasks(widget.mealPlanId);
+
+      final groupId = mealPlanProvider.mealPlan?.groupId;
+      if (groupId != null) {
+        await groupProvider.getAllMembersOfGroup(groupId: groupId.toString());
       }
     });
   }
@@ -74,7 +82,7 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
                 const SizedBox(height: 20),
 
                 /// TEXT AREA (TRUNG TÂM)
-                Expanded(child: _buildTextArea()),
+                Expanded(child: _buildTaskList()),
 
                 const SizedBox(height: 12),
 
@@ -85,6 +93,91 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildTaskList() {
+    return Consumer3<MealTaskProvider, GroupProvider, MealPlanProvider>(
+      builder: (_, taskProvider, groupProvider, planProvider, __) {
+        if (groupProvider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final members = groupProvider.allMembers;
+
+        return Column(
+          children: [
+            /// ➕ ADD TASK
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _showAddTaskDialog(taskProvider),
+                icon: const Icon(Icons.add),
+                label: const Text('Thêm task'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF2E7D32),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            /// 📋 TASK LIST
+            Expanded(
+              child: ListView.builder(
+                itemCount: taskProvider.tasks.length,
+                itemBuilder: (_, index) {
+                  final task = taskProvider.tasks[index];
+
+                  return TaskCard(
+                    task: task,
+                    users: members,
+                    // ✅ MEMBER TỪ API
+                    onToggle: () => taskProvider.toggleTask(task),
+                    onAssign: (userId) => taskProvider.assignTask(task, userId),
+                    onDelete: () => taskProvider.deleteTask(task),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAddTaskDialog(MealTaskProvider provider) {
+    final ctrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Thêm task'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'Nội dung task'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (ctrl.text.trim().isNotEmpty) {
+                provider.addTask(ctrl.text.trim(),0);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Thêm'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -212,18 +305,18 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
               border: Border.all(color: Colors.grey.shade400),
               color: Colors.white,
             ),
-            child: DropdownButton<String>(
-              value: _assignedUser,
-              hint: const Text('Assign to'),
-              isExpanded: true,
-              underline: const SizedBox(),
-              items: _fakeUsers
-                  .map((u) => DropdownMenuItem(value: u, child: Text(u)))
-                  .toList(),
-              onChanged: (val) {
-                setState(() => _assignedUser = val);
-              },
-            ),
+            // child: DropdownButton<String>(
+            //   value: _assignedUser,
+            //   hint: const Text('Assign to'),
+            //   isExpanded: true,
+            //   underline: const SizedBox(),
+            //   items: _fakeUsers
+            //       .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+            //       .toList(),
+            //   onChanged: (val) {
+            //     setState(() => _assignedUser = val);
+            //   },
+            // ),
           ),
 
           const SizedBox(height: 12),

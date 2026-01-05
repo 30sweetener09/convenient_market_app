@@ -603,26 +603,26 @@ class GroupProvider extends ChangeNotifier {
           headers['Authorization']!.isEmpty) {
         throw Exception('Chưa đăng nhập. Vui lòng đăng nhập lại.');
       }
+
       final gId = int.parse(groupId);
       final url = Uri.parse('$_baseUrl/group/$gId/members');
-      var request = http.MultipartRequest('GET', url);
 
-      //Thêm headers
-      request.headers.addAll({
-        'accept': '*/*',
-        'Authorization': headers['Authorization']!,
-      });
+      final response = await http.get(
+        url,
+        headers: {
+          'accept': '*/*',
+          'Authorization': headers['Authorization']!,
+        },
+      );
 
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        final List<MemberDTO> members = data.map<MemberDTO>((json) {
-          final user = json['users']; // lấy object users
+
+        final members = data.map<MemberDTO>((json) {
+          final user = json['users'];
 
           return MemberDTO(
-            id: user['id'],
+            id: user['id'], // String
             username: user['username'],
             email: user['email'],
             imageurl: user['imageurl'],
@@ -631,27 +631,25 @@ class GroupProvider extends ChangeNotifier {
           );
         }).toList();
 
-        // Lưu vào state của provider
         _allMembers = members;
-        debugPrint('\nUSER API RESPONSE: $_allGroups');
         isLoading = false;
         notifyListeners();
         return members;
-      } else if (response.statusCode == 401) {
+      }
+
+      if (response.statusCode == 401) {
         _error = 'Phiên đăng nhập đã hết hạn';
-        _allGroups = [];
-        isLoading = false;
-        notifyListeners();
-        return [];
+        _allMembers = [];
       } else {
         final errorData = jsonDecode(response.body);
         _error =
             errorData['message'] ??
-            'Lỗi không xác định: ${response.statusCode}';
-        isLoading = false;
-        notifyListeners();
-        return _allMembers;
+                'Lỗi không xác định: ${response.statusCode}';
       }
+
+      isLoading = false;
+      notifyListeners();
+      return _allMembers;
     } catch (e) {
       debugPrint('Error in getAllMembers: $e');
       _error = 'Lỗi kết nối: $e';
@@ -660,6 +658,7 @@ class GroupProvider extends ChangeNotifier {
       return _allMembers;
     }
   }
+
 
   Future<MemberDTO?> addMemberToGroup(String groupId, String email) async {
     try {

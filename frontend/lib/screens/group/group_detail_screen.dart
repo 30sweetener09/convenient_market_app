@@ -252,8 +252,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   widget.groupId,
                 );
               } else if (index == 1) {
-                context.read<GroupProvider>().getAllMemberOfGroup(
-                  widget.groupId,
+                context.read<GroupProvider>().getAllMembersOfGroup(
+                  groupId: 'widget.groupId'
                 );
               } else if (index == 2) {
                 // context
