@@ -127,7 +127,7 @@ const deleteGroupImageByUrl = async (imageurl) => {
 export const getGroups = async (req, res) => {
   const userId = req.user.id;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("group_members")
     .select(`
       role_in_group,
@@ -169,7 +169,7 @@ export const getGroupsByName = async (req, res) => {
   const userId = req.user.id;
   const { keyword = "" } = req.query;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("group_members")
     .select(`
       role_in_group,
@@ -412,13 +412,14 @@ export const deleteGroup = async (req, res) => {
  */
 export const getGroupMembers = async (req, res) => {
   const groupId = req.params.id;
+  console.log("Fetching members for group:", groupId);
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("group_members")
     .select(`
       role_in_group,
       joined_at,
-      users:user_id (id, username, email, imageurl)
+      users:user_id!inner (id, username, email, imageurl)
     `)
     .eq("group_id", groupId);
 
@@ -504,7 +505,7 @@ export const addMember = async (req, res) => {
     }
 
     // 1️⃣ Tìm user theo email
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await supabaseAdmin
       .from("users")
       .select("id, email")
       .eq("email", email)
@@ -519,7 +520,7 @@ export const addMember = async (req, res) => {
     }
 
     // 2️⃣ Check user đã ở trong group chưa
-    const { data: exists } = await supabase
+    const { data: exists } = await supabaseAdmin
       .from("group_members")
       .select("group_id")
       .eq("group_id", groupId)
@@ -666,7 +667,7 @@ export const getGroupsMemberByName = async (req, res) => {
   const groupId = req.params.id;
   const { keyword = "" } = req.query;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("group_members")
     .select(`users:user_id (id, username, email)`)
     .eq("group_id", groupId)
@@ -734,7 +735,7 @@ export const getGroupById = async (req, res) => {
     const userId = req.user.id;
 
     // 1️⃣ Check user có thuộc group không + lấy role
-    const { data: membership, error: memberError } = await supabase
+    const { data: membership, error: memberError } = await supabaseAdmin
       .from("group_members")
       .select("role_in_group")
       .eq("group_id", groupId)
@@ -750,7 +751,7 @@ export const getGroupById = async (req, res) => {
     }
 
     // 2️⃣ Lấy thông tin group
-    const { data: group, error: groupError } = await supabase
+    const { data: group, error: groupError } = await supabaseAdmin
       .from("groups")
       .select("id, name, description, imageurl, created_at")
       .eq("id", groupId)
@@ -761,7 +762,7 @@ export const getGroupById = async (req, res) => {
     }
 
     // 3️⃣ Đếm số thành viên
-    const { count } = await supabase
+    const { count } = await supabaseAdmin
       .from("group_members")
       .select("*", { count: "exact", head: true })
       .eq("group_id", groupId);
