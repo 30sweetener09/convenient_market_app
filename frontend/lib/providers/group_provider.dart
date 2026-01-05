@@ -603,26 +603,25 @@ class GroupProvider extends ChangeNotifier {
           headers['Authorization']!.isEmpty) {
         throw Exception('Chưa đăng nhập. Vui lòng đăng nhập lại.');
       }
+
       final gId = int.parse(groupId);
       final url = Uri.parse('$_baseUrl/group/$gId/members');
-      var request = http.MultipartRequest('GET', url);
 
-      //Thêm headers
-      request.headers.addAll({
-        'accept': '*/*',
-        'Authorization': headers['Authorization']!,
-      });
+      final response = await http.get(
+        url,
+        headers: {
+          'accept': 'application/json',
+          'Authorization': headers['Authorization']!,
+        },
+      );
 
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        final List<MemberDTO> members = data.map<MemberDTO>((json) {
-          final user = json['users']; // lấy object users
 
+        _allMembers = data.map<MemberDTO>((json) {
+          final user = json['users'];
           return MemberDTO(
-            id: user['id'],
+            id: user['id'], // String
             username: user['username'],
             email: user['email'],
             imageurl: user['imageurl'],
@@ -630,35 +629,25 @@ class GroupProvider extends ChangeNotifier {
             joinedAt: DateTime.parse(json['joined_at']),
           );
         }).toList();
-
-        // Lưu vào state của provider
-        _allMembers = members;
-        debugPrint('\nUSER API RESPONSE: $_allGroups');
-        isLoading = false;
-        notifyListeners();
-        return members;
       } else if (response.statusCode == 401) {
         _error = 'Phiên đăng nhập đã hết hạn';
-        _allGroups = [];
-        isLoading = false;
-        notifyListeners();
-        return [];
+        _allMembers = [];
       } else {
         final errorData = jsonDecode(response.body);
         _error =
             errorData['message'] ??
             'Lỗi không xác định: ${response.statusCode}';
-        isLoading = false;
-        notifyListeners();
-        return _allMembers;
+        _allMembers = [];
       }
     } catch (e) {
       debugPrint('Error in getAllMembers: $e');
       _error = 'Lỗi kết nối: $e';
+      _allMembers = [];
+    } finally {
       isLoading = false;
       notifyListeners();
-      return _allMembers;
     }
+    return _allMembers;
   }
 
   Future<MemberDTO?> addMemberToGroup(String groupId, String email) async {
@@ -675,19 +664,16 @@ class GroupProvider extends ChangeNotifier {
       }
       final gId = int.parse(groupId);
       final url = Uri.parse('$_baseUrl/group/$gId/members');
-      var request = http.MultipartRequest('POST', url);
 
-      //Thêm headers
-      request.headers.addAll({
-        'accept': '*/*',
-        'Authorization': headers['Authorization']!,
-      });
-
-      request.fields['email'] = email;
-      request.fields['role'] = "groupMember";
-
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
+      final response = await http.post(
+        url,
+        headers: {
+          'accept': 'application/json',
+          'Authorization': headers['Authorization']!,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'email': email, 'role': 'groupMember'}),
+      );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
@@ -701,16 +687,23 @@ class GroupProvider extends ChangeNotifier {
         );
 
         _allMembers.insert(0, newMember);
-        isLoading = false;
-        notifyListeners();
         return newMember;
+      } else if (response.statusCode == 409) {
+        _error = 'Thành viên đã tồn tại trong nhóm';
+      } else {
+        final errorData = jsonDecode(response.body);
+        _error =
+            errorData['message'] ??
+            'Lỗi không xác định: ${response.statusCode}';
       }
     } catch (e) {
       debugPrint('Error in addMember: $e');
       _error = 'Lỗi kết nối: $e';
+
+      return null;
+    } finally {
       isLoading = false;
       notifyListeners();
-      return null;
     }
     return null;
   }
@@ -729,13 +722,17 @@ class GroupProvider extends ChangeNotifier {
       }
       final gId = int.parse(groupId);
       final url = Uri.parse('$_baseUrl/group/$gId/members/$userId');
-      var request = http.MultipartRequest('DELETE', url);
 
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
+      final response = await http.delete(
+        url,
+        headers: {
+          'accept': 'application/json',
+          'Authorization': headers['Authorization']!,
+        },
+      );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        _member = null;
+        _allMembers.removeWhere((m) => m.id == userId);
       } else if (response.statusCode == 401) {
         _error = 'Phiên đăng nhập hết hạn';
       } else {
@@ -743,6 +740,70 @@ class GroupProvider extends ChangeNotifier {
       }
     } catch (e) {
       _error = 'Lỗi kết nối: $e';
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<List<MemberDTO>> searchMemberInGroup(
+    String groupId,
+    String keyword,
+  ) async {
+    try {
+      isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final headers = await _getHeaders();
+
+      if (!headers.containsKey('Authorization') ||
+          headers['Authorization']!.isEmpty) {
+        throw Exception('Chưa đăng nhập. Vui lòng đăng nhập lại.');
+      }
+      final gId = int.parse(groupId);
+      final url = Uri.parse(
+        '$_baseUrl/group/$gId/members/search',
+      ).replace(queryParameters: {'keyword': keyword});
+
+      final response = await http.get(
+        url,
+        headers: {
+          'accept': 'application/json',
+          'Authorization': headers['Authorization']!,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final List data = jsonDecode(response.body);
+        final members = <MemberDTO>[];
+
+        for (final item in data) {
+          final user = item['users'];
+          if (user == null) continue; // 🚨 BẮT BUỘC
+
+          members.add(
+            MemberDTO(
+              id: user['id'],
+              username: user['username'],
+              email: user['email'],
+              imageurl: null, // search API không trả
+              roleInGroup: 'groupMember', // default hoặc bỏ
+              joinedAt: null, // hoặc nullable
+            ),
+          );
+        }
+        return members;
+      } else if (response.statusCode == 401) {
+        _error = 'Phiên đăng nhập hết hạn';
+      } else {
+        _error = 'Xoá thành viên thất bại';
+      }
+      return [];
+    } catch (e) {
+      _error = 'Lỗi kết nối: $e';
+      return [];
+    } finally {
       isLoading = false;
       notifyListeners();
     }
