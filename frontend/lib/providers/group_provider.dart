@@ -1,3 +1,4 @@
+import 'package:di_cho_tien_loi/data/dto/group_member_dto.dart';
 import 'package:di_cho_tien_loi/data/models/group_model.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
@@ -15,6 +16,8 @@ class GroupProvider extends ChangeNotifier {
   String? accessToken;
   List<GroupDTO>? _allGroups = [];
   GroupDTO? _groupById;
+  List<MemberDTO> _allMembers = [];
+  MemberDTO? _member;
 
   static const String _baseUrl =
       "https://convenient-market-app.onrender.com/api";
@@ -24,6 +27,9 @@ class GroupProvider extends ChangeNotifier {
   List<GroupDTO>? get allGroups => _allGroups;
   GroupDTO? get groupById => _groupById;
   String? get error => _error;
+
+  List<MemberDTO>? get allMembers => _allMembers;
+  MemberDTO? get member => _member;
 
   // Thêm method reset error
   void resetError() {
@@ -121,29 +127,6 @@ class GroupProvider extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
       rethrow;
-    }
-  }
-
-  Future<void> getAllMemberOfGroup(String groupId) async {
-    isLoading = true;
-    _error = null;
-
-    try {
-      final headers = await _getHeaders();
-      final url = Uri.parse('$_baseUrl/group/$groupId/members');
-
-      final response = await http.get(url, headers: headers);
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        debugPrint('\nUSER API RESPONSE: $data');
-      } else {
-        throw Exception('Failed to load members: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('Error in getAllMemberOfGroup: $e');
-      _error = 'Lỗi kết nối: $e';
-      isLoading = false;
-      notifyListeners();
     }
   }
 
@@ -606,7 +589,131 @@ class GroupProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> addMemberToGroup(String username) async {}
+  Future<List<MemberDTO>> getAllMembersOfGroup({
+    required String groupId,
+  }) async {
+    try {
+      isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final headers = await _getHeaders();
+
+      if (!headers.containsKey('Authorization') ||
+          headers['Authorization']!.isEmpty) {
+        throw Exception('Chưa đăng nhập. Vui lòng đăng nhập lại.');
+      }
+      final gId = int.parse(groupId);
+      final url = Uri.parse('$_baseUrl/group/$gId/members');
+      var request = http.MultipartRequest('GET', url);
+
+      //Thêm headers
+      request.headers.addAll({
+        'accept': '*/*',
+        'Authorization': headers['Authorization']!,
+      });
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final List<dynamic> data = json.decode(response.body);
+        final List<MemberDTO> members = data.map<MemberDTO>((json) {
+          final user = json['users']; // lấy object users
+
+          return MemberDTO(
+            id: user['id'],
+            username: user['username'],
+            email: user['email'],
+            imageurl: user['imageurl'],
+            roleInGroup: json['role_in_group'],
+            joinedAt: DateTime.parse(json['joined_at']),
+          );
+        }).toList();
+
+        // Lưu vào state của provider
+        _allMembers = members;
+        debugPrint('\nUSER API RESPONSE: $_allGroups');
+        isLoading = false;
+        notifyListeners();
+        return members;
+      } else if (response.statusCode == 401) {
+        _error = 'Phiên đăng nhập đã hết hạn';
+        _allGroups = [];
+        isLoading = false;
+        notifyListeners();
+        return [];
+      } else {
+        final errorData = jsonDecode(response.body);
+        _error =
+            errorData['message'] ??
+            'Lỗi không xác định: ${response.statusCode}';
+        isLoading = false;
+        notifyListeners();
+        return _allMembers;
+      }
+    } catch (e) {
+      debugPrint('Error in getAllMembers: $e');
+      _error = 'Lỗi kết nối: $e';
+      isLoading = false;
+      notifyListeners();
+      return _allMembers;
+    }
+  }
+
+  Future<MemberDTO?> addMemberToGroup(String groupId, String email) async {
+    try {
+      isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final headers = await _getHeaders();
+
+      if (!headers.containsKey('Authorization') ||
+          headers['Authorization']!.isEmpty) {
+        throw Exception('Chưa đăng nhập. Vui lòng đăng nhập lại.');
+      }
+      final gId = int.parse(groupId);
+      final url = Uri.parse('$_baseUrl/group/$gId/members');
+      var request = http.MultipartRequest('POST', url);
+
+      //Thêm headers
+      request.headers.addAll({
+        'accept': '*/*',
+        'Authorization': headers['Authorization']!,
+      });
+
+      request.fields['email'] = email;
+      request.fields['role'] = "groupMember";
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = json.decode(response.body);
+        final newMember = MemberDTO(
+          id: data['id'].toString(),
+          username: data['name'] as String,
+          email: data['description'] as String,
+          joinedAt: DateTime.parse(data['created_at'] as String),
+          imageurl: data['imageurl'],
+          roleInGroup: "groupMember",
+        );
+
+        _allMembers.insert(0, newMember);
+        isLoading = false;
+        notifyListeners();
+        return newMember;
+      }
+    } catch (e) {
+      debugPrint('Error in addMember: $e');
+      _error = 'Lỗi kết nối: $e';
+      isLoading = false;
+      notifyListeners();
+      return null;
+    }
+    return null;
+  }
 
   Future<void> deleteMemberOfGroup(String username) async {}
 }
