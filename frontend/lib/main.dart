@@ -80,7 +80,7 @@ class MyApp extends StatelessWidget {
               onSecondary: Colors.white,
               error: Colors.red,
               onError: Colors.white,
-              surface: const Color.fromARGB(255, 236, 236, 236), // Bề mặt components
+              surface: const Color.fromARGB(255, 255, 255, 255), // Bề mặt components
               onSurface: Colors.black, // Chữ trên bề mặt
               outline: const Color(0xFFE0E0E0), // Đường viền
             ),

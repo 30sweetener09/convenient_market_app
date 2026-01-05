@@ -1,5 +1,7 @@
+import 'package:di_cho_tien_loi/screens/group/add_member_dialog.dart';
 import 'package:di_cho_tien_loi/screens/group/group_screen.dart';
 import 'package:di_cho_tien_loi/screens/group/update_group_modal.dart';
+import 'package:di_cho_tien_loi/widgets/member_card.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../widgets/custom_header.dart';
@@ -255,7 +257,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 );
               } else if (index == 1) {
                 context.read<GroupProvider>().getAllMembersOfGroup(
-                  groupId: 'widget.groupId'
+                  groupId: widget.groupId,
                 );
               } else if (index == 2) {
                 // context
@@ -327,7 +329,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         index: _activeTab,
         children: [
           _buildMealPlanTab(),
-          const Center(child: Text('👥 Danh sách thành viên')),
+          _buildMemberTab(),
           const Center(child: Text('🧊 Tủ lạnh')),
         ],
       ),
@@ -336,7 +338,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Widget _buildMealPlanTab() {
     return Consumer<MealPlanProvider>(
-      builder: (_, provider, __) {
+      builder: (_, provider, _) {
         if (provider.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -366,6 +368,100 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               },
             );
           },
+        );
+      },
+    );
+  }
+
+  Widget _buildAddMemberButton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          icon: const Icon(Icons.person_add, size: 18),
+          label: const Text(
+            'Thêm thành viên',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          onPressed: () async {
+            await showDialog(
+              context: context,
+              barrierDismissible: false, // chạm ngoài không tắt
+              builder: (_) => AddMemberDialog(groupId: widget.groupId),
+            );
+          },
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMemberTab() {
+    return Consumer<GroupProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (provider.allMembers == null || provider.allMembers!.isEmpty) {
+          return const Center(child: Text('Chưa có thành viên nào'));
+        }
+
+        return Column(
+          children: [
+            _buildAddMemberButton(),
+            Expanded(
+              child: ListView.separated(
+                itemCount: provider.allMembers!.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 1),
+                itemBuilder: (context, index) {
+                  final member = provider.allMembers![index];
+
+                  return MemberCard(
+                    member: member,
+                    onView: () {},
+                    onDelete: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Xoá thành viên'),
+                          content: Text(
+                            'Bạn có chắc muốn xoá ${member.username} khỏi nhóm?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Huỷ'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                              ),
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Xoá'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirmed == true && mounted) {
+                        await context.read<GroupProvider>().deleteMemberOfGroup(
+                          widget.groupId,
+                          member.id,
+                        );
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
     );
