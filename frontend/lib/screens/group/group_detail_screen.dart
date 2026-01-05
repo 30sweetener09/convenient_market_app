@@ -107,8 +107,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         });
 
         final groupProvider = context.read<GroupProvider>();
-          if (groupProvider.allGroups != null) {
-          final index = groupProvider.allGroups!.indexWhere((g) => g.id == widget.groupId);
+        if (groupProvider.allGroups != null) {
+          final index = groupProvider.allGroups!.indexWhere(
+            (g) => g.id == widget.groupId,
+          );
           if (index != -1) {
             groupProvider.allGroups![index] = updatedGroup;
           }
@@ -156,7 +158,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           await Future.delayed(const Duration(milliseconds: 300));
 
           // Quay về màn hình danh sách nhóm
-          Navigator.pop(context); 
+          Navigator.pop(context);
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
