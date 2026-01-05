@@ -589,9 +589,9 @@ class GroupProvider extends ChangeNotifier {
     }
   }
 
-  Future<List<MemberDTO>> getAllMembersOfGroup({
-    required String groupId,
-  }) async {
+  Future<List<MemberDTO>> getAllMembersOfGroup(
+    String groupId,
+  ) async {
     try {
       isLoading = true;
       _error = null;
