@@ -65,7 +65,7 @@ const validateAndFormatDate = (dateString) => {
  *               - mealplan_id
  *               - name
  *               - description
- *               - assignToUsername
+ *               - assignToUserId
  *             properties:
  *               groupId:
  *                 type: string
@@ -79,7 +79,7 @@ const validateAndFormatDate = (dateString) => {
  *               description:
  *                 type: string
  *                 example: "Buy 2 liters of milk"
- *               assignToUsername:
+ *               assignToUserId:
  *                 type: string
  *                 example: "Mai Văn Quân"
  *     responses:
@@ -143,17 +143,11 @@ const validateAndFormatDate = (dateString) => {
  */
 export const createTasks = async (req, res) => {
   try {
-    const { groupId, mealplan_id, name, description, assignToUsername } =
+    const { groupId, mealplan_id, name, description, assignToUserId } =
       req.body;
 
     // Validate required fields
-    if (
-      !groupId ||
-      !mealplan_id ||
-      !name ||
-      !description ||
-      !assignToUsername
-    ) {
+    if (!groupId || !mealplan_id || !name || !description) {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide all required fields",
@@ -224,14 +218,14 @@ export const createTasks = async (req, res) => {
     const { data: assignedUser } = await supabase
       .from("users")
       .select("id")
-      .ilike("username", assignToUsername)
+      .ilike("id", assignToUserId)
       .maybeSingle();
 
     if (!assignedUser) {
       return res.status(404).json({
         resultMessage: {
           en: "Assigned username does not exist",
-          vn: "Tên người dùng được gán không tồn tại",
+          vn: "Người dùng được gán không tồn tại",
         },
         resultCode: "00245",
       });
@@ -525,7 +519,7 @@ export const markTask = async (req, res) => {
  *               description:
  *                 type: string
  *                 example: "Buy fresh vegetables for dinner"
- *               assigntouserName:
+ *               assigntouserId:
  *                 type: string
  *                 example: "Mai Văn Quân"
  *     responses:
@@ -634,7 +628,7 @@ export const markTask = async (req, res) => {
  */
 export const updateTask = async (req, res) => {
   try {
-    const { groupId, taskId, name, description, assigntouserName } = req.body;
+    const { groupId, taskId, name, description, assignToUserId } = req.body;
     // Validate taskId
     if (!taskId || (typeof taskId === "string" && !taskId.trim())) {
       return res.status(400).json({
@@ -685,12 +679,12 @@ export const updateTask = async (req, res) => {
     if (
       name === undefined &&
       description === undefined &&
-      assigntouserName === undefined
+      assignToUserId === undefined
     ) {
       return res.status(400).json({
         resultMessage: {
-          en: "Please provide at least one of the following fields: name, description, assigntouserName",
-          vn: "Vui lòng cung cấp ít nhất một trong các trường sau: name, description, assigntouserName",
+          en: "Please provide at least one of the following fields: name, description, assignToUserId",
+          vn: "Vui lòng cung cấp ít nhất một trong các trường sau: name, description, assignToUserId",
         },
         resultCode: "00302",
       });
@@ -725,19 +719,19 @@ export const updateTask = async (req, res) => {
       }
     }
     const updateData = { updatedat: new Date().toISOString() };
-    if (assigntouserName) {
+    if (assignToUserId) {
       // Check if assigned user exists
       const { data: assignedUser } = await supabase
         .from("users")
         .select("id")
-        .ilike("username", assigntouserName)
+        .ilike("id", assignToUserId)
         .maybeSingle();
 
       if (!assignedUser) {
         return res.status(404).json({
           resultMessage: {
             en: "Assigned username does not exist",
-            vn: "Tên người dùng được gán không tồn tại",
+            vn: "Người dùng được gán không tồn tại",
           },
           resultCode: "00245",
         });
