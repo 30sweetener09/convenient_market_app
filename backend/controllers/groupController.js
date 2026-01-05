@@ -466,7 +466,7 @@ export const getGroupMembers = async (req, res) => {
  *                 type: string
  *                 description: Vai trò trong group
  *                 enum: [member, admin]
- *                 example: member
+ *                 example: groupMember
  *     responses:
  *       200:
  *         description: Thêm thành viên thành công
@@ -498,7 +498,7 @@ export const getGroupMembers = async (req, res) => {
 export const addMember = async (req, res) => {
   try {
     const groupId = req.params.id;
-    const { email, role = "member" } = req.body;
+    const { email, role = "groupMember" } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: "Email is required" });
@@ -539,8 +539,19 @@ export const addMember = async (req, res) => {
         user_id: user.id,
         role_in_group: role,
         joined_at: new Date(),
+        group_role_id: 2
       })
-      .select()
+      .select(`
+        group_id,
+        role_in_group,
+        joined_at,
+        users:user_id!inner (
+          id,
+          email,
+          username,
+          imageurl
+        )
+      `)
       .single();
 
     if (error) {
