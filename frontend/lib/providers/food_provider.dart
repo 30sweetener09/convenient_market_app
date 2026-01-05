@@ -32,7 +32,7 @@ class FoodProvider extends ChangeNotifier {
       if (token == null) return;
 
       final res = await http.get(
-        Uri.parse('$_baseUrl/list'),
+        Uri.parse('$_baseUrl'),
         headers: {
           "Authorization": "Bearer $token",
           "Content-Type": "application/json",
@@ -131,7 +131,7 @@ class FoodProvider extends ChangeNotifier {
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('$_baseUrl/create'),
+        Uri.parse('$_baseUrl'),
       );
 
       request.headers['Authorization'] = 'Bearer $token';
@@ -193,12 +193,13 @@ class FoodProvider extends ChangeNotifier {
 
       final request = http.MultipartRequest(
         'PUT',
-        Uri.parse('$_baseUrl/$id'),
+        Uri.parse(_baseUrl),
       );
 
       request.headers['Authorization'] = 'Bearer $token';
 
       request.fields.addAll({
+        'id': id.toString(),
         'name': name,
         'type': type,
         'unitName': unitName,
@@ -206,10 +207,27 @@ class FoodProvider extends ChangeNotifier {
       });
 
       if (imageFile != null) {
+        final ext = extension(imageFile.path).toLowerCase();
+
+        MediaType mediaType;
+        if (ext == '.png') {
+          mediaType = MediaType('image', 'png');
+        } else {
+          mediaType = MediaType('image', 'jpeg');
+        }
+
         request.files.add(
-          await http.MultipartFile.fromPath('image', imageFile.path),
+          await http.MultipartFile.fromPath(
+            'image',
+            imageFile.path,
+            filename: basename(imageFile.path),
+            contentType: mediaType, // ✅ QUAN TRỌNG
+          ),
         );
       }
+
+      debugPrint("📤 SEND UPDATE FOOD REQUEST ID $id ");
+
 
       final res = await http.Response.fromStream(await request.send());
 
@@ -229,11 +247,13 @@ class FoodProvider extends ChangeNotifier {
       if (token == null) return false;
 
       final res = await http.delete(
-        Uri.parse('$_baseUrl/$id'),
+        Uri.parse(_baseUrl),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
+          'Content-Type': 'application/json',
         },
+        body: jsonEncode({'id': id})
       );
 
       if (res.statusCode == 200 || res.statusCode == 204) {
@@ -241,7 +261,7 @@ class FoodProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        debugPrint("❌ Delete food failed: ${res.statusCode}");
+        debugPrint("❌ Delete food failed: id: $id ${res.statusCode} ${res.body}");
       }
     } catch (e) {
       debugPrint("❌ Delete food error: $e");

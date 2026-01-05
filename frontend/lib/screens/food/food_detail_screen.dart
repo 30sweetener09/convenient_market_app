@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../data/models/food_model.dart';
+import '../../providers/food_provider.dart';
 import 'food_form_dialog.dart';
 
 class FoodDetailScreen extends StatelessWidget {
@@ -29,9 +31,7 @@ class FoodDetailScreen extends StatelessWidget {
               errorBuilder: (_, __, ___) => Container(
                 height: 240,
                 color: Colors.grey.shade200,
-                child: const Center(
-                  child: Icon(Icons.image, size: 60),
-                ),
+                child: const Center(child: Icon(Icons.image, size: 60)),
               ),
             ),
 
@@ -81,8 +81,9 @@ class FoodDetailScreen extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                           icon: const Icon(Icons.edit, color: Colors.white),
-                          label: const Text("Chỉnh sửa",
-                              style: TextStyle(color: Colors.white),
+                          label: const Text(
+                            "Chỉnh sửa",
+                            style: TextStyle(color: Colors.white),
                           ),
                           onPressed: () async {
                             final reload = await showDialog<bool>(
@@ -91,25 +92,25 @@ class FoodDetailScreen extends StatelessWidget {
                             );
 
                             if (reload == true && context.mounted) {
-                              Navigator.pop(context, true); // quay về list và reload
+                              Navigator.pop(
+                                context,
+                                true,
+                              ); // quay về list và reload
                             }
                           },
-
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
-                            padding:
-                            const EdgeInsets.symmetric(vertical: 14),
-                            foregroundColor: Colors.red,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            foregroundColor: Colors.white,
+                            backgroundColor: Color(0xFFD32F2F),
                           ),
                           icon: const Icon(Icons.delete),
                           label: const Text("Xóa"),
-                          onPressed: () {
-                            // TODO: xóa food
-                          },
+                          onPressed: () => _confirmDelete(context),
                         ),
                       ),
                     ],
@@ -121,6 +122,48 @@ class FoodDetailScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _confirmDelete(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Xóa thực phẩm"),
+        content: Text("Bạn có chắc muốn xóa \"${food.name}\" không?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Hủy"),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context); // đóng dialog
+              await _deleteFood(context);
+            },
+            child: const Text("Xóa", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteFood(BuildContext context) async {
+    final provider = context.read<FoodProvider>();
+
+    final success = await provider.deleteFood(food.id);
+
+    if (!context.mounted) return;
+
+    if (success) {
+      Navigator.pop(context, true); // quay về list + reload
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Đã xóa thực phẩm")),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Xóa thất bại")),
+      );
+    }
   }
 }
 
@@ -145,19 +188,9 @@ class _InfoRow extends StatelessWidget {
         children: [
           Icon(icon, size: 20, color: Colors.grey),
           const SizedBox(width: 10),
-          Text(
-            "$label: ",
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text("$label: ", style: const TextStyle(fontWeight: FontWeight.w600)),
           Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-              ),
-            ),
+            child: Text(value, style: TextStyle(color: Colors.grey.shade700)),
           ),
         ],
       ),
