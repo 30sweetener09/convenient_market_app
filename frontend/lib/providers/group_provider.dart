@@ -692,12 +692,12 @@ class GroupProvider extends ChangeNotifier {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
         final newMember = MemberDTO(
-          id: data['id'].toString(),
-          username: data['name'] as String,
-          email: data['description'] as String,
-          joinedAt: DateTime.parse(data['created_at'] as String),
+          id: data['user_id'].toString(),
+          username: data['username'],
+          email: email,
+          joinedAt: DateTime.parse(data['joined_at'] as String),
           imageurl: data['imageurl'],
-          roleInGroup: "groupMember",
+          roleInGroup: data['role_in_group'],
         );
 
         _allMembers.insert(0, newMember);
@@ -715,5 +715,36 @@ class GroupProvider extends ChangeNotifier {
     return null;
   }
 
-  Future<void> deleteMemberOfGroup(String username) async {}
+  Future<void> deleteMemberOfGroup(String groupId, String userId) async {
+    try {
+      isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final headers = await _getHeaders();
+
+      if (!headers.containsKey('Authorization') ||
+          headers['Authorization']!.isEmpty) {
+        throw Exception('Chưa đăng nhập. Vui lòng đăng nhập lại.');
+      }
+      final gId = int.parse(groupId);
+      final url = Uri.parse('$_baseUrl/group/$gId/members/$userId');
+      var request = http.MultipartRequest('DELETE', url);
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        _member = null;
+      } else if (response.statusCode == 401) {
+        _error = 'Phiên đăng nhập hết hạn';
+      } else {
+        _error = 'Xoá thành viên thất bại';
+      }
+    } catch (e) {
+      _error = 'Lỗi kết nối: $e';
+      isLoading = false;
+      notifyListeners();
+    }
+  }
 }
