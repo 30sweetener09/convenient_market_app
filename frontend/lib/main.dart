@@ -1,4 +1,5 @@
 import 'package:di_cho_tien_loi/providers/food_provider.dart';
+import 'package:di_cho_tien_loi/providers/fridge_provider.dart';
 import 'package:di_cho_tien_loi/providers/group_provider.dart';
 import 'package:di_cho_tien_loi/providers/meal_plan_provider.dart';
 import 'package:di_cho_tien_loi/providers/meal_task_provider.dart';
@@ -22,6 +23,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => FoodProvider()),
         ChangeNotifierProvider(create: (_) => MealPlanProvider()),
         ChangeNotifierProvider(create: (_) => MealTaskProvider()),
+        ChangeNotifierProvider(create: (_) => FridgeProvider()),
       ],
       child: const MyApp()
     ),
