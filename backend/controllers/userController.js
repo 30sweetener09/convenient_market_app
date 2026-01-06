@@ -713,3 +713,96 @@ export const verifyCode = async (req, res) => {
     });
   }
 };
+
+/**
+ * @swagger
+ * /user/detail:
+ *   post:
+ *     summary: Lấy thông tin chi tiết của một user theo ID
+ *     description: >
+ *       Trả về thông tin cơ bản của một user bất kỳ theo ID.
+ *       Chỉ bao gồm các trường an toàn: id, email, username, imageurl.
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - id
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 description: ID của user
+ *                 example: "650b04fb-f88c-470b-8041-488d21710610"
+ *     responses:
+ *       200:
+ *         description: Thông tin chi tiết user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                   example: "650b04fb-f88c-470b-8041-488d21710610"
+ *                 email:
+ *                   type: string
+ *                   example: "test@gmail.com"
+ *                 username:
+ *                   type: string
+ *                   example: "duc"
+ *                 imageurl:
+ *                   type: string
+ *                   example: "https://example.com/avatar.png"
+ *       400:
+ *         description: Thiếu user id
+ *       401:
+ *         description: Chưa đăng nhập
+ *       404:
+ *         description: User không tồn tại
+ */
+
+
+
+export const getUserById = async (req, res) => {
+  try {
+    const { id } = req.body;
+
+    // Validate
+    if (!id) {
+      return res.status(400).json({ error: "User id is required" });
+    }
+
+    // Query user
+    const { data: user, error } = await supabaseAdmin
+      .from("users")
+      .select(`
+        id,
+        email,
+        username,
+        imageurl,
+        gender,
+        birthdate,
+        createdat,
+        updatedat
+      `)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    return res.status(200).json(user);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};

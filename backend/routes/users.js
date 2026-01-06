@@ -13,6 +13,7 @@ import {
   changePassword,
   updateUser,
   verifyCode,
+  getUserById,
 } from "../controllers/userController.js";
 
 import { requirePermission } from "../middlewares/permission.js";
@@ -26,6 +27,8 @@ router.post("/logout", logout);
 router.post("/refresh-token", refreshToken);
 router.post("/send-verification-code", sendVerificationCode);
 router.get("/", supabaseAuth, getUser);
+router.post("/detail", supabaseAuth, getUserById);
+
 router.delete("/", supabaseAuth, requirePermission("delete_user"), deleteUser);
 
 router.post("/verify-email", verifyEmail);
