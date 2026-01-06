@@ -1,6 +1,9 @@
+import 'package:di_cho_tien_loi/providers/fridge_provider.dart';
 import 'package:di_cho_tien_loi/screens/group/add_member_dialog.dart';
 import 'package:di_cho_tien_loi/screens/group/group_screen.dart';
+import 'package:di_cho_tien_loi/screens/group/member_detail_dialog.dart';
 import 'package:di_cho_tien_loi/screens/group/update_group_modal.dart';
+import 'package:di_cho_tien_loi/widgets/fridge_item_sheet.dart';
 import 'package:di_cho_tien_loi/widgets/member_card.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -260,9 +263,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   groupId: widget.groupId,
                 );
               } else if (index == 2) {
-                // context
-                //     .read<FridgeProvider>()
-                //     .fetchFridge(widget.groupId);
+                context.read<FridgeProvider>().fetchFridgesByGroupId(
+    int.parse(widget.groupId),
+  );
               }
             },
 
@@ -327,11 +330,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     return Expanded(
       child: IndexedStack(
         index: _activeTab,
-        children: [
-          _buildMealPlanTab(),
-          _buildMemberTab(),
-          const Center(child: Text('🧊 Tủ lạnh')),
-        ],
+        children: [_buildMealPlanTab(), _buildMemberTab(), _buildFridgeTab()],
       ),
     );
   }
@@ -425,7 +424,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
                   return MemberCard(
                     member: member,
-                    onView: () {},
+                    onView: () async {
+                      await showDialog(
+                        context: context,
+                        builder: (context) =>
+                            MemberDetailDialog(member: member),
+                      );
+                    },
                     onDelete: () async {
                       final confirmed = await showDialog<bool>(
                         context: context,
@@ -462,6 +467,65 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFridgeTab() {
+    return Consumer<FridgeProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (provider.allFridges.isEmpty) {
+          return const Center(child: Text('Chưa có tủ lạnh nào'));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: provider.allFridges.length,
+          itemBuilder: (_, index) {
+            final fridge = provider.allFridges[index];
+
+            return Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.kitchen, color: Colors.green),
+                title: Text(fridge.name),
+                subtitle: Text(
+                  fridge.description?.isNotEmpty == true
+                      ? fridge.description!
+                      : 'Không có mô tả',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  _openFridgeDetail(fridge.id);
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openFridgeDetail(int fridgeId) {
+    final groupId = int.parse(widget.groupId);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return ChangeNotifierProvider.value(
+          value: context.read<FridgeProvider>(),
+          child: FridgeItemSheet(fridgeId: fridgeId, groupId: groupId),
         );
       },
     );
