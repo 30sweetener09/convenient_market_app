@@ -84,31 +84,63 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
 
                 if (auth.error != null)
-                  Text(auth.error!, style: const TextStyle(color: Colors.red)),
+                  Text(
+                    "Không kết nối được với server!",
+                    style: const TextStyle(color: Colors.red),
+                  ),
 
                 const SizedBox(height: 16),
 
-                CustomButton(
-                  label: "Đăng nhập",
-                  loading: auth.isLoading,
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      await auth.login(
-                        _emailController.text.trim(),
-                        _passwordController.text,
-                      );
-                      if (auth.isLoggedIn) {
-                        if (context.mounted) {
-                          // Clear form
-                          _emailController.clear();
-                          _passwordController.clear();
-                          Navigator.pushReplacementNamed(context, '/home');
-                        }
-                      }
-                    }
-                  },
-                  backgroundColor: const Color(0xFF396A30),
-                  textColor: Colors.white,
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: auth.isLoading
+                        ? null
+                        : () async {
+                            if (_formKey.currentState!.validate()) {
+                              await auth.login(
+                                _emailController.text.trim(),
+                                _passwordController.text,
+                              );
+
+                              if (auth.isLoggedIn && context.mounted) {
+                                _emailController.clear();
+                                _passwordController.clear();
+                                Navigator.pushReplacementNamed(
+                                  context,
+                                  '/home',
+                                );
+                              }
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF396A30),
+                      disabledBackgroundColor: const Color.fromARGB(255, 144, 144, 144), // giữ màu khi loading
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(32),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: auth.isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Đăng nhập',
+                            style: TextStyle(
+                              fontSize: 24,
+                              color: Colors.white,
+                              fontFamily: 'Nunito',
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
                 ),
 
                 const SizedBox(height: 16),

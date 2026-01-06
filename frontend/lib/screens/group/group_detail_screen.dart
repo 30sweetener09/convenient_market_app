@@ -1,5 +1,6 @@
 import 'package:di_cho_tien_loi/screens/group/add_member_dialog.dart';
 import 'package:di_cho_tien_loi/screens/group/group_screen.dart';
+import 'package:di_cho_tien_loi/screens/group/member_detail_dialog.dart';
 import 'package:di_cho_tien_loi/screens/group/update_group_modal.dart';
 import 'package:di_cho_tien_loi/widgets/member_card.dart';
 import 'package:flutter/material.dart';
@@ -425,7 +426,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
                   return MemberCard(
                     member: member,
-                    onView: () {},
+                    onView: () async {
+                      await showDialog(
+                        context: context,
+                        builder: (context) => MemberDetailDialog(member: member),
+                      );
+                    },
                     onDelete: () async {
                       final confirmed = await showDialog<bool>(
                         context: context,
