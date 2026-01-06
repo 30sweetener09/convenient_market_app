@@ -494,8 +494,10 @@ export const markTask = async (req, res) => {
  * @swagger
  * /task:
  *   put:
- *     summary: Cập nhật task
- *     tags: [Task]
+ *     summary: Update task information
+ *     description: Update task name, description or assign task to another user (Admin only)
+ *     tags:
+ *       - Task
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -510,19 +512,19 @@ export const markTask = async (req, res) => {
  *             properties:
  *               groupId:
  *                 type: string
- *                 example: "group_123"
+ *                 example: "16"
  *               taskId:
  *                 type: string
- *                 example: "task_456"
+ *                 example: "33"
  *               name:
  *                 type: string
- *                 example: "Buy vegetables"
+ *                 example: "Mua tôm"
  *               description:
  *                 type: string
- *                 example: "Buy fresh vegetables for dinner"
- *               assigntouserId:
+ *                 example: "SaiGon PhanTom"
+ *               assignToUserId:
  *                 type: string
- *                 example: "Mai Văn Quân"
+ *                 example: "user_789"
  *     responses:
  *       200:
  *         description: Task updated successfully
@@ -531,9 +533,6 @@ export const markTask = async (req, res) => {
  *             schema:
  *               type: object
  *               properties:
- *                 resultCode:
- *                   type: string
- *                   example: "00312"
  *                 resultMessage:
  *                   type: object
  *                   properties:
@@ -543,99 +542,40 @@ export const markTask = async (req, res) => {
  *                     vn:
  *                       type: string
  *                       example: "Cập nhật nhiệm vụ thành công"
- *                 updateData:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "00312"
+ *                 data:
  *                   type: object
- *                   example:
- *                     name: "Buy vegetables"
- *                     description: "Buy fresh vegetables"
- *                     assigntouser_id: "user_123"
- *                     updatedat: "2026-01-04T10:30:00.000Z"
  *       400:
- *         description: Invalid request data
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 resultCode:
- *                   type: string
- *                   example: "00301"
- *                 resultMessage:
- *                   type: object
- *                   properties:
- *                     en:
- *                       type: string
- *                       example: "Please provide a task ID in the taskId field"
- *                     vn:
- *                       type: string
- *                       example: "Vui lòng cung cấp một ID nhiệm vụ trong trường taskId"
+ *         description: Invalid input data
  *       403:
- *         description: Permission denied
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 resultCode:
- *                   type: string
- *                   example: "00307"
- *                 resultMessage:
- *                   type: object
- *                   properties:
- *                     en:
- *                       type: string
- *                       example: "User is not a group admin"
- *                     vn:
- *                       type: string
- *                       example: "Người dùng không phải là quản trị viên nhóm"
+ *         description: User is not authorized
  *       404:
- *         description: Resource not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 resultCode:
- *                   type: string
- *                   example: "00306"
- *                 resultMessage:
- *                   type: object
- *                   properties:
- *                     en:
- *                       type: string
- *                       example: "Task not found with the provided ID"
- *                     vn:
- *                       type: string
- *                       example: "Không tìm thấy nhiệm vụ với ID đã cung cấp"
+ *         description: Task not found
  *       500:
  *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 resultCode:
- *                   type: string
- *                   example: "00500"
- *                 resultMessage:
- *                   type: object
- *                   properties:
- *                     en:
- *                       type: string
- *                       example: "Internal server error"
- *                     vn:
- *                       type: string
- *                       example: "Lỗi máy chủ nội bộ"
  */
+
 export const updateTask = async (req, res) => {
   try {
     const { groupId, taskId, name, description, assignToUserId } = req.body;
-    // Validate taskId
+
+    if (!groupId) {
+      return res.status(400).json({
+        resultMessage: {
+          en: "Please provide group ID",
+          vn: "Vui lòng cung cấp group ID",
+        },
+        resultCode: "00302",
+      });
+    }
+
     if (!taskId || (typeof taskId === "string" && !taskId.trim())) {
       return res.status(400).json({
         resultMessage: {
-          en: "Please provide a task ID in the taskId field",
-          vn: "Vui lòng cung cấp một ID nhiệm vụ trong trường taskId",
+          en: "Please provide a task ID",
+          vn: "Vui lòng cung cấp ID nhiệm vụ",
         },
         resultCode: "00301",
       });
@@ -643,7 +583,7 @@ export const updateTask = async (req, res) => {
 
     const { data: groupAdmin, error: groupError } = await supabase
       .from("groups")
-      .select("id, created_by")
+      .select("id")
       .eq("id", groupId)
       .eq("created_by", req.user.id)
       .maybeSingle();
@@ -652,31 +592,12 @@ export const updateTask = async (req, res) => {
       return res.status(403).json({
         resultMessage: {
           en: "User is not a group admin",
-          vn: "Người dùng không phải là quản trị viên nhóm",
+          vn: "Người dùng không phải quản trị viên nhóm",
         },
         resultCode: "00307",
       });
     }
 
-    // Check if task exists
-    const { data: task, error: fetchError } = await supabase
-      .from("task")
-      .select("id")
-      .eq("group_id", groupId)
-      .eq("id", taskId)
-      .maybeSingle();
-
-    if (fetchError || !task) {
-      return res.status(404).json({
-        resultMessage: {
-          en: "Task not found with the provided ID",
-          vn: "Không tìm thấy nhiệm vụ với ID đã cung cấp",
-        },
-        resultCode: "00306",
-      });
-    }
-
-    // Validate at least one field to update
     if (
       name === undefined &&
       description === undefined &&
@@ -684,111 +605,86 @@ export const updateTask = async (req, res) => {
     ) {
       return res.status(400).json({
         resultMessage: {
-          en: "Please provide at least one of the following fields: name, description, assignToUserId",
-          vn: "Vui lòng cung cấp ít nhất một trong các trường sau: name, description, assignToUserId",
+          en: "No fields provided to update",
+          vn: "Không có dữ liệu nào để cập nhật",
         },
-        resultCode: "00302",
+        resultCode: "00313",
       });
     }
 
-    // Validate newFoodName
-    if (name) {
-      if (!nameRegex.test(name) || name.length < 2 || name.length > 50) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Please provide a valid name",
-            vn: "Vui lòng cung cấp một name hợp lệ",
-          },
-          resultCode: "00303",
-        });
-      }
-    }
+    let updateFields = {
+      updatedat: new Date().toISOString(),
+    };
 
-    if (description) {
-      if (
-        !nameRegex.test(description) ||
-        description.length < 2 ||
-        description.length > 50
-      ) {
-        return res.status(400).json({
-          resultMessage: {
-            en: "Please provide a valid description",
-            vn: "Vui lòng cung cấp một description hợp lệ",
-          },
-          resultCode: "00303",
-        });
-      }
-    }
-    const updateData = { updatedat: new Date().toISOString() };
-    if (assignToUserId) {
-      // Check if assigned user exists
-      const { data: assignedUser } = await supabase
-        .from("users")
-        .select("id")
-        .ilike("id", assignToUserId)
-        .maybeSingle();
-
-      if (!assignedUser) {
-        return res.status(404).json({
-          resultMessage: {
-            en: "Assigned username does not exist",
-            vn: "Người dùng được gán không tồn tại",
-          },
-          resultCode: "00245",
-        });
-      }
-
-      // Check group membership
+    if (assignToUserId !== undefined) {
       const { data: groupMember } = await supabaseAdmin
         .from("group_members")
         .select("user_id")
         .eq("group_id", groupId)
-        .eq("user_id", assignedUser.id)
+        .eq("user_id", assignToUserId)
         .maybeSingle();
 
       if (!groupMember) {
         return res.status(403).json({
           resultMessage: {
-            en: "Unauthorized access",
-            vn: "Không có quyền gán task cho người dùng này",
+            en: "User is not a member of this group",
+            vn: "Người dùng không thuộc nhóm này",
           },
           resultCode: "00246",
         });
       }
-      updateData.assigntouser_id = assignedUser.id;
+
+      updateFields.assigntouser_id = assignToUserId;
     }
 
-    // Prepare update data
-
     if (name !== undefined) {
-      updateData.name = name.trim();
+      if (!nameRegex.test(name) || name.length < 2 || name.length > 50) {
+        return res.status(400).json({
+          resultMessage: {
+            en: "Invalid name",
+            vn: "Tên không hợp lệ",
+          },
+          resultCode: "00303",
+        });
+      }
+      updateFields.name = name.trim();
     }
 
     if (description !== undefined) {
-      updateData.description = description.trim();
+      updateFields.description = description.trim();
     }
 
-    // Perform update
     const { data: updatedTask, error: updateError } = await supabase
       .from("task")
-      .update(updateData)
+      .update(updateFields)
       .eq("id", taskId)
+      .eq("group_id", groupId)
       .select()
       .single();
 
     if (updateError) throw updateError;
 
-    res.status(200).json({
+    if (!updatedTask) {
+      return res.status(404).json({
+        resultMessage: {
+          en: "Task not found",
+          vn: "Không tìm thấy nhiệm vụ",
+        },
+        resultCode: "00304",
+      });
+    }
+
+    return res.status(200).json({
       resultMessage: {
         en: "Task updated successfully",
         vn: "Cập nhật nhiệm vụ thành công",
       },
       resultCode: "00312",
-      updateData,
+      data: updatedTask,
     });
   } catch (err) {
     console.error("Error updating task:", err.message);
-    res.status(500).json({
+    return res.status(500).json({
       resultMessage: {
         en: "Internal server error",
         vn: "Lỗi máy chủ nội bộ",
