@@ -1,4 +1,3 @@
-import 'package:di_cho_tien_loi/data/dto/group_member_dto.dart';
 import 'package:di_cho_tien_loi/data/models/meal_plan_model.dart';
 import 'package:di_cho_tien_loi/providers/meal_plan_provider.dart';
 import 'package:di_cho_tien_loi/screens/meal_plan/widgets/task_card.dart';
@@ -104,6 +103,7 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
         }
 
         final members = groupProvider.allMembers;
+        final groupId = planProvider.mealPlan?.groupId;
 
         return Column(
           children: [
@@ -135,12 +135,13 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
                   final task = taskProvider.tasks[index];
 
                   return TaskCard(
+                    key: ValueKey(task.id),
                     task: task,
                     users: members,
                     // ✅ MEMBER TỪ API
-                    onToggle: () => taskProvider.toggleTask(task),
-                    onAssign: (userId) => taskProvider.assignTask(task, userId),
-                    onDelete: () => taskProvider.deleteTask(task),
+                    onToggle: () => taskProvider.toggleTask(task, groupId.toString()),
+                    onAssign: (userId) => taskProvider.assignTask(task, userId, groupId.toString()),
+                    onDelete: () => taskProvider.deleteTask(task, groupId.toString()),
                   );
                 },
               ),
@@ -168,10 +169,25 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
             child: const Text('Hủy'),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (ctrl.text.trim().isNotEmpty) {
-                provider.addTask(ctrl.text.trim(),0);
+            onPressed: () async {
+              final desc = ctrl.text.trim();
+              if (desc.isEmpty) return;
+
+              final mealPlanProvider = context.read<MealPlanProvider>();
+              final groupId = mealPlanProvider.mealPlan?.groupId;
+
+              if (groupId == null) {
+                debugPrint('❌ groupId null');
+                return;
               }
+
+              await provider.addTask(
+                mealPlanId: widget.mealPlanId,
+                groupId: groupId.toString(),
+                name: desc, // hoặc "Task mới"
+                description: desc,
+              );
+
               Navigator.pop(context);
             },
             child: const Text('Thêm'),
@@ -180,6 +196,7 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
       ),
     );
   }
+
 
   // ================= META CARD =================
   Widget _buildMetaSection(MealPlan plan) {

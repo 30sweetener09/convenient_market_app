@@ -82,7 +82,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               children: [
                 _buildHeader(),
                 _buildTabSection(),
-                const Divider(height: 1),
+                // const Divider(height: 1),
                 _buildTabContent(),
               ],
             ),
