@@ -663,6 +663,7 @@ export const getFridgeItems = async (req, res) => {
             unit: i.unit,
             expiryDate: i.expirydate,
             fridgeName: i.fridge?.name,
+            fridgeId: i.fridge?.id,
             Food: i.food
         }));
 
