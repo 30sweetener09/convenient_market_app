@@ -60,7 +60,7 @@ class _MainLayoutState extends State<MainLayout> {
   final avatarUrl = user?.photoUrl;
 
     return AppBar(
-      backgroundColor: Color(0xFF4C663C),
+      backgroundColor: Color(0xFF396A30),
       toolbarHeight: 60,
       elevation: 0,
       titleSpacing: 0,
@@ -73,7 +73,7 @@ class _MainLayoutState extends State<MainLayout> {
             backgroundImage: hasAvatar ? NetworkImage(avatarUrl!) : null,
             child:
               !hasAvatar 
-              ? Icon(Icons.person, color: Color(0xFF4C663C), size: 24)
+              ? Icon(Icons.person, color: Color(0xFF396A30), size: 24)
               : null,
           ),
         ),
@@ -103,7 +103,7 @@ class _MainLayoutState extends State<MainLayout> {
     return BottomAppBar(
       shape: const CircularNotchedRectangle(), // Tạo đường lượn cho nút FAB
       notchMargin: 8.0,
-      color: const Color(0xFF4C663C),
+      color: const Color(0xFF396A30),
       child: SizedBox(
         height: 60,
         child: Row(
@@ -137,7 +137,7 @@ class _MainLayoutState extends State<MainLayout> {
       ),
       child: Icon(
         isSelected ? iconFilled : iconOutlined,
-        color: isSelected ? Color(0xFF4C663C) : Colors.white,
+        color: isSelected ? Color(0xFF396A30) : Colors.white,
         size: 28,
       ),
     ),

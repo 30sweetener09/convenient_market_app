@@ -40,7 +40,7 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
 
       final groupId = mealPlanProvider.mealPlan?.groupId;
       if (groupId != null) {
-        await groupProvider.getAllMembersOfGroup(groupId: groupId.toString());
+        await groupProvider.getAllMembersOfGroup(groupId.toString());
       }
     });
   }

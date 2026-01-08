@@ -589,9 +589,9 @@ class GroupProvider extends ChangeNotifier {
     }
   }
 
-  Future<List<MemberDTO>> getAllMembersOfGroup({
-    required String groupId,
-  }) async {
+  Future<List<MemberDTO>> getAllMembersOfGroup(
+    String groupId,
+  ) async {
     try {
       isLoading = true;
       _error = null;
@@ -688,6 +688,7 @@ class GroupProvider extends ChangeNotifier {
         );
 
         _allMembers.insert(0, newMember);
+            
         return newMember;
       } else if (response.statusCode == 409) {
         _error = 'Thành viên đã tồn tại trong nhóm';

@@ -9,9 +9,9 @@ class FridgeProvider extends ChangeNotifier {
   bool isLoading = false;
   String? _error;
 
+  List<FridgeItemDTO> _fridgeItems = [];
   List<FridgeDTO> _allFridges = [];
   FridgeDTO? _fridgeById;
-  List<FridgeItemDTO> _fridgeItems = [];
   bool isLoadingFridgeItems = false;
 
   static const String _baseUrl =
@@ -19,9 +19,9 @@ class FridgeProvider extends ChangeNotifier {
 
   // ================= GETTERS =================
   List<FridgeDTO> get allFridges => _allFridges;
+  List<FridgeItemDTO> get fridgeItems => _fridgeItems;
   FridgeDTO? get fridgeById => _fridgeById;
   String? get error => _error;
-  List<FridgeItemDTO> get fridgeItems => _fridgeItems;
 
   // ================= RESET =================
   void resetError() {
@@ -50,7 +50,6 @@ class FridgeProvider extends ChangeNotifier {
     try {
       isLoading = true;
       _error = null;
-      notifyListeners();
 
       final headers = await _getHeaders();
       final uri = Uri.parse(
@@ -85,7 +84,6 @@ class FridgeProvider extends ChangeNotifier {
     try {
       isLoading = true;
       _error = null;
-      notifyListeners();
 
       final headers = await _getHeaders();
       final uri = Uri.parse('$_baseUrl/fridge/$fridgeId');
@@ -107,7 +105,7 @@ class FridgeProvider extends ChangeNotifier {
     }
   }
 
-  // ================= CREATE =================
+  // ================= CREATE FRIDGE =================
   Future<FridgeDTO?> createFridge({
     required String name,
     required int groupId,
@@ -116,7 +114,6 @@ class FridgeProvider extends ChangeNotifier {
     try {
       isLoading = true;
       _error = null;
-      notifyListeners();
 
       final headers = await _getHeaders();
       final uri = Uri.parse('$_baseUrl/fridge');
@@ -150,7 +147,7 @@ class FridgeProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-
+  /*
   Future<void> fetchFridgeItems({
     required int fridgeId,
     required int groupId,
@@ -158,7 +155,6 @@ class FridgeProvider extends ChangeNotifier {
     try {
       isLoadingFridgeItems = true;
       _error = null;
-      notifyListeners();
 
       final headers = await _getHeaders();
 
@@ -188,5 +184,6 @@ class FridgeProvider extends ChangeNotifier {
       isLoadingFridgeItems = false;
       notifyListeners();
     }
-  }
+  }*/
+
 }

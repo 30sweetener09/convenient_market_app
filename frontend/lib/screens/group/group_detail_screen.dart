@@ -1,4 +1,7 @@
+import 'package:di_cho_tien_loi/providers/fridge_item_provider.dart';
 import 'package:di_cho_tien_loi/providers/fridge_provider.dart';
+import 'package:di_cho_tien_loi/screens/fridge/fridge_detail_screen.dart';
+import 'package:di_cho_tien_loi/screens/group/add_fridge_modal.dart';
 import 'package:di_cho_tien_loi/screens/group/add_member_dialog.dart';
 import 'package:di_cho_tien_loi/screens/group/group_screen.dart';
 import 'package:di_cho_tien_loi/screens/group/member_detail_dialog.dart';
@@ -192,6 +195,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          SizedBox(height: 20),
           Center(
             child: CircleAvatar(
               radius: 30,
@@ -208,7 +212,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           const SizedBox(height: 6),
           Text(
             _group!.name,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
@@ -234,7 +238,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: [_buildTabs(), const SizedBox(height: 6), _buildSearchBar()],
+        children: [SizedBox(height: 16), _buildTabs(), const SizedBox(height: 6),/* _buildSearchBar()*/],
       ),
     );
   }
@@ -260,12 +264,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 );
               } else if (index == 1) {
                 context.read<GroupProvider>().getAllMembersOfGroup(
-                  groupId: widget.groupId,
+                  widget.groupId,
                 );
               } else if (index == 2) {
                 context.read<FridgeProvider>().fetchFridgesByGroupId(
-    int.parse(widget.groupId),
-  );
+                  int.parse(widget.groupId),
+                );
               }
             },
 
@@ -274,19 +278,19 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 4),
               padding: const EdgeInsets.symmetric(vertical: 6),
               decoration: BoxDecoration(
-                color: isActive ? Colors.green.shade50 : Colors.white,
+                color: isActive ? Color.fromARGB(255, 60, 137, 62) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isActive ? Colors.green : Colors.grey.shade300,
+                  color: isActive ? Color.fromARGB(255, 60, 137, 62) : Colors.grey.shade300,
                 ),
               ),
               child: Center(
                 child: Text(
                   _tabs[index],
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                    color: isActive ? Colors.green : Colors.grey[700],
+                    color: isActive ? Colors.white : Colors.grey[700],
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -384,11 +388,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
           onPressed: () async {
-            await showDialog(
+            final added = await showDialog<bool>(
               context: context,
               barrierDismissible: false, // chạm ngoài không tắt
               builder: (_) => AddMemberDialog(groupId: widget.groupId),
             );
+            if (added == true) {
+              context.read<GroupProvider>().getAllMembersOfGroup(widget.groupId);
+            }
           },
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -479,43 +486,94 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (provider.allFridges.isEmpty) {
-          return const Center(child: Text('Chưa có tủ lạnh nào'));
-        }
+        return Column(
+          children: [
+            //_buildAddFridgeButton(),
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: provider.allFridges.length,
-          itemBuilder: (_, index) {
-            final fridge = provider.allFridges[index];
+            if (provider.allFridges.isEmpty)
+              const Expanded(child: Center(child: Text('Chưa có tủ lạnh nào')))
+            else
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                  itemCount: provider.allFridges.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 6),
+                  itemBuilder: (_, index) {
+                    final fridge = provider.allFridges[index];
 
-            return Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: ListTile(
-                leading: const Icon(Icons.kitchen, color: Colors.green),
-                title: Text(fridge.name),
-                subtitle: Text(
-                  fridge.description?.isNotEmpty == true
-                      ? fridge.description!
-                      : 'Không có mô tả',
+                    return Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: ListTile(
+                        leading: const Icon(Icons.kitchen, color: Colors.green),
+                        title: Text(fridge.name),
+                        subtitle: Text(
+                          fridge.description?.isNotEmpty == true
+                              ? fridge.description!
+                              : '(Không có mô tả)',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          _openFridgeDetail(fridge.id, fridge.name);
+                        },
+                      ),
+                    );
+                  },
                 ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  _openFridgeDetail(fridge.id);
-                },
               ),
-            );
-          },
+          ],
         );
       },
     );
   }
 
-  void _openFridgeDetail(int fridgeId) {
+  void _openFridgeDetail(int fridgeId, String fridgeName) {
     final groupId = int.parse(widget.groupId);
 
+    Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ChangeNotifierProvider.value(
+        value: context.read<FridgeItemProvider>(),
+        child: FridgeDetailScreen(
+          fridgeId: fridgeId,
+          groupId: groupId,
+          fridgeName: fridgeName,
+        ),
+      ),
+    ),
+  );
+  }
+
+  Widget _buildAddFridgeButton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text(
+            'Thêm ngăn tủ',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          onPressed: () {
+            // TODO: mở modal / dialog thêm tủ
+            _openAddFridgeModal();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _openAddFridgeModal() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -523,10 +581,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) {
-        return ChangeNotifierProvider.value(
-          value: context.read<FridgeProvider>(),
-          child: FridgeItemSheet(fridgeId: fridgeId, groupId: groupId),
-        );
+        return AddFridgeModal(groupId: int.parse(widget.groupId));
       },
     );
   }

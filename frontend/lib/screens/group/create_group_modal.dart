@@ -1,5 +1,6 @@
 // create_group_modal.dart
 import 'dart:io';
+import 'package:di_cho_tien_loi/providers/fridge_provider.dart';
 import 'package:di_cho_tien_loi/providers/group_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -19,34 +20,62 @@ class _CreateGroupModalState extends State<CreateGroupModal> {
   File? _selectedImageFile;
   bool _isLoading = false;
 
+  Future<void> _createDefaultFridges({
+    required int groupId,
+    required FridgeProvider fridgeProvider,
+  }) async {
+    const defaultFridges = ['Khác', 'Ngăn đông', 'Ngăn mát'];
+    const defaultBio = [
+      'Chứa thực phẩm khác',
+      'Chứa thực phẩm cần bảo quản đông',
+      'Chứa thực phẩm, đồ ăn bảo quản ngắn ngày',
+    ];
+
+    for (int i = 0; i < defaultFridges.length; i++) {
+      await fridgeProvider.createFridge(
+        name: defaultFridges[i],
+        groupId: groupId,
+        description: defaultBio[i],
+      );
+    }
+  }
+
   Future<void> _createGroup() async {
     debugPrint('=== BẮT ĐẦU TẠO NHÓM ===');
     debugPrint('Tên: ${_nameController.text}');
     debugPrint('Mô tả: ${_descriptionController.text}');
     debugPrint('Ảnh: ${_selectedImageFile?.path}');
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       final groupProvider = context.read<GroupProvider>();
-      await groupProvider.createGroup(
+      final fridgeProvider = context.read<FridgeProvider>();
+      final newGroup = await groupProvider.createGroup(
         name: _nameController.text.trim(),
         description: _descriptionController.text.trim(),
         imageFile: _selectedImageFile,
       );
-      
+      final groupId = int.parse(newGroup.id);
+      await _createDefaultFridges(
+        groupId: groupId,
+        fridgeProvider: fridgeProvider,
+      );
+
       if (mounted) {
         Navigator.pop(context, true); // TRẢ VỀ true KHI TẠO THÀNH CÔNG
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tạo nhóm thành công!')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Tạo nhóm thành công!')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Lỗi: ${e.toString().replaceFirst("Exception: ", "")}'),
+            content: Text(
+              'Lỗi: ${e.toString().replaceFirst("Exception: ", "")}',
+            ),
             duration: const Duration(seconds: 3),
           ),
         );
@@ -85,13 +114,15 @@ class _CreateGroupModalState extends State<CreateGroupModal> {
                       ),
                     ),
                     IconButton(
-                      onPressed: _isLoading ? null : () => Navigator.pop(context),
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.pop(context),
                       icon: const Icon(Icons.close),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Tên nhóm
                 TextFormField(
                   controller: _nameController,
@@ -103,7 +134,7 @@ class _CreateGroupModalState extends State<CreateGroupModal> {
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Vui lòng nhập tên nhóm';
-                    } 
+                    }
                     if (value.trim().length < 3) {
                       return 'Tên nhóm phải có ít nhất 3 ký tự';
                     }
@@ -114,7 +145,7 @@ class _CreateGroupModalState extends State<CreateGroupModal> {
                   readOnly: _isLoading,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Mô tả
                 TextFormField(
                   controller: _descriptionController,
@@ -137,7 +168,7 @@ class _CreateGroupModalState extends State<CreateGroupModal> {
                   readOnly: _isLoading,
                 ),
                 const SizedBox(height: 20),
-                
+
                 //Ảnh đại diện nhóm
                 ImagePickerWidget(
                   title: 'Ảnh đại diện nhóm (tùy chọn)',
@@ -147,9 +178,9 @@ class _CreateGroupModalState extends State<CreateGroupModal> {
                     });
                   },
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Nút tạo
                 SizedBox(
                   width: double.infinity,
@@ -181,7 +212,7 @@ class _CreateGroupModalState extends State<CreateGroupModal> {
                           ),
                   ),
                 ),
-                
+
                 // Cancel button
                 if (!_isLoading) ...[
                   const SizedBox(height: 12),

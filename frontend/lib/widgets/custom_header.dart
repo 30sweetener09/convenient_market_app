@@ -33,6 +33,8 @@ class CustomHeader extends StatelessWidget
       centerTitle: true,
       actions: [
         PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert, color: Colors.white),
+          color: Colors.white,
           onSelected: (value) {
             if (value == 'edit') onEdit?.call();
             if (value == 'delete') onDelete?.call();
