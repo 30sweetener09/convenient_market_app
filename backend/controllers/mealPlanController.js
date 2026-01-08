@@ -1,10 +1,3 @@
-/**
- * @swagger
- * tags:
- *   name: Shopping List
- *   description: Shopping list management APIs
- */
-
 // controllers/mealPlanController.js
 import { supabase } from "../db.js";
 
@@ -17,7 +10,6 @@ const validateAndFormatDate = (dateString) => {
 
   const parts = dateString.split("-");
   if (parts.length !== 3) return null;
-
   const [month, day, year] = parts;
   const monthNum = parseInt(month, 10);
   const dayNum = parseInt(day, 10);
@@ -85,7 +77,6 @@ const formatDateToDisplay = (dateString) => {
  *                 example: 1
  *               name:
  *                 type: string
- *                 enum: [breakfast, launch, dinner]
  *                 description: "Meal name: breakfast (sáng), lunch (trưa), dinner (tối)"
  *                 example: "breakfast"
  *               description:
@@ -96,7 +87,7 @@ const formatDateToDisplay = (dateString) => {
  *                 type: string
  *                 format: date-time
  *                 description: Scheduled time for the meal (must be in the future)
- *                 example: "2024-01-10T07:00:00.000Z"
+ *                 example: "01-02-2026"
  *           examples:
  *             breakfast:
  *               summary: Breakfast meal plan
@@ -216,12 +207,8 @@ export const createMealPlan = async (req, res) => {
     }
 
     // 00316 - Vui lòng cung cấp một tên hợp lệ cho bữa ăn, sáng, trưa, tối
-    const validMealNames = ["breakfast", "launch", "dinner"];
-    if (
-      typeof name !== "string" ||
-      name.trim() === "" ||
-      !validMealNames.includes(name.trim().toLowerCase())
-    ) {
+
+    if (typeof name !== "string" || name.trim() === "") {
       return res.status(400).json({
         resultMessage: {
           en: "Please provide a valid meal name: breakfast (sáng), lunch (trưa), dinner (tối)",
@@ -248,15 +235,12 @@ export const createMealPlan = async (req, res) => {
       });
     }
 
-    // Chuẩn hóa tên bữa ăn
-    let normalizedMealName = name.trim().toLowerCase();
-
     // Insert meal plan
     const { data: mealPlanData, error: insertError } = await supabase
       .from("mealplan")
       .insert([
         {
-          name: normalizedMealName,
+          name: name,
           description: description,
           timestamp: timestamp,
           status: "NOT_PASS_YET",
@@ -650,13 +634,12 @@ export const updateMealPlan = async (req, res) => {
  *       - Meal Plans
  *     summary: Delete a meal plan
  *     description: |
- *       Delete a meal plan and all associated data (shopping lists and tasks).
+ *       Delete a meal plan and all associated data ( tasks).
  *       Only group admin can perform this action.
  *
  *       **Cascade deletion:**
- *       1. Delete all tasks associated with shopping lists
- *       2. Delete all shopping lists associated with the meal plan
- *       3. Delete the meal plan itself
+ *       1. Delete all tasks associated with mealplan
+ *       2. Delete the meal plan itself
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -845,7 +828,6 @@ export const deleteMealPlan = async (req, res) => {
     const numericPlanId = Number(planId);
 
     if (
-      !Number.isInteger(numericPlanId) ||
       numericPlanId <= 0 ||
       (typeof planId === "string" && planId.trim() === "")
     ) {
@@ -893,32 +875,13 @@ export const deleteMealPlan = async (req, res) => {
       });
     }
 
-    const { data: shoppingLists, error: fetchError1 } = await supabase
-      .from("shoppinglist")
-      .select("id")
-      .eq("mealplan_id", planId);
-
-    if (fetchError1) throw fetchError1;
-
-    if (shoppingLists && shoppingLists.length > 0) {
-      const shoppingListIds = shoppingLists.map((list) => list.id);
-
-      // 2. Xóa tất cả TASK thuộc về các shoppinglist đó (Xóa Cháu)
-      const { error: errorTask } = await supabase
-        .from("task")
-        .delete()
-        .in("shoppinglist_id", shoppingListIds);
-
-      if (errorTask) throw errorTask;
-    }
-
-    // 3. Xóa tất cả SHOPPINGLIST thuộc về mealplan này (Xóa Cha)
-    const { error: errorShopping } = await supabase
-      .from("shoppinglist")
+    // 2. Xóa tất cả TASK thuộc về mealplan
+    const { error: errorTask } = await supabase
+      .from("task")
       .delete()
       .eq("mealplan_id", planId);
 
-    if (errorShopping) throw errorShopping;
+    if (errorTask) throw errorTask;
 
     const { error: deleteError } = await supabase
       .from("mealplan")
