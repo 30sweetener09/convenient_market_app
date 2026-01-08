@@ -25,4 +25,19 @@ class MealPlan {
       groupId: json['groupid'],
     );
   }
+  MealPlan copyWith({
+    String? name,
+    String? description,
+    String? timestamp,
+  }) {
+    return MealPlan(
+      id: id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      timestamp: timestamp ?? this.timestamp,
+      status: status,
+      groupId: groupId,
+    );
+  }
+
 }

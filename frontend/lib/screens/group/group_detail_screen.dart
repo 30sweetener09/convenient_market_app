@@ -17,6 +17,7 @@ import 'package:di_cho_tien_loi/providers/group_provider.dart';
 
 import '../../providers/meal_plan_provider.dart';
 import '../meal_plan/meal_plan_detail_screen.dart';
+import '../meal_plan/meal_plan_form_dialog.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   final String groupId;
@@ -88,7 +89,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               children: [
                 _buildHeader(),
                 _buildTabSection(),
-                const Divider(height: 1),
+                // const Divider(height: 1),
                 _buildTabContent(),
               ],
             ),
@@ -341,36 +342,48 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Widget _buildMealPlanTab() {
     return Consumer<MealPlanProvider>(
-      builder: (_, provider, _) {
+      builder: (context, provider, _) {
         if (provider.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
 
         if (provider.mealPlans.isEmpty) {
-          return const Center(child: Text('Chưa có meal plan'));
+          return Column(
+            children: [
+              _buildAddMealPlanButton(),
+              const Expanded(child: Center(child: Text('Chưa có meal plan'))),
+            ],
+          );
         }
 
-        return ListView.builder(
-          itemCount: provider.mealPlans.length,
-          itemBuilder: (_, index) {
-            final plan = provider.mealPlans[index];
+        return Column(
+          children: [
+            _buildAddMealPlanButton(), // 👈 giống MemberTab
+            Expanded(
+              child: ListView.builder(
+                itemCount: provider.mealPlans.length,
+                itemBuilder: (_, index) {
+                  final plan = provider.mealPlans[index];
 
-            return MealPlanCard(
-              name: plan.name,
-              date: plan.timestamp,
-              description: plan.description,
-              isStarred: plan.status == 'PASS',
-              // userEmail: plan.userEmail,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => MealPlanDetailScreen(mealPlanId: plan.id),
-                  ),
-                );
-              },
-            );
-          },
+                  return MealPlanCard(
+                    name: plan.name,
+                    date: plan.timestamp,
+                    description: plan.description,
+                    isStarred: plan.status == 'PASS',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              MealPlanDetailScreen(mealPlanId: plan.id),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
     );
@@ -407,6 +420,34 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       ),
     );
   }
+
+  Widget _buildAddMealPlanButton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          icon: const Icon(Icons.note_add),
+          label: const Text('Thêm kế hoạch bữa ăn'),
+          onPressed: () async {
+            final created = await showDialog<bool>(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) => MealPlanFormDialog(groupId: widget.groupId,),
+            );
+
+            // ❗ KHÔNG fetch lại
+            // chỉ cần provider.createMealPlan() notifyListeners()
+            if (created == true && mounted) {
+              // nothing here
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+
 
   Widget _buildMemberTab() {
     return Consumer<GroupProvider>(

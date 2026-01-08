@@ -1,4 +1,3 @@
-import 'package:di_cho_tien_loi/data/dto/group_member_dto.dart';
 import 'package:di_cho_tien_loi/data/models/meal_plan_model.dart';
 import 'package:di_cho_tien_loi/providers/meal_plan_provider.dart';
 import 'package:di_cho_tien_loi/screens/meal_plan/widgets/task_card.dart';
@@ -8,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../providers/group_provider.dart';
 import '../../providers/meal_task_provider.dart';
 import '../../widgets/custom_header.dart';
+import 'meal_plan_form_dialog.dart';
 
 class MealPlanDetailScreen extends StatefulWidget {
   final int mealPlanId;
@@ -87,7 +87,7 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
                 const SizedBox(height: 12),
 
                 /// ACTIONS (ĐƯA XUỐNG DƯỚI)
-                _buildBottomActions(),
+                _buildBottomActions(plan),
               ],
             ),
           ),
@@ -104,6 +104,7 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
         }
 
         final members = groupProvider.allMembers;
+        final groupId = planProvider.mealPlan?.groupId;
 
         return Column(
           children: [
@@ -135,12 +136,13 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
                   final task = taskProvider.tasks[index];
 
                   return TaskCard(
+                    key: ValueKey(task.id),
                     task: task,
                     users: members,
                     // ✅ MEMBER TỪ API
-                    onToggle: () => taskProvider.toggleTask(task),
-                    onAssign: (userId) => taskProvider.assignTask(task, userId),
-                    onDelete: () => taskProvider.deleteTask(task),
+                    onToggle: () => taskProvider.toggleTask(task, groupId.toString()),
+                    onAssign: (userId) => taskProvider.assignTask(task, userId, groupId.toString()),
+                    onDelete: () => taskProvider.deleteTask(task, groupId.toString()),
                   );
                 },
               ),
@@ -168,10 +170,25 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
             child: const Text('Hủy'),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (ctrl.text.trim().isNotEmpty) {
-                provider.addTask(ctrl.text.trim(),0);
+            onPressed: () async {
+              final desc = ctrl.text.trim();
+              if (desc.isEmpty) return;
+
+              final mealPlanProvider = context.read<MealPlanProvider>();
+              final groupId = mealPlanProvider.mealPlan?.groupId;
+
+              if (groupId == null) {
+                debugPrint('❌ groupId null');
+                return;
               }
+
+              await provider.addTask(
+                mealPlanId: widget.mealPlanId,
+                groupId: groupId.toString(),
+                name: desc, // hoặc "Task mới"
+                description: desc,
+              );
+
               Navigator.pop(context);
             },
             child: const Text('Thêm'),
@@ -180,6 +197,7 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
       ),
     );
   }
+
 
   // ================= META CARD =================
   Widget _buildMetaSection(MealPlan plan) {
@@ -215,131 +233,57 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
     );
   }
 
-  Widget _buildTextArea() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: TextField(
-        controller: _descCtrl,
-        readOnly: !_isEditing,
-        maxLines: null,
-        expands: true,
-        decoration: const InputDecoration(
-          hintText: 'Ghi chú cho meal plan...',
-          border: InputBorder.none,
-        ),
+  Widget _buildBottomActions(MealPlan plan) {
+    return _buildViewActions(plan);
+  }
+  Future<void> _onEdit(MealPlan plan) async {
+    final updated = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => MealPlanFormDialog(
+        mealPlan: plan,
+        groupId: plan.groupId.toString(), // ✅ BẮT BUỘC
       ),
     );
+
+    // Provider đã notifyListeners → UI tự update
   }
 
-  Widget _buildBottomActions() {
-    if (_isEditing) {
-      return _buildEditActions(); // có container
-    }
 
-    return _buildViewActions(); // KHÔNG container
-  }
 
-  Widget _buildViewActions() {
-    return Row(
-      children: [
-        /// ✏️ EDIT – nền xanh, chữ trắng
-        ElevatedButton.icon(
-          onPressed: () {
-            setState(() => _isEditing = true);
-          },
-          icon: const Icon(Icons.edit, size: 18),
-          label: const Text('Chỉnh sửa'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2E7D32),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 32),
-
-        /// 🗑 DELETE – chữ đỏ, không nền
-        TextButton.icon(
-          onPressed: _confirmDelete,
-          icon: const Icon(Icons.delete, size: 18, color: Colors.white),
-          label: const Text('Xóa', style: TextStyle(color: Colors.white)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFFD32F2F),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEditActions() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildViewActions(MealPlan plan) {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          /// ASSIGN
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade400),
-              color: Colors.white,
+          /// ✏️ EDIT
+          ElevatedButton.icon(
+            onPressed: () => _onEdit(plan),
+            icon: const Icon(Icons.edit, size: 18),
+            label: const Text('Chỉnh sửa'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E7D32),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            // child: DropdownButton<String>(
-            //   value: _assignedUser,
-            //   hint: const Text('Assign to'),
-            //   isExpanded: true,
-            //   underline: const SizedBox(),
-            //   items: _fakeUsers
-            //       .map((u) => DropdownMenuItem(value: u, child: Text(u)))
-            //       .toList(),
-            //   onChanged: (val) {
-            //     setState(() => _assignedUser = val);
-            //   },
-            // ),
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(width: 24),
 
-          /// SAVE
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                setState(() => _isEditing = false);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E7D32),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text(
-                'Lưu thay đổi',
-                style: TextStyle(fontWeight: FontWeight.bold),
+          /// 🗑 DELETE
+          ElevatedButton.icon(
+            onPressed: () => _confirmDelete(plan),
+            icon: const Icon(Icons.delete, size: 18),
+            label: const Text('Xóa'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD32F2F),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
@@ -348,7 +292,8 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
     );
   }
 
-  void _confirmDelete() {
+
+  void _confirmDelete(MealPlan plan) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -360,9 +305,20 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
             child: const Text('Hủy'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              // TODO: call delete API
+
+              final provider = context.read<MealPlanProvider>();
+              final groupId = plan.groupId.toString();
+
+              final success = await provider.deleteMealPlan(
+                groupId: groupId,
+                planId: plan.id,
+              );
+
+              if (success && mounted) {
+                Navigator.pop(context); // 👈 quay về list
+              }
             },
             child: const Text('Xóa', style: TextStyle(color: Colors.red)),
           ),
@@ -370,6 +326,7 @@ class _MealPlanDetailScreenState extends State<MealPlanDetailScreen> {
       ),
     );
   }
+
 
   String _formatDate(String timestamp) {
     final date = DateTime.parse(timestamp);
