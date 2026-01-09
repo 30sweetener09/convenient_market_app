@@ -881,7 +881,7 @@ export const getUserById = async (req, res) => {
 };
 /**
  * @swagger
- * /devices/register:
+ * /user/devices/register:
  *   post:
  *     summary: Đăng ký thiết bị nhận thông báo
  *     tags: [User Device]
