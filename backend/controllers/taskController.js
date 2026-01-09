@@ -561,7 +561,7 @@ export const markTask = async (req, res) => {
 
 export const updateTask = async (req, res) => {
   try {
-    const { groupId, taskId, name, description, assignToUserId } = req.body;
+    const { groupId, taskId, name, description } = req.body;
 
     if (!groupId) {
       return res.status(400).json({
@@ -618,63 +618,17 @@ export const updateTask = async (req, res) => {
       updatedat: new Date().toISOString(),
     };
 
-<<<<<<< HEAD
-    if (assignToUserId !== undefined) {
-=======
-    if (description) {
-      if (
-        !nameRegex.test(description) ||
-        description.length < 2 ||
-        description.length > 50
-      ) {
+    if (description !== undefined) {  
+      if (!description.trim()) {
         return res.status(400).json({
           resultMessage: {
-            en: "Please provide a valid description",
-            vn: "Vui lòng cung cấp một description hợp lệ",
+            en: "Invalid description",
+            vn: "Mô tả không hợp lệ",
           },
-          resultCode: "00303",
-        });
+          resultCode: "00304",
+        });  
       }
-    }
-    const updateData = { updatedat: new Date().toISOString() };
-    if (assignToUserId) {
-      // Check if assigned user exists
-      const { data: assignedUser } = await supabase
-        .from("users")
-        .select("id")
-        .eq("id", assignToUserId)
-        .maybeSingle();
-
-      if (!assignedUser) {
-        return res.status(404).json({
-          resultMessage: {
-            en: "Assigned username does not exist",
-            vn: "Người dùng được gán không tồn tại",
-          },
-          resultCode: "00245",
-        });
-      }
-
-      // Check group membership
->>>>>>> b4b431c (fix api delete)
-      const { data: groupMember } = await supabaseAdmin
-        .from("group_members")
-        .select("user_id")
-        .eq("group_id", groupId)
-        .eq("user_id", assignToUserId)
-        .maybeSingle();
-
-      if (!groupMember) {
-        return res.status(403).json({
-          resultMessage: {
-            en: "User is not a member of this group",
-            vn: "Người dùng không thuộc nhóm này",
-          },
-          resultCode: "00246",
-        });
-      }
-
-      updateFields.assigntouser_id = assignToUserId;
+      updateFields.description = description.trim();
     }
 
     if (name !== undefined) {
@@ -690,9 +644,7 @@ export const updateTask = async (req, res) => {
       updateFields.name = name.trim();
     }
 
-    if (description !== undefined) {
-      updateFields.description = description.trim();
-    }
+    
 
     const { data: updatedTask, error: updateError } = await supabase
       .from("task")
