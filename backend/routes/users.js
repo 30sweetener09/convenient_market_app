@@ -14,6 +14,7 @@ import {
   updateUser,
   verifyCode,
   getUserById,
+  registerUserDevice,
 } from "../controllers/userController.js";
 
 import { requirePermission } from "../middlewares/permission.js";
@@ -29,13 +30,14 @@ router.post("/send-verification-code", sendVerificationCode);
 router.get("/", supabaseAuth, getUser);
 router.post("/detail", supabaseAuth, getUserById);
 
-router.delete("/", supabaseAuth, requirePermission("delete_user"), deleteUser);
+router.delete("/", supabaseAuth, deleteUser);
 
 router.post("/verify-email", verifyEmail);
 router.post("/verify-code", verifyCode);
 router.post("/change-password", supabaseAuth, changePassword);
 
 router.put("/", supabaseAuth, upload.single("avatar"), updateUser);
+router.post("/devices/register", supabaseAuth, registerUserDevice);
 
 
 export default router;

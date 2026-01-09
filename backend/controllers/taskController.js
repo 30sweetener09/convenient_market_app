@@ -1,5 +1,7 @@
 // controllers/taskController.js
 import { supabase, supabaseAdmin } from "../db.js";
+import { firebaseAdmin } from "../services/firebase.js";
+
 
 // ==================== HELPER FUNCTIONS ====================
 
@@ -616,7 +618,45 @@ export const updateTask = async (req, res) => {
       updatedat: new Date().toISOString(),
     };
 
+<<<<<<< HEAD
     if (assignToUserId !== undefined) {
+=======
+    if (description) {
+      if (
+        !nameRegex.test(description) ||
+        description.length < 2 ||
+        description.length > 50
+      ) {
+        return res.status(400).json({
+          resultMessage: {
+            en: "Please provide a valid description",
+            vn: "Vui lòng cung cấp một description hợp lệ",
+          },
+          resultCode: "00303",
+        });
+      }
+    }
+    const updateData = { updatedat: new Date().toISOString() };
+    if (assignToUserId) {
+      // Check if assigned user exists
+      const { data: assignedUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", assignToUserId)
+        .maybeSingle();
+
+      if (!assignedUser) {
+        return res.status(404).json({
+          resultMessage: {
+            en: "Assigned username does not exist",
+            vn: "Người dùng được gán không tồn tại",
+          },
+          resultCode: "00245",
+        });
+      }
+
+      // Check group membership
+>>>>>>> b4b431c (fix api delete)
       const { data: groupMember } = await supabaseAdmin
         .from("group_members")
         .select("user_id")
@@ -1208,3 +1248,161 @@ export const getTaskById = async (req, res) => {
     });
   }
 };
+
+/**
+ * @swagger
+ * /task/{taskId}/assign:
+ *   put:
+ *     summary: Gán công việc cho một người dùng
+ *     tags: [Task]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: taskId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - assignToUserId
+ *             properties:
+ *               assignToUserId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Task assigned successfully
+ *       400:
+ *         description: Invalid request
+ *       403:
+ *         description: Permission denied
+ *       404:
+ *         description: Task or user not found
+ *       500:
+ *         description: Internal server error
+ */
+
+export const assignTaskToUser = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { assignToUserId } = req.body;
+    const currentUserId = req.user.id;
+
+    if (!assignToUserId) {
+      return res.status(400).json({
+        resultCode: "00401",
+        message: "assignToUserId is required",
+      });
+    }
+
+    /* 1. Check task */
+    const { data: task, error: taskError } = await supabase
+      .from("task")
+      .select("id, name, group_id")
+      .eq("id", taskId)
+      .maybeSingle();
+
+    if (taskError || !task) {
+      return res.status(404).json({
+        resultCode: "00404",
+        message: "Task not found",
+      });
+    }
+
+    /* 2. Check permission (group owner / admin) */
+    const { data: permission } = await supabase
+      .from("group_members")
+      .select("role_in_group")
+      .eq("group_id", task.group_id)
+      .eq("user_id", currentUserId)
+      .in("role_in_group", ["owner", "admin"])
+      .maybeSingle();
+
+    if (!permission) {
+      return res.status(403).json({
+        resultCode: "00403",
+        message: "Permission denied",
+      });
+    }
+
+    /* 3. Check assignee is group member */
+    const { data: member } = await supabase
+      .from("group_members")
+      .select("user_id")
+      .eq("group_id", task.group_id)
+      .eq("user_id", assignToUserId)
+      .maybeSingle();
+
+    if (!member) {
+      return res.status(404).json({
+        resultCode: "00405",
+        message: "User not in group",
+      });
+    }
+
+    /* 4. Update task */
+    const { error: updateError } = await supabase
+      .from("task")
+      .update({
+        assigntouser_id: assignToUserId,
+        updatedat: new Date().toISOString(),
+      })
+      .eq("id", taskId);
+
+    if (updateError) throw updateError;
+
+    /* 5. Push notification */
+    const { data: devices } = await supabase
+      .from("user_devices")
+      .select("id, fcm_token")
+      .eq("user_id", assignToUserId)
+      .eq("is_active", true);
+
+    if (devices?.length) {
+      const tokens = devices.map(d => d.fcm_token);
+
+      const response = await firebaseAdmin.messaging().sendEachForMulticast({
+        tokens,
+        notification: {
+          title: "📌 Bạn được giao công việc",
+          body: task.name,
+        },
+        data: {
+          taskId: task.id,
+          type: "TASK_ASSIGNED",
+        },
+      });
+
+      /* Auto clean invalid tokens */
+      const invalidTokens = [];
+      response.responses.forEach((r, idx) => {
+        if (!r.success) invalidTokens.push(devices[idx].id);
+      });
+
+      if (invalidTokens.length) {
+        await supabase
+          .from("user_devices")
+          .update({ is_active: false })
+          .in("id", invalidTokens);
+      }
+    }
+
+    return res.status(200).json({
+      resultCode: "00400",
+      message: "Task assigned successfully",
+    });
+  } catch (err) {
+    console.error("assignTaskToUser:", err);
+    return res.status(500).json({
+      resultCode: "00500",
+      message: "Internal server error",
+    });
+  }
+};
+
+

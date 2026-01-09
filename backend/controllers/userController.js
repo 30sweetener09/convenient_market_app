@@ -15,6 +15,9 @@ import {
  *   description: API liên quan đến tài khoản người dùng
  */
 
+
+
+
 /**
  * @swagger
  * /user/login:
@@ -443,37 +446,107 @@ export const getUser = async (req, res) => {
 
 /**
  * @swagger
- * /user/:
+ * /user:
  *   delete:
- *     summary: Xóa tài khoản người dùng
+ *     summary: Xóa tài khoản người dùng theo userId
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: ID của người dùng (users.id / auth.users.id)
+ *                 example: "b3a1c2d4-5678-90ab-cdef-1234567890ab"
  *     responses:
  *       200:
  *         description: Xóa tài khoản thành công
+ *       400:
+ *         description: Thiếu userId
+ *       500:
+ *         description: Lỗi máy chủ
  */
 export const deleteUser = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ message: "userId is required" });
+    }
 
-    await supabaseAdmin.auth.admin.deleteUser(userId);
-    await supabaseAdmin.from("users").delete().eq("id", userId);
+    /* ===============================
+       1. BẢNG PHỤ THUỘC users.id
+    =============================== */
+
+    // food.userid → users.id
+    await supabaseAdmin.from("food").delete().eq("userid", userId);
+
+    // task.assigntouser_id → users.id
+    await supabaseAdmin.from("task").delete().eq("assigntouser_id", userId);
+
+    // group_members.user_id → users.id
+    await supabaseAdmin.from("group_members").delete().eq("user_id", userId);
+
+    // user_role.user_id → users.id
+    await supabaseAdmin.from("user_role").delete().eq("user_id", userId);
+
+    // users.belongstogroupadminid (self reference)
+    await supabaseAdmin
+      .from("users")
+      .update({ belongstogroupadminid: null })
+      .eq("belongstogroupadminid", userId);
+
+    /* ===============================
+       2. GROUP DO USER TẠO
+       (KHÔNG xóa group, chỉ bỏ created_by)
+    =============================== */
+    await supabaseAdmin
+      .from("groups")
+      .update({ created_by: null })
+      .eq("created_by", userId);
+
+    /* ===============================
+       3. USER DEVICES (auth.users FK)
+    =============================== */
+    await supabaseAdmin.from("user_devices").delete().eq("user_id", userId);
+
+    /* ===============================
+       4. XÓA public.users
+    =============================== */
+    const { error: dbError } = await supabaseAdmin
+      .from("users")
+      .delete()
+      .eq("id", userId);
+
+    if (dbError) throw dbError;
+
+    /* ===============================
+       5. XÓA auth.users (CUỐI CÙNG)
+    =============================== */
+    const { error: authError } =
+      await supabaseAdmin.auth.admin.deleteUser(userId);
+
+    if (authError) throw authError;
 
     return res.status(200).json({
       resultCode: "00092",
-      resultMessage: {
-        vn: "Tài khoản của bạn đã bị xóa thành công.",
-        en: "Your account has been deleted successfully.",
-      },
+      message: "User deleted successfully",
     });
-  } catch {
+  } catch (err) {
+    console.error("DELETE USER ERROR:", err);
     return res.status(500).json({
       resultCode: "00008",
-      message: "Đã xảy ra lỗi máy chủ nội bộ, vui lòng thử lại.",
+      message: err.message || "Database error deleting user",
     });
   }
 };
+
 
 /**
  * @swagger
@@ -806,3 +879,77 @@ export const getUserById = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+/**
+ * @swagger
+ * /devices/register:
+ *   post:
+ *     summary: Đăng ký thiết bị nhận thông báo
+ *     tags: [User Device]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - fcmToken
+ *             properties:
+ *               fcmToken:
+ *                 type: string
+ *               platform:
+ *                 type: string
+ *                 example: android
+ *               deviceId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Device registered
+ *       400:
+ *         description: Invalid request
+ *       500:
+ *         description: Internal server error
+ */
+
+export const registerUserDevice = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { fcmToken, platform, deviceId } = req.body;
+
+    if (!fcmToken) {
+      return res.status(400).json({
+        resultCode: "00601",
+        message: "fcmToken is required",
+      });
+    }
+
+    const { error } = await supabase
+      .from("user_devices")
+      .upsert(
+        {
+          user_id: userId,
+          fcm_token: fcmToken,
+          platform,
+          device_id: deviceId,
+          is_active: true,
+          last_seen_at: new Date().toISOString(),
+        },
+        { onConflict: "fcm_token" }
+      );
+
+    if (error) throw error;
+
+    return res.status(200).json({
+      resultCode: "00600",
+      message: "Device registered successfully",
+    });
+  } catch (err) {
+    console.error("registerUserDevice:", err);
+    return res.status(500).json({
+      resultCode: "00699",
+      message: "Internal server error",
+    });
+  }
+};
+
