@@ -19,8 +19,8 @@ class CustomBottomNav extends StatelessWidget {
       Icons.group,
       Icons.menu_book,
       Icons.home,
-      Icons.kitchen,
-      Icons.bar_chart,
+      Icons.fastfood,
+      Icons.person_2,
     ];
 
     return SizedBox(

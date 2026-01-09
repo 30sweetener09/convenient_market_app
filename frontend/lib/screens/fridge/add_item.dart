@@ -21,8 +21,16 @@ class AddItemSheet extends StatefulWidget {
 class _AddItemSheetState extends State<AddItemSheet> {
   final _quantityCtrl = TextEditingController();
 
-  Food? _selectedFood;
+  int? _selectedFoodId;
   DateTime? _expiryDate;
+
+  Food? get _selectedFood {
+    if (_selectedFoodId == null) return null;
+    return context
+        .read<FoodProvider>()
+        .foods
+        .firstWhere((f) => f.id == _selectedFoodId);
+  }
 
   @override
   void initState() {
@@ -60,17 +68,20 @@ class _AddItemSheetState extends State<AddItemSheet> {
           const SizedBox(height: 16),
 
           /// ===== FOOD DROPDOWN =====
-          DropdownButtonFormField<Food>(
-            initialValue: _selectedFood,
+          DropdownButtonFormField<int>(
+            initialValue: _selectedFoodId,
             decoration: const InputDecoration(
               labelText: 'Thực phẩm',
               border: OutlineInputBorder(),
             ),
             items: foodProvider.foods.map((food) {
-              return DropdownMenuItem(value: food, child: Text(food.name));
+              return DropdownMenuItem<int>(
+                value: food.id,
+                child: Text(food.name),
+              );
             }).toList(),
-            onChanged: (food) {
-              setState(() => _selectedFood = food);
+            onChanged: (value) {
+              setState(() => _selectedFoodId = value);
             },
           ),
 
@@ -154,15 +165,16 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   void _submit() async {
     final useWithinDays = _expiryDate!.difference(DateTime.now()).inDays;
+    final provider = context.read<FridgeItemProvider>();
 
-    await context.read<FridgeItemProvider>().createItem(
+    await provider.createItem(
       widget.fridgeId,
       _selectedFood!.name,
       double.parse(_quantityCtrl.text),
       _selectedFood!.unit,
       useWithinDays,
     );
-
+    await provider.fetchAllItems(fridgeId: widget.fridgeId);
     if (mounted) Navigator.pop(context);
   }
 

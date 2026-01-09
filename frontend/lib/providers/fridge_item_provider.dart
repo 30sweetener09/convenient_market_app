@@ -150,6 +150,7 @@ class FridgeItemProvider extends ChangeNotifier {
           fridgeId: data['fridge_id'],
         );
         _fridgeItems.insert(0, newItem);
+        notifyListeners();
         return newItem;
       } else {
         throw Exception('Lỗi kết nối');
@@ -229,7 +230,7 @@ class FridgeItemProvider extends ChangeNotifier {
 
       final headers = await _getHeaders();
       headers['Content-Type'] = 'application/json';
-      final uri = Uri.parse('$_baseUrl/fridge/item/create');
+      final uri = Uri.parse('$_baseUrl/fridge/item/delete');
 
       debugPrint(uri.toString());
 
@@ -246,6 +247,7 @@ class FridgeItemProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         _fridgeItems.removeWhere((item) => item.id == itemId);
+        notifyListeners();
 
         return true;
       } else {

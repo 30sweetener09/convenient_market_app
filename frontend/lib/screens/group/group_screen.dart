@@ -184,7 +184,7 @@ class _GroupScreenState extends State<GroupScreen> {
                               horizontal: 16,
                               vertical: 14,
                             ),
-                            prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                            //prefixIcon: const SizedBox(width: 4),
                             suffixIcon: _searchController.text.isNotEmpty
                                 ? IconButton(
                                     icon: const Icon(Icons.clear, size: 20),
@@ -250,10 +250,10 @@ class _GroupScreenState extends State<GroupScreen> {
               ),
             ],
           ),
-          // ⭐ SỬA LỖI HERO: Dùng Material để wrap FAB
           floatingActionButton: Material(
             color: Colors.transparent,
             child: FloatingActionButton(
+              heroTag: null,
               onPressed: _showCreateGroupModal,
               backgroundColor: Theme.of(context).primaryColor,
               foregroundColor: Colors.white,

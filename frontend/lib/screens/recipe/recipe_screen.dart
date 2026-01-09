@@ -53,6 +53,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         backgroundColor: const Color(0xFF386633),
         shape: const CircleBorder(),
         onPressed: () async {

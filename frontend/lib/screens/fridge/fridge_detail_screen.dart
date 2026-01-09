@@ -68,11 +68,16 @@ class _FridgeDetailScreenState extends State<FridgeDetailScreen> {
               return ItemCard(
                 item: item,
                 onDelete: () {
-                  context.read<FridgeItemProvider>().deleteItem(
-                    item.id,
-                    item.foodName!,
-                    widget.fridgeId,
-                  );
+                  final provider = context.read<FridgeItemProvider>();
+                  //provider.removeLocalItem(item.id);
+                  provider.deleteItem(item.id, item.foodName!, widget.fridgeId);
+                  /*
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Đã xoá ${item.foodName}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );*/
                 },
               );
             },
@@ -80,6 +85,7 @@ class _FridgeDetailScreenState extends State<FridgeDetailScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'items_screen_fab',
         backgroundColor: const Color(0xFF396A30),
         onPressed: _openAddItemSheet,
         child: const Icon(Icons.add, color: Colors.white),

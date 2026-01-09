@@ -54,6 +54,7 @@ class _FoodScreenState extends State<FoodScreen> {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         backgroundColor: const Color(0xFF386633),
         shape: const CircleBorder(),
         onPressed: () async {
