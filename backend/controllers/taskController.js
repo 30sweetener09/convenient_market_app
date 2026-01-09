@@ -1253,7 +1253,7 @@ export const assignTaskToUser = async (req, res) => {
     }
 
     /* 1. Check task */
-    const { data: task, error: taskError } = await supabase
+    const { data: task, error: taskError } = await supabaseAdmin
       .from("task")
       .select("id, name, group_id")
       .eq("id", taskId)
@@ -1267,12 +1267,12 @@ export const assignTaskToUser = async (req, res) => {
     }
 
     /* 2. Check permission (group owner / admin) */
-    const { data: permission } = await supabase
+    const { data: permission } = await supabaseAdmin
       .from("group_members")
       .select("role_in_group")
       .eq("group_id", task.group_id)
       .eq("user_id", currentUserId)
-      .in("role_in_group", ["owner", "admin"])
+      .in("role_in_group", ["owner", "groupAdmin"])
       .maybeSingle();
 
     if (!permission) {
@@ -1283,7 +1283,7 @@ export const assignTaskToUser = async (req, res) => {
     }
 
     /* 3. Check assignee is group member */
-    const { data: member } = await supabase
+    const { data: member } = await supabaseAdmin
       .from("group_members")
       .select("user_id")
       .eq("group_id", task.group_id)
@@ -1298,7 +1298,7 @@ export const assignTaskToUser = async (req, res) => {
     }
 
     /* 4. Update task */
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from("task")
       .update({
         assigntouser_id: assignToUserId,
@@ -1309,7 +1309,7 @@ export const assignTaskToUser = async (req, res) => {
     if (updateError) throw updateError;
 
     /* 5. Push notification */
-    const { data: devices } = await supabase
+    const { data: devices } = await supabaseAdmin
       .from("user_devices")
       .select("id, fcm_token")
       .eq("user_id", assignToUserId)
@@ -1337,7 +1337,7 @@ export const assignTaskToUser = async (req, res) => {
       });
 
       if (invalidTokens.length) {
-        await supabase
+        await supabaseAdmin
           .from("user_devices")
           .update({ is_active: false })
           .in("id", invalidTokens);
