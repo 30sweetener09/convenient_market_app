@@ -30,7 +30,7 @@ class GroupExpirySection extends StatelessWidget {
             const Text(
               "Tủ lạnh của bạn",
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),

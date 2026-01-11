@@ -23,7 +23,7 @@ class MenuItem extends StatelessWidget {
       title: Column (
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-        Text (title, style: TextStyle(color:  Colors.black, fontSize: 20, fontWeight: FontWeight.w700)),
+        Text (title, style: TextStyle(color:  Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
         Text (description, style: TextStyle(color:  const Color.fromARGB(255, 47, 47, 47), fontSize: 12, fontWeight: FontWeight.normal)),
         SizedBox (height: 6),
       ],),

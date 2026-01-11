@@ -68,7 +68,7 @@ class TaskCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      task.description,
+                      task.description!,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,

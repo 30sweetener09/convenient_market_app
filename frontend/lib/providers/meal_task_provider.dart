@@ -226,4 +226,36 @@ class MealTaskProvider extends ChangeNotifier {
     _tasks.clear();
     notifyListeners();
   }
+
+  Future<void> getMyTask() async {
+    try {
+      final token = await _getToken();
+      if (token == null) throw Exception('Chưa đăng nhập');
+
+      final uri = Uri.parse("$_baseUrl/getMyTask");
+      final res = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        final decoded = jsonDecode(res.body);
+        final List list = decoded['data'] ?? [];
+
+        _tasks
+          ..clear()
+          ..addAll(list.map((e) => MealTask.fromJson(e)));
+        _error = null;
+        notifyListeners();
+      } else {
+        _error = 'Tìm task của user thất bại';
+        notifyListeners();
+      }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
 }

@@ -34,4 +34,19 @@ class UserDTO {
       'image': photoUrl, // Map photoUrl thành 'image' cho API
     };
   }
+  // Thêm getter để format
+  String get formattedGender {
+    if (gender.isEmpty) return 'Chưa cập nhật';
+    
+    switch (gender.toLowerCase()) {
+      case 'male':
+        return 'Nam';
+      case 'female':
+        return 'Nữ';
+      case 'other':
+        return '(không có)';
+      default:
+        return gender; // Giữ nguyên nếu không phải các giá trị trên
+    }
+  }
 }

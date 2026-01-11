@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:di_cho_tien_loi/screens/user/modals/change_password_modal.dart';
 import 'package:flutter/material.dart';
 import './widgets/menu_item.dart';
 import 'modals/logout_dialog.dart';
@@ -29,10 +30,7 @@ class _UserScreenState extends State<UserScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(),
-      body: _profileScreen(),
-    );
+    return Scaffold(appBar: AppBar(), body: _profileScreen());
   }
 
   Widget _profileScreen() {
@@ -55,7 +53,7 @@ class _UserScreenState extends State<UserScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -102,22 +100,19 @@ class _UserScreenState extends State<UserScreen> {
                   ],
                 ),
               ),
-              
-            ]
+            ],
           ),
           const SizedBox(height: 16),
           ExpansionTile(
             title: const Text('Chi tiết'),
-            tilePadding: EdgeInsets.zero,
+            tilePadding: EdgeInsets.only(left: 4),
             trailing: Icon(Icons.keyboard_arrow_down),
-            childrenPadding: const EdgeInsets.only(top: 8),
+            childrenPadding: const EdgeInsets.only(left: 4),
             children: [
               _infoRow('Ngày sinh', user.birthdate),
-              _infoRow('Giới tính', user.gender),
+              _infoRow('Giới tính', user.formattedGender),
             ],
           ),
-            
-          
         ],
       ),
     );
@@ -125,7 +120,7 @@ class _UserScreenState extends State<UserScreen> {
 
   Widget _menuList() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         children: [
           MenuItem(
@@ -140,7 +135,16 @@ class _UserScreenState extends State<UserScreen> {
             icon: Icons.lock_outline,
             title: 'Đổi mật khẩu',
             description: 'Thay đổi mật khẩu để đăng nhập tài khoản',
-            onTap: () {},
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                builder: (_) => const ChangePasswordModal(),
+              );
+            },
           ),
           MenuItem(
             icon: Icons.person_remove,
@@ -207,10 +211,11 @@ class _UserScreenState extends State<UserScreen> {
       ),
     );
   }
-   void _showEditProfileModal() {
+
+  void _showEditProfileModal() {
     final userProvider = context.read<UserProvider>();
     final user = userProvider.user;
-    
+
     if (user == null) return;
 
     showModalBottomSheet(
@@ -223,17 +228,18 @@ class _UserScreenState extends State<UserScreen> {
         return EditProfileModal(
           currentUsername: user.username,
           currentPhotoUrl: user.photoUrl ?? '',
-          onSave: (String newUsername, File? imageFile, String? imageUrl) async {
-            // Gọi API cập nhật thông tin
-            await userProvider.updateUserInfo(
-              username: newUsername,
-              
-            avatarFile: imageFile,
-            );
-            if (mounted) {
-              setState(() {});
-            }
-          },
+          onSave:
+              (String newUsername, File? imageFile, String? imageUrl) async {
+                // Gọi API cập nhật thông tin
+                await userProvider.updateUserInfo(
+                  username: newUsername,
+
+                  avatarFile: imageFile,
+                );
+                if (mounted) {
+                  setState(() {});
+                }
+              },
         );
       },
     );

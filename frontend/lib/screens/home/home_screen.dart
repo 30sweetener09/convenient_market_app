@@ -1,6 +1,8 @@
+import 'package:di_cho_tien_loi/providers/meal_task_provider.dart';
 import 'package:di_cho_tien_loi/providers/recipe_provider.dart';
 import 'package:di_cho_tien_loi/screens/home/group_expiry_section.dart';
 import 'package:di_cho_tien_loi/screens/home/recipe_section.dart';
+import 'package:di_cho_tien_loi/screens/home/task_section.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -38,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final groupProvider = context.read<GroupProvider>();
       final fridgeProvider = context.read<FridgeItemProvider>();
       final recipeProvider = context.read<RecipeProvider>();
+      final taskProvider = context.read<MealTaskProvider>();
 
       /// đảm bảo đã có groups
       if (groupProvider.allGroups == null || groupProvider.allGroups!.isEmpty) {
@@ -53,7 +56,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (recipeProvider.recipes.isEmpty) {
         await recipeProvider.fetchRecipes();
       }
-      
+
+      if (taskProvider.tasks.isEmpty) {
+        await taskProvider.getMyTask();
+      }
     });
   }
 
@@ -72,10 +78,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
         children: [
           RecipeHomeSection(),
-          SizedBox(height: 24),
+          SizedBox(height: 36),
+          TaskSection(),
+          SizedBox(height: 36),
           GroupExpirySection(), // 👈 dùng section mới
         ],
       ),

@@ -279,14 +279,16 @@ class UserProvider extends ChangeNotifier {
     }
 
     final url = Uri.parse('$_baseUrl/user/change-password');
+    final body = 'newPassword=${Uri.encodeComponent(newPassword)}';
 
     final response = await http.post(
       url,
       headers: {
-        'Content-Type': 'application/json',
+        'accept': '*/*',
         'Authorization': 'Bearer $token',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: jsonEncode({'newPassword': newPassword}),
+      body: body,
     );
 
     if (response.statusCode != 200) {
