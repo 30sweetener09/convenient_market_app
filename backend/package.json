@@ -2,6 +2,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.87.3",
     "cors": "^2.8.5",
+    "cron-job": "^1.0.3",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "firebase-admin": "^13.6.0",
@@ -9,6 +10,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
     "muter": "^0.7.0",
+    "node-cron": "^4.2.1",
     "nodemailer": "^7.0.11",
     "resend": "^6.6.0",
     "swagger-jsdoc": "^6.2.8",

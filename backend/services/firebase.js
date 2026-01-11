@@ -1,3 +1,4 @@
+// convenient_market_app/backend/services/firebase.js
 import admin from "firebase-admin";
 import fs from "fs";
 import dotenv from "dotenv";

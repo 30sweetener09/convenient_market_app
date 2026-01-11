@@ -7,6 +7,8 @@ import bodyParser from "body-parser";
 import dotenv from "dotenv";
 dotenv.config();
 import { supabase } from "./db.js"; // client Supabase
+import { startExpiryCron } from "./jobs/expiryNotification.cron.js";
+
 import registerMiddlewares from "./middlewares/index.js";
 import setupSwagger from "./services/swagger.js";
 import userRoute from "./routes/users.js";
@@ -48,6 +50,8 @@ app.get("/", (req, res) => res.send("Smart Schedule API running"));
 // Start server
 (async () => {
   try {
+    startExpiryCron(); // gọi sau khi app khởi động
+
     app.listen(PORT, () => {
       console.log(` Server running on port ${PORT}`);
     });

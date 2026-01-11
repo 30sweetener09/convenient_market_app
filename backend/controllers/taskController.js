@@ -1252,7 +1252,7 @@ export const assignTaskToUser = async (req, res) => {
     /* 1. Check task */
     const { data: task, error: taskError } = await supabaseAdmin
       .from("task")
-      .select("id, name, group_id, mealplan_id")
+      .select("id, name, group_id, mealplan_id, description")
       .eq("id", taskId)
       .maybeSingle();
 
@@ -1312,21 +1312,39 @@ export const assignTaskToUser = async (req, res) => {
       .eq("user_id", assignToUserId)
       .eq("is_active", true);
 
+    console.log("Devices to notify:", devices);
+
     if (devices?.length) {
       const tokens = devices.map((d) => d.fcm_token);
 
-      const response = await firebaseAdmin.messaging().sendEachForMulticast({
-        tokens,
-        notification: {
-          title: "📌 Bạn được giao công việc",
-          body: task.name,
-        },
-        data: {
-          taskId: task.id,
-          mealPlanId: task.mealplan_id,
-          type: "TASK_ASSIGNED",
-        },
-      });
+      const response =
+  await firebaseAdmin.messaging().sendEachForMulticast({
+    tokens,
+    notification: {
+      title: "📌 Bạn được giao công việc",
+      body: `Công việc: ${task.name} - ${task.description }`,
+    },
+    data: {
+      taskId: String(task.id),
+      mealPlanId: String(task.mealplan_id ?? ""),
+      type: "TASK_ASSIGNED",
+    },
+  });
+
+console.log("FCM success:", response.successCount);
+console.log("FCM failure:", response.failureCount);
+
+// In chi tiết lỗi từng token
+response.responses.forEach((r, idx) => {
+  if (!r.success) {
+    console.error(
+      `❌ FCM error for token[${idx}]:`,
+      r.error?.code,
+      r.error?.message
+    );
+  }
+});
+
 
       /* Auto clean invalid tokens */
       const invalidTokens = [];
@@ -1334,12 +1352,12 @@ export const assignTaskToUser = async (req, res) => {
         if (!r.success) invalidTokens.push(devices[idx].id);
       });
 
-      if (invalidTokens.length) {
+      /*if (invalidTokens.length) {
         await supabaseAdmin
           .from("user_devices")
           .update({ is_active: false })
           .in("id", invalidTokens);
-      }
+      }*/
     }
 
     return res.status(200).json({
