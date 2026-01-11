@@ -1326,6 +1326,7 @@ export const assignTaskToUser = async (req, res) => {
         },
         data: {
           taskId: task.id,
+          mealPlanId: task.mealplan_id,
           type: "TASK_ASSIGNED",
         },
       });
