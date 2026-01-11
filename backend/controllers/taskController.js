@@ -1255,7 +1255,7 @@ export const assignTaskToUser = async (req, res) => {
     /* 1. Check task */
     const { data: task, error: taskError } = await supabaseAdmin
       .from("task")
-      .select("id, name, group_id")
+      .select("id, name, group_id, mealplan_id")
       .eq("id", taskId)
       .maybeSingle();
 
@@ -1348,7 +1348,7 @@ export const assignTaskToUser = async (req, res) => {
     return res.status(200).json({
       resultCode: "00400",
       message: "Task assigned successfully",
-      data: { taskId, assignToUserId, mealPlanId },
+      data: { taskId, assignToUserId, mealPlanId: task.mealplan_id },
     });
   } catch (err) {
     console.error("assignTaskToUser:", err);
