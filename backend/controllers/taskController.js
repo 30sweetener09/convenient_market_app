@@ -1458,3 +1458,159 @@ export const getAllMyTask = async (req, res) => {
     });
   }
 };
+/**
+ * @swagger
+ * /task/{taskId}/assign:
+ *   put:
+ *     summary: Gán công việc cho một người dùng
+ *     tags: [Task]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: taskId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - assignToUserId
+ *             properties:
+ *               assignToUserId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Task assigned successfully
+ *       400:
+ *         description: Invalid request
+ *       403:
+ *         description: Permission denied
+ *       404:
+ *         description: Task or user not found
+ *       500:
+ *         description: Internal server error
+ */
+
+export const assignTaskToUser = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { assignToUserId } = req.body;
+    const currentUserId = req.user.id;
+
+    if (!assignToUserId) {
+      return res.status(400).json({
+        resultCode: "00401",
+        message: "assignToUserId is required",
+      });
+    }
+
+    /* 1. Check task */
+    const { data: task, error: taskError } = await supabaseAdmin
+      .from("task")
+      .select("id, name, group_id")
+      .eq("id", taskId)
+      .maybeSingle();
+
+    if (taskError || !task) {
+      return res.status(404).json({
+        resultCode: "00404",
+        message: "Task not found",
+      });
+    }
+
+    /* 2. Check permission (group owner / admin) */
+    const { data: permission } = await supabaseAdmin
+      .from("group_members")
+      .select("role_in_group")
+      .eq("group_id", task.group_id)
+      .eq("user_id", currentUserId)
+      .in("role_in_group", ["owner", "groupAdmin"])
+      .maybeSingle();
+
+    if (!permission) {
+      return res.status(403).json({
+        resultCode: "00403",
+        message: "Permission denied",
+      });
+    }
+
+    /* 3. Check assignee is group member */
+    const { data: member } = await supabaseAdmin
+      .from("group_members")
+      .select("user_id")
+      .eq("group_id", task.group_id)
+      .eq("user_id", assignToUserId)
+      .maybeSingle();
+
+    if (!member) {
+      return res.status(404).json({
+        resultCode: "00405",
+        message: "User not in group",
+      });
+    }
+
+    /* 4. Update task */
+    const { error: updateError } = await supabaseAdmin
+      .from("task")
+      .update({
+        assigntouser_id: assignToUserId,
+        updatedat: new Date().toISOString(),
+      })
+      .eq("id", taskId);
+
+    if (updateError) throw updateError;
+
+    /* 5. Push notification */
+    const { data: devices } = await supabaseAdmin
+      .from("user_devices")
+      .select("id, fcm_token")
+      .eq("user_id", assignToUserId)
+      .eq("is_active", true);
+
+    if (devices?.length) {
+      const tokens = devices.map((d) => d.fcm_token);
+
+      const response = await firebaseAdmin.messaging().sendEachForMulticast({
+        tokens,
+        notification: {
+          title: "📌 Bạn được giao công việc",
+          body: task.name,
+        },
+        data: {
+          taskId: task.id,
+          mealPlanId: task.mealplan_id,
+          type: "TASK_ASSIGNED",
+        },
+      });
+
+      /* Auto clean invalid tokens */
+      const invalidTokens = [];
+      response.responses.forEach((r, idx) => {
+        if (!r.success) invalidTokens.push(devices[idx].id);
+      });
+
+      if (invalidTokens.length) {
+        await supabaseAdmin
+          .from("user_devices")
+          .update({ is_active: false })
+          .in("id", invalidTokens);
+      }
+    }
+
+    return res.status(200).json({
+      resultCode: "00400",
+      message: "Task assigned successfully",
+    });
+  } catch (err) {
+    console.error("assignTaskToUser:", err);
+    return res.status(500).json({
+      resultCode: "00500",
+      message: "Internal server error",
+    });
+  }
+};
