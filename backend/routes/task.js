@@ -8,6 +8,7 @@ import {
   getAllTasks,
   getTaskById,
   assignTaskToUser,
+  getAllMyTask,
 } from "../controllers/taskController.js";
 
 import { supabaseAuth } from "../middlewares/supabaseAuth.js";
@@ -24,6 +25,7 @@ router.put("/", updateTask);
 router.delete("/", deleteTask);
 router.post("/getAll", getAllTasks);
 router.post("/detail", getTaskById);
+router.get("/getMyTask", getAllMyTask);
 router.put("/:taskId/assign", assignTaskToUser);
 
 export default router;

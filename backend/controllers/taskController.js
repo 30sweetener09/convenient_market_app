@@ -2,7 +2,6 @@
 import { supabase, supabaseAdmin } from "../db.js";
 import { firebaseAdmin } from "../services/firebase.js";
 
-
 // ==================== HELPER FUNCTIONS ====================
 
 /**
@@ -618,7 +617,7 @@ export const updateTask = async (req, res) => {
       updatedat: new Date().toISOString(),
     };
 
-    if (description !== undefined) {  
+    if (description !== undefined) {
       if (!description.trim()) {
         return res.status(400).json({
           resultMessage: {
@@ -626,7 +625,7 @@ export const updateTask = async (req, res) => {
             vn: "Mô tả không hợp lệ",
           },
           resultCode: "00304",
-        });  
+        });
       }
       updateFields.description = description.trim();
     }
@@ -643,8 +642,6 @@ export const updateTask = async (req, res) => {
       }
       updateFields.name = name.trim();
     }
-
-    
 
     const { data: updatedTask, error: updateError } = await supabase
       .from("task")
@@ -1316,7 +1313,7 @@ export const assignTaskToUser = async (req, res) => {
       .eq("is_active", true);
 
     if (devices?.length) {
-      const tokens = devices.map(d => d.fcm_token);
+      const tokens = devices.map((d) => d.fcm_token);
 
       const response = await firebaseAdmin.messaging().sendEachForMulticast({
         tokens,
@@ -1359,4 +1356,105 @@ export const assignTaskToUser = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /task/getMyTask:
+ *   get:
+ *     summary: Lấy tất cả task được assign cho user hiện tại
+ *     tags:
+ *       - Task
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách task thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "000000"
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: Success
+ *                     vn:
+ *                       type: string
+ *                       example: Thành công
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         example: 1
+ *                       name:
+ *                         type: string
+ *                         example: Task title
+ *                       description:
+ *                         type: string
+ *                         example: Task description
+ *                       assigntouser_id:
+ *                         type: string
+ *                         example: 12345
+ *                       updatedat:
+ *                         type: string
+ *                         format: date-time
+ *                         example: 2026-01-09T10:00:00Z
+ *       500:
+ *         description: Lỗi server
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 resultCode:
+ *                   type: string
+ *                   example: "999999"
+ *                 resultMessage:
+ *                   type: object
+ *                   properties:
+ *                     en:
+ *                       type: string
+ *                       example: Internal server error
+ *                     vn:
+ *                       type: string
+ *                       example: Đã xảy ra lỗi nội bộ
+ */
 
+export const getAllMyTask = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const { data: myTask, error: myTaskError } = await supabase
+      .from("task")
+      .select("*")
+      .eq("assigntouser_id", userId)
+      .order("updatedat", { ascending: true });
+
+    if (myTaskError) throw myTaskError;
+
+    return res.status(200).json({
+      resultCode: "000000",
+      resultMessage: {
+        en: "Success",
+        vn: "Thành công",
+      },
+      data: myTask,
+    });
+  } catch (err) {
+    console.log("Có lỗi là: ", err);
+    return res.status(500).json({
+      resultCode: "999999",
+      resultMessage: {
+        en: "Internal server error",
+        vn: "Đã xảy ra lỗi nội bộ",
+      },
+    });
+  }
+};
