@@ -21,8 +21,9 @@ import '../meal_plan/meal_plan_form_dialog.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   final String groupId;
+  final int? indexTab;
 
-  const GroupDetailScreen({super.key, required this.groupId});
+  const GroupDetailScreen({super.key, required this.groupId, this.indexTab});
 
   @override
   State<GroupDetailScreen> createState() => _GroupDetailScreenState();
@@ -41,11 +42,21 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   void initState() {
     super.initState();
 
+    _activeTab = widget.indexTab ?? 0;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadGroupDetail();
 
-      // 🔥 default tab = meal plan
-      context.read<MealPlanProvider>().fetchMealPlansByGroup(widget.groupId);
+      // fetch dữ liệu đúng theo tab
+      if (_activeTab == 0) {
+        context.read<MealPlanProvider>().fetchMealPlansByGroup(widget.groupId);
+      } else if (_activeTab == 1) {
+        context.read<GroupProvider>().getAllMembersOfGroup(widget.groupId);
+      } else if (_activeTab == 2) {
+        context.read<FridgeProvider>().fetchFridgesByGroupId(
+          int.parse(widget.groupId),
+        );
+      }
     });
   }
 
@@ -239,7 +250,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: [SizedBox(height: 16), _buildTabs(), const SizedBox(height: 6),/* _buildSearchBar()*/],
+        children: [
+          SizedBox(height: 16),
+          _buildTabs(),
+          const SizedBox(height: 6) /* _buildSearchBar()*/,
+        ],
       ),
     );
   }
@@ -279,10 +294,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 4),
               padding: const EdgeInsets.symmetric(vertical: 6),
               decoration: BoxDecoration(
-                color: isActive ? Color.fromARGB(255, 60, 137, 62) : Colors.white,
+                color: isActive
+                    ? Color.fromARGB(255, 60, 137, 62)
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isActive ? Color.fromARGB(255, 60, 137, 62) : Colors.grey.shade300,
+                  color: isActive
+                      ? Color.fromARGB(255, 60, 137, 62)
+                      : Colors.grey.shade300,
                 ),
               ),
               child: Center(
@@ -407,7 +426,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               builder: (_) => AddMemberDialog(groupId: widget.groupId),
             );
             if (added == true) {
-              context.read<GroupProvider>().getAllMembersOfGroup(widget.groupId);
+              context.read<GroupProvider>().getAllMembersOfGroup(
+                widget.groupId,
+              );
             }
           },
           style: OutlinedButton.styleFrom(
@@ -433,7 +454,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
             final created = await showDialog<bool>(
               context: context,
               barrierDismissible: false,
-              builder: (_) => MealPlanFormDialog(groupId: widget.groupId,),
+              builder: (_) => MealPlanFormDialog(groupId: widget.groupId),
             );
 
             // ❗ KHÔNG fetch lại
@@ -446,8 +467,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       ),
     );
   }
-
-
 
   Widget _buildMemberTab() {
     return Consumer<GroupProvider>(
@@ -530,7 +549,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         return Column(
           children: [
             //_buildAddFridgeButton(),
-
             if (provider.allFridges.isEmpty)
               const Expanded(child: Center(child: Text('Chưa có tủ lạnh nào')))
             else
@@ -574,18 +592,18 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     final groupId = int.parse(widget.groupId);
 
     Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => ChangeNotifierProvider.value(
-        value: context.read<FridgeItemProvider>(),
-        child: FridgeDetailScreen(
-          fridgeId: fridgeId,
-          groupId: groupId,
-          fridgeName: fridgeName,
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChangeNotifierProvider.value(
+          value: context.read<FridgeItemProvider>(),
+          child: FridgeDetailScreen(
+            fridgeId: fridgeId,
+            groupId: groupId,
+            fridgeName: fridgeName,
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 
   Widget _buildAddFridgeButton() {

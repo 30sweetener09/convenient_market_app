@@ -65,10 +65,6 @@ class MealPlanCard extends StatelessWidget {
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(
-              isStarred ? Icons.star : Icons.star_border,
-              color: isStarred ? Colors.amber : Colors.grey,
-            ),
             const Icon(Icons.more_vert),
           ],
         ),

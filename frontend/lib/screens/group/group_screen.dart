@@ -131,8 +131,6 @@ class _GroupScreenState extends State<GroupScreen> {
         final providerIsLoading = groupProvider.isLoading;
         
         debugPrint('=== GroupScreen REBUILD ===');
-        debugPrint('Provider isLoading: $providerIsLoading');
-        debugPrint('Initial loading: $_isInitialLoading');
         debugPrint('Số lượng groups: ${allGroups.length}');
         debugPrint('Search query: $_searchQuery');
 

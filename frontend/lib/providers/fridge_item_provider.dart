@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:di_cho_tien_loi/data/dto/fridge_dto.dart';
 import 'package:di_cho_tien_loi/data/dto/fridge_item_dto.dart';
+import 'package:di_cho_tien_loi/data/models/expiry_utils.dart';
+import 'package:di_cho_tien_loi/data/models/group_expiry_stats.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +15,7 @@ class FridgeItemProvider extends ChangeNotifier {
   late FridgeItemDTO _item;
   List<FridgeItemDTO> _fridgeItems = [];
   bool isLoadingFridgeItems = false;
+  final Map<int, List<FridgeItemDTO>> _itemsByGroup = {};
 
   FridgeItemProvider();
 
@@ -24,6 +27,7 @@ class FridgeItemProvider extends ChangeNotifier {
   String? get error => _error;
   List<FridgeItemDTO> get fridgeItems => _fridgeItems;
   FridgeItemDTO get item => _item;
+  Map<int, List<FridgeItemDTO>> get itemsByGroup => _itemsByGroup;
 
   // ================= RESET =================
   void resetError() {
@@ -77,7 +81,7 @@ class FridgeItemProvider extends ChangeNotifier {
         final data = jsonDecode(response.body);
         final List list = data['items'] ?? [];
 
-        _fridgeItems = list.map<FridgeItemDTO>((e) {
+        final items = list.map<FridgeItemDTO>((e) {
           return FridgeItemDTO(
             id: e['id'],
             foodId: e['Food']['id'],
@@ -91,6 +95,14 @@ class FridgeItemProvider extends ChangeNotifier {
             fridgeName: e['fridgeName'],
           );
         }).toList();
+
+        _fridgeItems = items;
+        debugPrint("lấy được _fridgeItems: $_fridgeItems");
+
+        if (groupId != null) {
+          _itemsByGroup[groupId] = items;
+          debugPrint("lấy được _fridgeItems: ${_itemsByGroup[groupId]}");
+        }
       } else {
         final data = jsonDecode(response.body);
         _error = data['resultMessage']?['vn'] ?? 'Lấy danh sách thất bại';
@@ -311,5 +323,99 @@ class FridgeItemProvider extends ChangeNotifier {
       isLoadingFridgeItems = false;
       notifyListeners();
     }
+  }
+
+  // ================= FETCH ITEMS OF GROUPS =================
+  Future<void> fetchAllItemsOfGroup({int? groupId}) async {
+    try {
+      debugPrint("=== đang làm fetchAllItemsOfGroup ====");
+      isLoadingFridgeItems = true;
+      _error = null;
+      notifyListeners();
+
+      if (groupId == null) {
+        throw Exception('Cần truyền groupId');
+      }
+
+      final headers = await _getHeaders();
+      final queryParams = <String, String>{};
+      queryParams['groupId'] = groupId.toString();
+
+      final uri = Uri.parse(
+        '$_baseUrl/fridge/item/list',
+      ).replace(queryParameters: queryParams);
+
+      debugPrint('📦 Fetch fridge items: $uri');
+
+      final response = await http.get(uri, headers: headers);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List list = data['items'] ?? [];
+
+        final items = list.map<FridgeItemDTO>((e) {
+          return FridgeItemDTO(
+            id: e['id'],
+            foodId: e['Food']['id'],
+            foodName: e['Food']['name'],
+            imageUrl: e['Food']['imageurl'],
+            quantity: (e['quantity'] as num).toDouble(),
+            unit: e['unit'],
+            expiryDate: e['expiryDate'] != null
+                ? DateTime.parse(e['expiryDate'])
+                : null,
+            fridgeName: e['fridgeName'],
+          );
+        }).toList();
+
+        _itemsByGroup[groupId] = items;
+        debugPrint("lấy được _itemsByGroup[$groupId]: ${_itemsByGroup[groupId]}");
+      } else {
+        final data = jsonDecode(response.body);
+        _error = data['resultMessage']?['vn'] ?? 'Lấy danh sách thất bại';
+        _fridgeItems = [];
+      }
+    } catch (e) {
+      _error = e.toString();
+      _fridgeItems = [];
+    } finally {
+      isLoadingFridgeItems = false;
+      notifyListeners();
+    }
+  }
+
+  GroupExpiryStats getStatsByGroup(int groupId) {
+    if (!_itemsByGroup.containsKey(groupId)) {
+      debugPrint("📊 Group $groupId không lấy được dữ liệu");
+      return GroupExpiryStats(safe: 0, warning: 0, expired: 0);
+    }
+    final items = _itemsByGroup[groupId]!;
+
+    int safe = 0;
+    int warning = 0;
+    int expired = 0;
+
+    for (final item in items) {
+      switch (getExpiryStatus(item.expiryDate)) {
+        case ExpiryStatus.safe:
+          safe++;
+          break;
+        case ExpiryStatus.warning:
+          warning++;
+          break;
+        case ExpiryStatus.expired:
+          expired++;
+          break;
+      }
+    }
+    debugPrint(
+      "📊 Group $groupId → safe:$safe warning:$warning expired:$expired",
+    );
+
+    return GroupExpiryStats(safe: safe, warning: warning, expired: expired);
+  }
+
+  bool hasGroupData(int groupId) {
+    return _itemsByGroup.containsKey(groupId);
   }
 }
