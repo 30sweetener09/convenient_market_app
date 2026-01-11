@@ -1,8 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:di_cho_tien_loi/data/dto/user_dto.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../services/device_service.dart';
+import '../services/notification_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   bool isLoggedIn = false;
@@ -89,6 +93,9 @@ class AuthProvider extends ChangeNotifier {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('access_token', token!);
           isLoggedIn = true;
+          // final tokenFcm = await NotificationService.getFcmToken();
+          debugPrint('register device');
+          await registerDevice();
         } else {
           _error = "Access Denied";
         }
@@ -392,4 +399,26 @@ class AuthProvider extends ChangeNotifier {
 
     return success;
   }
+
+  Future<void> registerDevice() async {
+    final fcmToken = await NotificationService.getFcmToken();
+    final deviceId = await DeviceService.getDeviceId();
+
+    if (fcmToken == null || token == null) return;
+    debugPrint("START CALLING API REGISTER SERVICE - FCM token: $fcmToken}");
+    final response = await http.post(
+      Uri.parse('$_baseUrl/user/devices/register'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'deviceId': deviceId,
+        'fcmToken': fcmToken,
+        'platform': Platform.isAndroid ? 'ANDROID' : 'IOS',
+      }),
+    );
+    debugPrint('${response.statusCode} ${response.body}');
+  }
+
 }

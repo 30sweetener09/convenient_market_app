@@ -143,13 +143,16 @@ class MealPlanProvider extends ChangeNotifier {
 
       if (res.statusCode == 200 || res.statusCode == 201) {
         final decoded = jsonDecode(res.body);
-        final created = decoded['data'] ?? decoded['mealPlan'];
+        final created = decoded['newPlan'] ?? decoded['mealPlan'];
+        created['groupid'] = int.parse(groupId);
 
         if (created != null) {
           final newPlan = MealPlan.fromJson(created);
 
           // 👉 thêm lên đầu list
           _mealPlans.insert(0, newPlan);
+          debugPrint('insert to provider: $newPlan');
+          // fetchMealPlansByGroup(groupId);
           notifyListeners();
         }
         return true;
@@ -181,7 +184,7 @@ class MealPlanProvider extends ChangeNotifier {
           "groupId": int.parse(groupId),
           "planId": planId,
           "newName": newName,
-          "newTimestamp": newTimestamp.toIso8601String(),
+          "newTimestamp": formatDate(newTimestamp),
         }),
       );
 
@@ -205,6 +208,7 @@ class MealPlanProvider extends ChangeNotifier {
             timestamp: newTimestamp.toIso8601String(),
           );
         }
+        fetchMealPlansByGroup(groupId);
 
         notifyListeners();
         return true;

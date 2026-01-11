@@ -118,30 +118,28 @@ class MealTaskProvider extends ChangeNotifier {
       if (token == null) throw Exception('Chưa đăng nhập');
 
       final res = await http.put(
-        Uri.parse(_baseUrl),
+        Uri.parse('$_baseUrl/${task.id}/assign'),
         headers: {
           'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
+          'Accept': '*/*',
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          "groupId": groupId,
-          "taskId": task.id.toString(),
-          "name": task.name,
-          "description": task.description,
-          "assigntouserId": userId,
+          "assignToUserId": userId,
         }),
       );
+      debugPrint('${res.statusCode} ${res.body} ');
 
       if (res.statusCode != 200) {
         throw Exception('Assign task thất bại');
       }
     } catch (e) {
-      // ❌ rollback
+      // rollback
       task.assigntouser_id = oldUser;
       _error = e.toString();
       notifyListeners();
     }
+
   }
 
 

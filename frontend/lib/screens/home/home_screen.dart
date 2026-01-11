@@ -4,6 +4,9 @@ import 'package:di_cho_tien_loi/screens/home/recipe_section.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../providers/user_provider.dart';
+import '../../../services/notification_service.dart';
+
 import 'package:di_cho_tien_loi/providers/group_provider.dart';
 import 'package:di_cho_tien_loi/providers/fridge_item_provider.dart';
 
@@ -17,6 +20,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _loaded = false;
 
+  @override
+  void initState() {
+    super.initState();
+
+    /// 🔔 Xin quyền + lắng nghe notification
+    NotificationService.init(context);
+  }
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
