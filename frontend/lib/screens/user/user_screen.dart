@@ -29,15 +29,17 @@ class _UserScreenState extends State<UserScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(appBar: AppBar(), body: _profileScreen());
+    return Scaffold(/*appBar: AppBar(),*/ body: _profileScreen());
   }
 
   Widget _profileScreen() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
       child: Column(
-        children: [_profileCard(), const SizedBox(height: 24), _menuList()],
-      ),
+        children: [const SizedBox(height: 40), _profileCard(), const SizedBox(height: 32), _menuList()],
+      ),),
     );
   }
 
@@ -52,7 +54,7 @@ class _UserScreenState extends State<UserScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -76,7 +78,7 @@ class _UserScreenState extends State<UserScreen> {
                     ? const Icon(Icons.person, color: Colors.white, size: 32)
                     : null,
               ),
-              const SizedBox(width: 32),
+              const SizedBox(width: 20),
 
               Expanded(
                 child: Column(
@@ -101,7 +103,7 @@ class _UserScreenState extends State<UserScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           ExpansionTile(
             title: const Text('Chi tiết'),
             tilePadding: EdgeInsets.only(left: 4),
