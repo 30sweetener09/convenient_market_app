@@ -167,7 +167,7 @@ class _GroupScreenState extends State<GroupScreen> {
                 padding: const EdgeInsets.all(16.0),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(color: Colors.grey[300]!),
                   ),
