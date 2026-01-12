@@ -22,10 +22,9 @@ class _UserScreenState extends State<UserScreen> {
   @override
   void initState() {
     super.initState();
-    final provider = context.read<UserProvider>();
-    if (provider.user == null) {
-      provider.fetchUserInfo();
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<UserProvider>().fetchUserInfo();
+    });
   }
 
   @override
@@ -146,26 +145,28 @@ class _UserScreenState extends State<UserScreen> {
               );
             },
           ),
+          /*
           MenuItem(
             icon: Icons.person_remove,
             title: 'Xoá tài khoản',
             description: 'Xoá tài khoản này ra khỏi hệ thống',
             color: Colors.red,
             onTap: () {
-              final userProvider = context.read<UserProvider>();
+              //final userProvider = context.read<UserProvider>();
               final authProvider = context.read<AuthProvider>();
 
               showDialog(
                 context: context,
                 builder: (_) => DeleteAccDialog(
                   onConfirmDelete: () async {
-                    await userProvider.delete();
+                    //final userId = userProvider.user!.;
                     await authProvider.logout();
+                    //await userProvider.deleteAccount();
                   },
                 ),
               );
             },
-          ),
+          ),*/
           MenuItem(
             icon: Icons.logout,
             title: 'Đăng xuất',
@@ -173,11 +174,13 @@ class _UserScreenState extends State<UserScreen> {
             description: 'Đăng xuất tài khoản này ở trên thiết bị này',
             onTap: () {
               final authProvider = context.read<AuthProvider>();
+              final userProvider = context.read<UserProvider>();
               showDialog(
                 context: context,
                 builder: (_) => LogoutDialog(
                   onConfirmLogout: () async {
-                    authProvider.logout();
+                    await authProvider.logout();
+                    userProvider.clearUser();
                   },
                 ),
               );

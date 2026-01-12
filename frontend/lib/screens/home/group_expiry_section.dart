@@ -16,24 +16,68 @@ class GroupExpirySection extends StatelessWidget {
         final groups = groupProvider.allGroups;
 
         if (groups == null || groups.isEmpty) {
-          return const Center(
-            child: Text(
-              "Chưa có nhóm nào",
-              style: TextStyle(fontSize: 16),
-            ),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    "Tủ lạnh của bạn",
+                    style: TextStyle(fontSize: 20, fontFamily: 'Unbounded'),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      height: 1.5,
+                      decoration: BoxDecoration(
+                        color: const Color.fromARGB(255, 89, 89, 89),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 28),
+              Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.warning, color: Colors.grey, size: 20),
+                    SizedBox (width: 12,),
+                    Text(
+                      "Bạn hiện chưa thuộc nhóm nào",
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           );
         }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "Tủ lạnh của bạn",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                const Text(
+                  "Tủ lạnh của bạn",
+                  style: TextStyle(fontSize: 20, fontFamily: 'Unbounded'),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    height: 1.5,
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(255, 89, 89, 89),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ],
             ),
+
             const SizedBox(height: 12),
 
             ...groups.map((group) {

@@ -19,11 +19,9 @@ class _TaskSectionState extends State<TaskSection> {
   Widget build(BuildContext context) {
     return Consumer<MealTaskProvider>(
       builder: (context, provider, _) {
-        final allTasks =
-            provider.tasks.where((t) => !t.isdone).toList();
+        final allTasks = provider.tasks.where((t) => !t.isdone).toList();
 
-        final visibleTasks =
-            _expanded ? allTasks : allTasks.take(2).toList();
+        final visibleTasks = _expanded ? allTasks : allTasks.take(2).toList();
 
         return Container(
           //padding: const EdgeInsets.all(12),
@@ -40,9 +38,16 @@ class _TaskSectionState extends State<TaskSection> {
                 children: [
                   const Text(
                     'Việc cần làm',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                    style: TextStyle(fontSize: 20, fontFamily: 'Unbounded'),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      height: 1.5,
+                      decoration: BoxDecoration(
+                        color: const Color.fromARGB(255, 90, 90, 90),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
                   if (allTasks.isNotEmpty)
@@ -83,28 +88,21 @@ class _TaskSectionState extends State<TaskSection> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.check_circle,
-            color: Colors.green,
-            size: 28,
-          ),
+          const Icon(Icons.check_circle, color: Colors.grey, size: 20),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Bạn đã hoàn thành tất cả công việc 🎉',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+          Text(
+            'Bạn chưa có công việc nào cần làm',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: Colors.grey),
           ),
         ],
       ),
     );
   }
 }
+
 class _TaskItem extends StatelessWidget {
   final MealTask task;
 
@@ -116,12 +114,10 @@ class _TaskItem extends StatelessWidget {
       builder: (context, groupProvider, _) {
         String? groupName;
 
-        if (task.group_id != null &&
-            groupProvider.allGroups != null) {
-          final group = groupProvider.allGroups!
-              .firstWhere(
-                (g) => int.parse(g.id) == task.group_id,
-              );
+        if (task.group_id != null && groupProvider.allGroups != null) {
+          final group = groupProvider.allGroups!.firstWhere(
+            (g) => int.parse(g.id) == task.group_id,
+          );
           groupName = group.name;
         }
 
@@ -151,10 +147,7 @@ class _TaskItem extends StatelessWidget {
             subtitle: groupName != null
                 ? Text(
                     "Nhóm: $groupName",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   )
                 : const Text(
                     'Nhóm không xác định',
@@ -176,5 +169,3 @@ class _TaskItem extends StatelessWidget {
     );
   }
 }
-
-

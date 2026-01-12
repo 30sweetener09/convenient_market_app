@@ -66,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      /*
       appBar: AppBar(
         title: Center (
           child: Text(
@@ -76,15 +77,17 @@ class _HomeScreenState extends State<HomeScreen> {
             color: Color(0xFF396A30),
           ),
         ),
-      ),),
+      ),),*/
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+        padding: const EdgeInsets.fromLTRB(24, 40, 24, 16),
         children: [
           RecipeHomeSection(),
-          SizedBox(height: 36),
+          SizedBox(height: 32),
+
           TaskSection(),
-          SizedBox(height: 36),
-          GroupExpirySection(), // 👈 dùng section mới
+          SizedBox(height: 32),
+
+          GroupExpirySection(), 
         ],
       ),
     );

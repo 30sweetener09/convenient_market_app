@@ -676,27 +676,27 @@ class GroupProvider extends ChangeNotifier {
         body: jsonEncode({'email': email, 'role': 'groupMember'}),
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
         final data = json.decode(response.body);
         final newMember = MemberDTO(
-          id: data['user_id'].toString(),
-          username: data['username'],
+          id: data['users']['id'].toString(),
+          username: data['users']['username'],
           email: email,
           joinedAt: DateTime.parse(data['joined_at'] as String),
-          imageurl: data['imageurl'],
+          imageurl: data['users']['imageurl'],
           roleInGroup: data['role_in_group'],
         );
 
         _allMembers.insert(0, newMember);
             
         return newMember;
-      } else if (response.statusCode == 409) {
+      } else if (response.statusCode == 409 || response.statusCode == 400) {
         _error = 'Thành viên đã tồn tại trong nhóm';
+      } else if (response.statusCode == 404 ) {
+        _error = 'Không tìm được tài khoản';
       } else {
         final errorData = jsonDecode(response.body);
-        _error =
-            errorData['message'] ??
-            'Lỗi không xác định: ${response.statusCode}';
+        _error = "Lỗi hệ thống";
       }
     } catch (e) {
       debugPrint('Error in addMember: $e');

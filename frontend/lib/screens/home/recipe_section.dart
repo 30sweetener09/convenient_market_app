@@ -17,13 +17,25 @@ class RecipeHomeSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Gợi ý công thức',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Text(
+                  'Gợi ý công thức',
+                  style: TextStyle(fontSize: 20, fontFamily: 'Unbounded'),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    height: 1.5,
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(255, 90, 90, 90),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ],
             ),
+
             const SizedBox(height: 12),
 
             SizedBox(
@@ -31,9 +43,7 @@ class RecipeHomeSection extends StatelessWidget {
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  ...recipes.map(
-                    (recipe) => _RecipeCard(recipe: recipe),
-                  ),
+                  ...recipes.map((recipe) => _RecipeCard(recipe: recipe)),
                 ],
               ),
             ),
@@ -54,9 +64,7 @@ class _RecipeCard extends StatelessWidget {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => RecipeDetailScreen(recipe: recipe),
-          ),
+          MaterialPageRoute(builder: (_) => RecipeDetailScreen(recipe: recipe)),
         );
       },
       child: Container(
@@ -66,10 +74,7 @@ class _RecipeCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           color: Colors.white,
           boxShadow: [
-            BoxShadow(
-              blurRadius: 8,
-              color: Colors.black.withOpacity(0.08),
-            ),
+            BoxShadow(blurRadius: 8, color: Colors.black.withOpacity(0.08)),
           ],
         ),
         child: Column(
@@ -103,6 +108,7 @@ class _RecipeCard extends StatelessWidget {
     );
   }
 }
+
 class _AddRecipeCard extends StatelessWidget {
   final VoidCallback onTap;
   const _AddRecipeCard({required this.onTap});
@@ -118,9 +124,7 @@ class _AddRecipeCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.grey),
         ),
-        child: const Center(
-          child: Icon(Icons.add, size: 36),
-        ),
+        child: const Center(child: Icon(Icons.add, size: 36)),
       ),
     );
   }

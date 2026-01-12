@@ -147,17 +147,19 @@ class _GroupScreenState extends State<GroupScreen> {
         // Hiển thị loading chỉ khi lần đầu tải
         if (_isInitialLoading && allGroups.isEmpty) {
           return Scaffold(
+            /*
             appBar: AppBar(
               title: Text('Nhóm của bạn'),
-            ),
+            ),*/
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
         return Scaffold(
+          /*
           appBar: AppBar(
             title: const Text('Nhóm của bạn'),
-          ),
+          ),*/
           body: Column(
             children: [
               // Thanh tìm kiếm

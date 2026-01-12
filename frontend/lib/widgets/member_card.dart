@@ -67,7 +67,7 @@ class MemberCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '@${member.email}',
+              'Account: ${member.email}',
               style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
             ),
             if (member.roleInGroup == "groupAdmin")

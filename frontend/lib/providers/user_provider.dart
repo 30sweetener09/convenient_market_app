@@ -4,7 +4,6 @@ import 'package:di_cho_tien_loi/data/dto/user_dto.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as path;
 
@@ -22,11 +21,20 @@ class UserProvider extends ChangeNotifier {
   UserDTO? get user => _user;
   String? get error => _error;
 
+  bool _isDeleting = false;
+  bool get isDeleting => _isDeleting;
+
   // Thêm method reset error
   void resetError() {
     _error = null;
     notifyListeners();
   }
+  void clearUser() {
+    _user = null;
+    _error = null;
+    notifyListeners();
+  }
+
 
   //Lấy thông tin user
   Future<void> fetchUserInfo() async {
@@ -226,8 +234,8 @@ class UserProvider extends ChangeNotifier {
   }
 
   //Xoá tài khoản
-  Future<void> delete() async {
-    isLoading = true;
+  Future<void> deleteAccount({required String userId}) async {
+    _isDeleting = true;
     _error = null;
     notifyListeners();
 
@@ -243,9 +251,13 @@ class UserProvider extends ChangeNotifier {
       final response = await http.delete(
         Uri.parse('$_baseUrl/user'),
         headers: {
+          'accept': '*/*',
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
+        body: jsonEncode({
+          'userId': userId,
+        }),
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {
@@ -258,7 +270,7 @@ class UserProvider extends ChangeNotifier {
     } catch (e) {
       _error = 'Không thể kết nối server';
     } finally {
-      isLoading = false;
+      _isDeleting = false;
       notifyListeners();
     }
   }
