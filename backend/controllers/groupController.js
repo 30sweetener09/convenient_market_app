@@ -234,13 +234,20 @@ export const createGroup = async (req, res) => {
       await supabaseAdmin.from("groups").update({ imageurl }).eq("id", group.id);
     }
 
-    await supabaseAdmin.from("group_members").insert({
-      group_id: group.id,
-      user_id: userId,
-      role_in_group: "groupAdmin",
-      group_role_id: 1,
-      joined_at: new Date(),
-    });
+    const { error: memberError } = await supabaseAdmin
+  .from("group_members")
+  .insert({
+    group_id: group.id,
+    user_id: userId,
+    role_in_group: "groupAdmin",
+    group_role_id: 1,
+    joined_at: new Date(),
+  });
+
+if (memberError) {
+  console.error("Insert group_members failed:", memberError);
+  throw memberError;
+}
 
     res.json({ ...group, imageurl });
   } catch {
