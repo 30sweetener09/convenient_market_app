@@ -4,6 +4,8 @@ import 'package:di_cho_tien_loi/screens/meal_plan/meal_plan_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../data/models/meal_task.dart';
+import 'package:collection/collection.dart';
+
 
 class TaskSection extends StatefulWidget {
   const TaskSection({super.key});
@@ -115,10 +117,9 @@ class _TaskItem extends StatelessWidget {
         String? groupName;
 
         if (task.group_id != null && groupProvider.allGroups != null) {
-          final group = groupProvider.allGroups!.firstWhere(
-            (g) => int.parse(g.id) == task.group_id,
-          );
-          groupName = group.name;
+          final group = groupProvider.allGroups
+            ?.firstWhereOrNull((g) => int.tryParse(g.id) == task.group_id);
+          groupName = group?.name;
         }
 
         return Container(
