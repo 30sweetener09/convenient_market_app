@@ -3,7 +3,7 @@ import { supabase, supabaseAdmin } from "../db.js";
 import { firebaseAdmin } from "../services/firebase.js";
 
 export const startExpiryCron = () => {
-  cron.schedule("0 8 * * *", async () => {
+  cron.schedule("*/2 * * * *", async () => {
 
     console.log("⏰ Running expiry notification cron...");
 
